@@ -6,7 +6,8 @@ Read this before every CherKit task. Module tasks often run in parallel; these r
 
 CherKit is the shared library added to Abominable Enterprise's iOS and Android apps (Kotlin Multiplatform + SwiftUI
 apps, pure Swift iOS apps and later others). It ships as a Swift Package (`Package.swift`, iOS 16+ / macOS 13+) and as
-Kotlin Multiplatform modules (`kotlin/`, Android + JVM, group `com.abominableenterprise.cherkit`). v1 modules:
+Kotlin Multiplatform modules (`kotlin/`, Android + JVM, packages `com.abominableenterprise.cherkit.*`, published through
+JitPack as `com.github.abominableenterprise.cherkit:<module>`; see the README's Install section). v1 modules:
 
 - **Analytics** (`CherKitAnalytics`, `:analytics`): thin typed facade over PostHog, fixed list of allowed events, opt-in,
   off in debug builds.
@@ -69,6 +70,17 @@ scripts/test.sh                 # everything that runs on Linux; run it before o
   on a macOS task.
 - The PR body lists the commands run with their results, and what was not verified.
 - Every bug fix comes with a test that fails without the fix.
+
+## Releasing
+
+A release is its own small PR, then a tag:
+
+1. Compile the `changelog/*.md` fragments into a new `## X.Y.Z` section at the top of `CHANGELOG.md`, delete the
+   fragments, and bump `version` in `gradle.properties` to `X.Y.Z` (semver; `breaking` fragments mean a major bump).
+2. After that PR merges, tag `vX.Y.Z` on `main` and push the tag (SwiftPM consumers resolve it directly).
+3. Trigger the JitPack build by requesting `https://jitpack.io/com/github/abominableenterprise/cherkit/vX.Y.Z/`
+   (or "Get it" on https://jitpack.io/#abominableenterprise/cherkit). Check its `build.log` there; JitPack publishes
+   with the tag as the version, and `jitpack.yml` sets up the JDK and Android SDK.
 
 ## Threat model (for rating severity)
 
