@@ -139,4 +139,8 @@ Minimal file (only a soft prompt on iOS; add `minimumVersion` for a hard block):
 Validate the JSON before publishing: a malformed file never blocks anyone, but apps then keep the last good config.
 
 - iOS: the SwiftUI screens are in CherKitUI (`.sunsetPrompt`).
-- Android: the Compose screens are in the `sunset-compose` module.
+- Android: the Compose screens are in the `sunset-compose` module; `SunsetPrompt(checker = ...)` there also runs the
+  checks.
+- `SunsetCheckScheduler` (Kotlin, common code) holds the rule both use for when to re-check: once at launch, again
+  only on a return from the background, never two at once, at most once per `minimumInterval`. Use it if you run the
+  checks yourself.
