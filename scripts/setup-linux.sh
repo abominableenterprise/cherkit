@@ -15,12 +15,12 @@ SWIFT_VERSION="6.4.1"
 JDK_VERSION="21.0.13+9" # Eclipse Temurin
 JDK_SHA256_x64="d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c"
 JDK_SHA256_aarch64="e3522e707fc7dbe2a72c30746b1e7068301a0213ecd213d4491f35a14eb55578"
-ANDROID_CMDLINE_TOOLS="16111833"
-ANDROID_CMDLINE_TOOLS_SHA256="0877a1d048fe4a24efe2eff536ca4223f7adeb58648bb81909d33c446918cfa8"
-ANDROID_PACKAGES=("platforms;android-36" "build-tools;36.0.0")
 RECIPE_REVISION="2" # bump to invalidate every cache key below
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# ANDROID_CMDLINE_TOOLS, ANDROID_CMDLINE_TOOLS_SHA256, ANDROID_PACKAGES (shared with the JitPack build).
+# shellcheck source=lib/android-sdk-versions.sh
+. "$ROOT/scripts/lib/android-sdk-versions.sh"
 TOOLS="${CHERKIT_TOOLS:-$HOME/.cherkit-tools}"
 START=$SECONDS
 mkdir -p "$TOOLS"

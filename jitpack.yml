@@ -1,0 +1,10 @@
+# JitPack build for the Kotlin modules (https://jitpack.io/#abominableenterprise/cherkit).
+# AGP 9 needs JDK 17+; the repo builds and tests on JDK 21.
+jdk:
+  - openjdk21
+before_install:
+  # Pinned Android SDK platform + build tools, wired in through local.properties.
+  - bash scripts/jitpack-android-sdk.sh
+install:
+  # publishToMavenLocal runs no tests; JitPack collects ~/.m2 for group com.github.abominableenterprise.cherkit.
+  - ./gradlew publishToMavenLocal --no-daemon --console=plain

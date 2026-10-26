@@ -15,6 +15,59 @@ its own product, so an app imports only what it needs.
 
 Status: v0.1.0: Analytics (PostHog), Sunset and WhatsNew logic plus SwiftUI views; Android UI not included.
 
+## Install
+
+Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
+
+### iOS / macOS (SwiftPM)
+
+Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
+"Up to Next Major Version" from 0.1.0), then link only the products you use:
+`CherKitAnalytics`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew) and
+`CherKitCore` (pulled in by Sunset and WhatsNew).
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.1.0"),
+],
+targets: [
+    .target(name: "MyApp", dependencies: [
+        .product(name: "CherKitSunset", package: "cherkit"),
+        .product(name: "CherKitWhatsNew", package: "cherkit"),
+        .product(name: "CherKitUI", package: "cherkit"),
+    ]),
+]
+```
+
+### Android / JVM (Gradle, via JitPack)
+
+Add JitPack to the repositories in `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
+```
+
+Then depend on the modules you use. The version is the git tag, including the `v`. Gradle picks the Android (AAR) or
+JVM variant automatically, and from a Kotlin Multiplatform module you can add them to `commonMain`.
+
+```kotlin
+dependencies {
+    implementation("com.github.abominableenterprise.cherkit:analytics:v0.1.0")
+    implementation("com.github.abominableenterprise.cherkit:sunset:v0.1.0")
+    implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.1.0")
+    implementation("com.github.abominableenterprise.cherkit:core:v0.1.0") // already included by sunset and whatsnew
+}
+```
+
+The Kotlin packages stay `com.abominableenterprise.cherkit.<module>`; only the Maven group follows JitPack's
+`com.github.<owner>.<repo>` convention.
+
 ## Running the tests
 
 ```sh
