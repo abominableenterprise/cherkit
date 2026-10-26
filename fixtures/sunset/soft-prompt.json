@@ -1,0 +1,17 @@
+{
+  "description": "Soft prompt \"Not now\" rule (Swift: CherKitUI SunsetSoftPromptRule and the version .sunsetPrompt keys on; Kotlin: :sunset-compose SunsetSoftPromptRule). `decision` is null, upToDate, softUpdate or hardUpdate; its prompt has the config's `latestVersion` (null: none). The version \"Not now\" is remembered for is the prompt's latestVersion as normalized by AppVersion (e.g. `1.4.0`, `1.4`; a suffix is dropped), else `installedVersion`; expected as `version`. `show` is true only for softUpdate when `dismissedVersion` (null: never dismissed) differs from that version as a plain string.",
+  "cases": [
+    { "name": "soft, never dismissed", "decision": "softUpdate", "latestVersion": "2.0", "installedVersion": "1.0", "dismissedVersion": null, "version": "2.0", "show": true },
+    { "name": "soft, dismissed for this latest version", "decision": "softUpdate", "latestVersion": "2.0", "installedVersion": "1.0", "dismissedVersion": "2.0", "version": "2.0", "show": false },
+    { "name": "soft, a newer latest version shows it again", "decision": "softUpdate", "latestVersion": "2.1", "installedVersion": "1.0", "dismissedVersion": "2.0", "version": "2.1", "show": true },
+    { "name": "soft, latest version is normalized", "decision": "softUpdate", "latestVersion": "v1.4.0-beta", "installedVersion": "1.0", "dismissedVersion": "1.4.0", "version": "1.4.0", "show": false },
+    { "name": "soft, the same version spelled differently is another string", "decision": "softUpdate", "latestVersion": "1.4", "installedVersion": "1.0", "dismissedVersion": "1.4.0", "version": "1.4", "show": true },
+    { "name": "soft without latest version keys on the installed version", "decision": "softUpdate", "latestVersion": null, "installedVersion": "1.3.2", "dismissedVersion": null, "version": "1.3.2", "show": true },
+    { "name": "soft without latest version, dismissed for the installed version", "decision": "softUpdate", "latestVersion": null, "installedVersion": "1.3.2", "dismissedVersion": "1.3.2", "version": "1.3.2", "show": false },
+    { "name": "soft without latest version, after the app was updated", "decision": "softUpdate", "latestVersion": null, "installedVersion": "1.3.3", "dismissedVersion": "1.3.2", "version": "1.3.3", "show": true },
+    { "name": "hard ignores Not now", "decision": "hardUpdate", "latestVersion": "2.0", "installedVersion": "1.0", "dismissedVersion": null, "version": "2.0", "show": false },
+    { "name": "hard, even when dismissed for another version", "decision": "hardUpdate", "latestVersion": "2.0", "installedVersion": "1.0", "dismissedVersion": "1.0", "version": "2.0", "show": false },
+    { "name": "up to date", "decision": "upToDate", "latestVersion": null, "installedVersion": "1.0", "dismissedVersion": null, "version": "1.0", "show": false },
+    { "name": "no decision yet", "decision": null, "latestVersion": null, "installedVersion": "1.0", "dismissedVersion": null, "version": "1.0", "show": false }
+  ]
+}

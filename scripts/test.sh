@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run everything that runs on Linux:  scripts/test.sh
 # Run one module on both platforms:   scripts/test.sh sunset   (or analytics, whatsnew)
+# A Kotlin-only module (no Sources/CherKit<Module>, e.g. sunset-compose) runs only its Gradle tests.
 # Run setup first: scripts/setup-linux.sh. Swift and Gradle run in parallel; their logs
 # are printed when each finishes. With a module selected, a Swift or Gradle run that executed
 # 0 tests fails. The Gradle and Kotlin compile daemons are stopped at the end, pass or fail.
@@ -74,25 +75,35 @@ for m in "${SELECTED[@]}"; do
   GRADLE_TASKS+=(":$m:jvmTest" ":$m:testAndroidHostTest")
 done
 
+# A selection of Kotlin-only modules has no Swift filter: skip Swift rather than run every Swift test.
+RUN_SWIFT=1
+if [ $# -gt 0 ] && [ ${#SWIFT_ARGS[@]} -eq 2 ]; then RUN_SWIFT=0; fi
+
 LOGS="$(mktemp -d)"
 # Keep the daemons for the run (faster), stop them at the end whatever happens.
 trap 'stop_build_daemons ./gradlew; rm -rf "$LOGS"' EXIT
 trap 'exit 130' INT TERM
-echo "==> swift ${SWIFT_ARGS[*]}"
+if [ "$RUN_SWIFT" = 1 ]; then
+  echo "==> swift ${SWIFT_ARGS[*]}"
+  (swift "${SWIFT_ARGS[@]}" >"$LOGS/swift.log" 2>&1; echo $? >"$LOGS/swift.rc") &
+  SWIFT_PID=$!
+else
+  echo "==> swift: skipped, no Swift target for: ${SELECTED[*]}"
+fi
 echo "==> ./gradlew ${GRADLE_TASKS[*]}"
-(swift "${SWIFT_ARGS[@]}" >"$LOGS/swift.log" 2>&1; echo $? >"$LOGS/swift.rc") &
-SWIFT_PID=$!
 (./gradlew --quiet --console=plain "${GRADLE_TASKS[@]}" >"$LOGS/gradle.log" 2>&1; echo $? >"$LOGS/gradle.rc") &
 GRADLE_PID=$!
 
 FAILED=()
-wait "$SWIFT_PID" || true
-echo "--- swift ---"; tail -n 40 "$LOGS/swift.log"
-[ "$(cat "$LOGS/swift.rc")" = "0" ] || FAILED+=(swift)
-# `swift test --filter` passes when the filter matches nothing, so check that tests ran.
-if [ $# -gt 0 ] && [ "$(cat "$LOGS/swift.rc")" = "0" ] && [ "$(tests_run_count "$LOGS/swift.log")" -eq 0 ]; then
-  echo "ERROR: swift ${SWIFT_ARGS[*]} executed 0 tests: the filter matched no test target"
-  FAILED+=("swift (0 tests)")
+if [ "$RUN_SWIFT" = 1 ]; then
+  wait "$SWIFT_PID" || true
+  echo "--- swift ---"; tail -n 40 "$LOGS/swift.log"
+  [ "$(cat "$LOGS/swift.rc")" = "0" ] || FAILED+=(swift)
+  # `swift test --filter` passes when the filter matches nothing, so check that tests ran.
+  if [ $# -gt 0 ] && [ "$(cat "$LOGS/swift.rc")" = "0" ] && [ "$(tests_run_count "$LOGS/swift.log")" -eq 0 ]; then
+    echo "ERROR: swift ${SWIFT_ARGS[*]} executed 0 tests: the filter matched no test target"
+    FAILED+=("swift (0 tests)")
+  fi
 fi
 wait "$GRADLE_PID" || true
 echo "--- gradle ---"; tail -n 60 "$LOGS/gradle.log"
