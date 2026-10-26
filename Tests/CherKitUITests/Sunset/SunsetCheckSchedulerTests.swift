@@ -109,5 +109,68 @@ final class SunsetCheckSchedulerTests: XCTestCase {
             scheduler.checkFinished()
         }
     }
+
+    func testFailedLaunchCheckDoesNotConsumeTheIntervalAndAsksForOneRetry() {
+        var scheduler = SunsetCheckScheduler(minimumInterval: 3600)
+        XCTAssertTrue(scheduler.shouldCheckAtLaunch(now: start))
+        XCTAssertTrue(scheduler.checkFinished(failed: true), "the first failure asks for the quick retry")
+        XCTAssertFalse(scheduler.isChecking)
+        XCTAssertNil(scheduler.lastCheckStarted, "a failed check does not count toward the interval")
+        XCTAssertTrue(scheduler.isRetryPending)
+
+        XCTAssertTrue(scheduler.shouldRetry(now: at(3)))
+        XCTAssertFalse(scheduler.shouldRetry(now: at(3)), "the retry starts once")
+        XCTAssertFalse(scheduler.checkFinished(failed: true), "a second failure in a row does not retry again")
+        XCTAssertFalse(scheduler.shouldRetry(now: at(6)))
+        XCTAssertNil(scheduler.lastCheckStarted)
+        XCTAssertEqual(scheduler.failuresInARow, 2)
+    }
+
+    func testAfterTwoFailuresTheNextForegroundRechecksDespiteTheInterval() {
+        var scheduler = SunsetCheckScheduler(minimumInterval: 3600)
+        XCTAssertTrue(scheduler.shouldCheckAtLaunch(now: start))
+        scheduler.checkFinished(failed: true)
+        XCTAssertTrue(scheduler.shouldRetry(now: at(3)))
+        scheduler.checkFinished(failed: true)
+
+        // `.inactive` → `.active` (Control Center) still never checks.
+        XCTAssertFalse(scheduler.shouldCheck(onScenePhase: .inactive, now: at(10)))
+        XCTAssertFalse(scheduler.shouldCheck(onScenePhase: .active, now: at(10)))
+        // A real return from the background does, long before the interval.
+        _ = scheduler.shouldCheck(onScenePhase: .background, now: at(20))
+        XCTAssertTrue(scheduler.shouldCheck(onScenePhase: .active, now: at(30)))
+        // It succeeds: from now on the interval counts from it again.
+        XCTAssertFalse(scheduler.checkFinished(failed: false))
+        XCTAssertEqual(scheduler.failuresInARow, 0)
+        XCTAssertEqual(scheduler.lastCheckStarted, at(30))
+        _ = scheduler.shouldCheck(onScenePhase: .background, now: at(40))
+        XCTAssertFalse(scheduler.shouldCheck(onScenePhase: .active, now: at(50)), "the interval applies again")
+    }
+
+    func testFailedRecheckKeepsTheLastGoodCheckForTheInterval() {
+        var scheduler = launched(minimumInterval: 3600)
+        _ = scheduler.shouldCheck(onScenePhase: .background, now: at(3600))
+        XCTAssertTrue(scheduler.shouldCheck(onScenePhase: .active, now: at(3600)))
+        XCTAssertTrue(scheduler.checkFinished(failed: true))
+        XCTAssertEqual(scheduler.lastCheckStarted, start, "the failed re-check is not counted; the launch check still is")
+    }
+
+    func testAFailedCheckDuringTheRetryDelayMakesTheRetryStale() {
+        var scheduler = SunsetCheckScheduler(minimumInterval: 3600)
+        XCTAssertTrue(scheduler.shouldCheckAtLaunch(now: start))
+        scheduler.checkFinished(failed: true)
+        // The app goes away and back before the retry fires: that return re-checks instead.
+        _ = scheduler.shouldCheck(onScenePhase: .background, now: at(1))
+        XCTAssertTrue(scheduler.shouldCheck(onScenePhase: .active, now: at(2)))
+        XCTAssertFalse(scheduler.shouldRetry(now: at(3)), "the pending retry is dropped once another check starts")
+    }
+
+    func testSuccessfulChecksNeverAskForARetry() {
+        var scheduler = SunsetCheckScheduler()
+        XCTAssertTrue(scheduler.shouldCheckAtLaunch(now: start))
+        XCTAssertFalse(scheduler.checkFinished(failed: false))
+        XCTAssertFalse(scheduler.shouldRetry(now: at(3)))
+        XCTAssertEqual(scheduler.lastCheckStarted, start)
+    }
 }
 #endif

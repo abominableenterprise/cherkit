@@ -2,8 +2,8 @@
 import CherKitSunset
 import SwiftUI
 
-/// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:)``
-/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)``.
+/// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:)``
+/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)``.
 @available(iOS 16, macOS 13, *)
 struct SunsetPromptModifier: ViewModifier {
     @Binding var decision: SunsetDecision?
@@ -16,6 +16,8 @@ struct SunsetPromptModifier: ViewModifier {
     let appIcon: Image?
     /// The hard block's tint; the soft alert keeps the app's.
     var tint: Color?
+    /// The hard block's button label color on `tint`; `nil` picks black or white by contrast.
+    var tintLabel: Color?
 
     @Environment(\.openURL) private var openURL
 
@@ -44,7 +46,9 @@ struct SunsetPromptModifier: ViewModifier {
             } message: { prompt in
                 Text(strings.softText(for: prompt))
             }
-            .modifier(SunsetHardBlockPresenter(prompt: hardPrompt, strings: strings, appIcon: appIcon, tint: tint))
+            .modifier(SunsetHardBlockPresenter(
+                prompt: hardPrompt, strings: strings, appIcon: appIcon, tint: tint, tintLabel: tintLabel
+            ))
     }
 
     private var softPrompt: SunsetPrompt? {
@@ -75,12 +79,15 @@ struct SunsetHardBlockPresenter: ViewModifier {
     let strings: SunsetStrings
     let appIcon: Image?
     let tint: Color?
+    var tintLabel: Color? = nil
 
     func body(content: Content) -> some View {
         #if canImport(UIKit)
         // iOS: its own window above the scene's windows rather than a `fullScreenCover`, which cannot appear while
         // the app already presents a sheet or cover (onboarding, an editor), leaving the old version usable.
-        content.background(SunsetHardBlockHost(prompt: prompt, strings: strings, appIcon: appIcon, tint: tint))
+        content.background(SunsetHardBlockHost(
+            prompt: prompt, strings: strings, appIcon: appIcon, tint: tint, tintLabel: tintLabel
+        ))
         #else
         // macOS: an overlay instead of a sheet, so neither Escape nor a window command can dismiss it. The content
         // below is disabled and hidden from VoiceOver so it cannot be reached from the keyboard either.
@@ -90,7 +97,7 @@ struct SunsetHardBlockPresenter: ViewModifier {
             .accessibilityHidden(blocked)
             .overlay {
                 if let prompt {
-                    SunsetUpdateView(prompt: prompt, strings: strings, appIcon: appIcon, tint: tint)
+                    SunsetUpdateView(prompt: prompt, strings: strings, appIcon: appIcon, tint: tint, tintLabel: tintLabel)
                 }
             }
         #endif
@@ -112,7 +119,7 @@ extension View {
     ///
     /// This modifier only displays a decision; it never fetches. Get one from the Sunset checker (or
     /// ``SunsetDecider``) and assign it to `decision`, or let
-    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)`` run the checks.
+    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)`` run the checks.
     ///
     /// - Parameters:
     ///   - decision: The decision to show, `nil` while unknown.
@@ -127,13 +134,16 @@ extension View {
     ///   - tint: The hard block's button and accent color, e.g. your accent color. On iOS the block runs in its own
     ///     window, which does not inherit your app's tint, so pass it to match. `nil` (the default) keeps the system
     ///     tint. The soft alert always uses the app's tint.
+    ///   - tintLabel: The hard block's button label color on the `tint` fill. `nil` (the default) picks black or
+    ///     white, whichever contrasts more with `tint` in the current light or dark mode. Ignored without a `tint`.
     public func sunsetPrompt(
         decision: Binding<SunsetDecision?>,
         latestVersion: String? = nil,
         memory: SunsetSoftPromptMemory = SunsetSoftPromptMemory(),
         strings: SunsetStrings = SunsetStrings(),
         appIcon: Image? = nil,
-        tint: Color? = nil
+        tint: Color? = nil,
+        tintLabel: Color? = nil
     ) -> some View {
         modifier(SunsetPromptModifier(
             decision: decision,
@@ -142,7 +152,8 @@ extension View {
             memory: memory,
             strings: strings,
             appIcon: appIcon,
-            tint: tint
+            tint: tint,
+            tintLabel: tintLabel
         ))
     }
 }

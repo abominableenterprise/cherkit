@@ -29,8 +29,9 @@ public struct SunsetChecker: Sendable {
     public let timeout: TimeInterval
     /// Which block of the config applies to this app.
     public let platform: SunsetPlatform
-    /// `true` only for ``disabled``: ``check(installedVersion:osVersion:locale:)`` answers `upToDate` at once.
-    let isDisabled: Bool
+    /// `true` only for ``disabled``: ``check(installedVersion:osVersion:locale:)`` answers `upToDate` at once, so app
+    /// tests can assert they got the switched-off checker.
+    public let isDisabled: Bool
 
     /// A checker over any `source` and `cache`.
     public init(
@@ -62,19 +63,31 @@ public struct SunsetChecker: Sendable {
     ///   - osVersion: The device OS version, e.g. `"17.4.1"` (on Android, the API level).
     ///   - locale: The user's preferred language tags in order, e.g. `Locale.preferredLanguages`.
     public func check(installedVersion: String, osVersion: String, locale: [String]) async -> SunsetDecision {
-        if isDisabled { return .upToDate }
+        await checkReportingFailure(installedVersion: installedVersion, osVersion: osVersion, locale: locale).decision
+    }
+
+    /// ``check(installedVersion:osVersion:locale:)`` plus whether it failed: `failed` is `true` when there was no
+    /// usable config at all (the fetch failed, timed out or did not parse, and nothing usable was cached), so the
+    /// fail-open `upToDate` is not a real answer. CherKitUI uses it to retry; ``disabled`` never fails.
+    package func checkReportingFailure(
+        installedVersion: String,
+        osVersion: String,
+        locale: [String]
+    ) async -> (decision: SunsetDecision, failed: Bool) {
+        if isDisabled { return (.upToDate, false) }
         let source = self.source
         let timeout = self.timeout
         let fetched = await SunsetTimeout.run(seconds: timeout) { await source.fetch(timeout: timeout) }
         let choice = SunsetConfigChoice.choose(fetched: fetched, cached: await cache.load())
         if choice.source == .fetched, let fetched { await cache.save(fetched) }
-        return SunsetDecider.decide(
+        let decision = SunsetDecider.decide(
             config: choice.config,
             platform: platform,
             appVersion: installedVersion,
             osVersion: osVersion,
             languages: locale
         )
+        return (decision, choice.source == .missing)
     }
 
     /// ``check(installedVersion:osVersion:locale:)`` for the running app: its `CFBundleShortVersionString`, the

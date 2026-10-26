@@ -24,6 +24,10 @@ malformed fetch is never cached. Offline or with no usable config at all, the an
 The prompt carries `storeURL`, the resolved `message` and the config's `latestVersion` (`AppVersion?`, `nil` when the
 platform block has none).
 
+`.sunsetPrompt(checker:)` in CherKitUI runs this check at launch and on returns from the background. When a check
+has no usable config at all (fetch failed and nothing cached), it retries once a few seconds later and, if that fails
+too, re-checks on the next return from the background regardless of `minimumInterval` (see the CherKitUI README).
+
 ## Turn it off in UI tests and on the simulator
 
 `SunsetChecker.disabled` always answers `upToDate` without touching the network or the cache:
@@ -31,6 +35,9 @@ platform block has none).
 ```swift
 let checker = isUITest ? .disabled : SunsetChecker(url: URL(string: "https://example.github.io/myapp/sunset.json")!)
 ```
+
+`isDisabled` is public and read-only, so app tests can assert they wired the switched-off checker:
+`XCTAssertTrue(AppEnvironment.uiTest.sunsetChecker.isDisabled)`.
 
 ## Hosting
 

@@ -35,12 +35,15 @@ When it checks:
   `minimumInterval` (default 1 hour; `0` re-checks on every return). The initial `.active`, and `.inactive` →
   `.active` (Control Center, a system alert), do not check, so the launch fetch never runs twice.
 - Never while a check is still running.
+- After a failed check, i.e. the fetch failed, timed out or did not parse and no usable config is cached (e.g. a
+  fresh install with a dropped connection), once more about 3 seconds later. A failed check does not count toward
+  `minimumInterval`: if the retry fails too, the next return from the background re-checks whatever the interval.
 
 The checker fetches with a timeout and falls back to the cached config. It fails open, so a missing or broken config
 gives `.upToDate` and nothing is shown. A re-check replaces the decision, so a hard block goes away once the config
 stops requiring the update. Optional parameters: `installedVersion:` (default `CFBundleShortVersionString`),
-`locale:` (default `Locale.preferredLanguages`), `minimumInterval:`, plus `memory:`, `strings:`, `appIcon:` and
-`tint:` below.
+`locale:` (default `Locale.preferredLanguages`), `minimumInterval:`, plus `memory:`, `strings:`, `appIcon:`, `tint:`
+and `tintLabel:` below.
 
 To fetch on your own schedule, pass the decision instead. This modifier only displays it:
 
@@ -77,8 +80,12 @@ Options, all with defaults:
 - `tint: Color?`: the "Update required" button and accents, e.g. `.accentColor`. On iOS the block runs in its own
   window, which does not inherit the app's tint, so without it the button is system blue. The soft alert always uses
   the app's tint.
+- `tintLabel: Color?`: the "Update required" button's label color on the `tint` fill. `nil` (the default) picks
+  black or white from the tint's WCAG relative luminance, resolved in the current light or dark mode: white while it
+  keeps at least 3:1 contrast (the bold-text minimum, so e.g. system blue keeps its white label), black on brighter
+  tints such as a light dark-mode accent. Ignored without `tint`, which keeps the system look.
 
-`SunsetUpdateView(prompt:strings:appIcon:tint:)` can also be used on its own. It scrolls, so it does not clip on small
+`SunsetUpdateView(prompt:strings:appIcon:tint:tintLabel:)` can also be used on its own. It scrolls, so it does not clip on small
 screens or at the largest Dynamic Type sizes. `SunsetSoftPromptRule.shouldShow(_:version:dismissedVersion:)` is the
 pure "show the soft prompt?" rule the modifier uses.
 
