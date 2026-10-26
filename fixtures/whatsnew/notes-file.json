@@ -1,0 +1,141 @@
+{
+  "description": "Reading one bundled notes file whatsnew/<version>.json. Each case gives the fileName and either `file` (the JSON content) or `text` (raw text, for malformed files). `errors` lists every expected error (code and exact message) in order; empty means the file is valid, and then `parsed` (when present) is the expected ReleaseNotes. Unknown fields are ignored; `date` is optional, `show` defaults to true, `notes` defaults to {}.",
+  "cases": [
+    {
+      "name": "valid with translation and unknown field",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.0", "date": "2026-11-02", "show": true, "author": "ignored",
+        "notes": { "en": ["You can now export to CSV.", "Fixed a crash on launch."], "de": ["Export als CSV."] } },
+      "errors": [],
+      "parsed": { "version": "1.4.0", "date": "2026-11-02", "show": true,
+        "notes": { "en": ["You can now export to CSV.", "Fixed a crash on launch."], "de": ["Export als CSV."] } }
+    },
+    {
+      "name": "show defaults to true, date optional",
+      "fileName": "2.0.json",
+      "file": { "version": "2.0", "notes": { "en": ["New look."] } },
+      "errors": [],
+      "parsed": { "version": "2.0", "date": null, "show": true, "notes": { "en": ["New look."] } }
+    },
+    {
+      "name": "fix-only release needs no notes",
+      "fileName": "1.4.1.json",
+      "file": { "version": "1.4.1", "date": "2026-11-09", "show": false },
+      "errors": [],
+      "parsed": { "version": "1.4.1", "date": "2026-11-09", "show": false, "notes": {} }
+    },
+    {
+      "name": "null optional fields count as absent",
+      "fileName": "1.5.0.json",
+      "file": { "version": "1.5.0", "date": null, "show": null, "notes": { "en": ["Faster sync."] } },
+      "errors": [],
+      "parsed": { "version": "1.5.0", "date": null, "show": true, "notes": { "en": ["Faster sync."] } }
+    },
+    {
+      "name": "file name may be a path and may spell the version differently",
+      "fileName": "whatsnew/1.4.json",
+      "file": { "version": "1.4.0", "show": false },
+      "errors": []
+    },
+    {
+      "name": "four bullets is the maximum",
+      "fileName": "3.0.0.json",
+      "file": { "version": "3.0.0", "notes": { "en": ["One.", "Two.", "Three.", "Four."] } },
+      "errors": []
+    },
+    {
+      "name": "malformed JSON",
+      "fileName": "1.4.0.json",
+      "text": "{ \"version\": \"1.4.0\", ",
+      "errors": [{ "code": "notJSONObject", "message": "The file is not a JSON object." }]
+    },
+    {
+      "name": "top level is a list",
+      "fileName": "1.4.0.json",
+      "file": ["1.4.0"],
+      "errors": [{ "code": "notJSONObject", "message": "The file is not a JSON object." }]
+    },
+    {
+      "name": "missing version",
+      "fileName": "1.4.0.json",
+      "file": { "notes": { "en": ["Hi."] } },
+      "errors": [{ "code": "missingField", "message": "Missing required field \"version\"." }]
+    },
+    {
+      "name": "every field has the wrong type",
+      "fileName": "1.4.0.json",
+      "file": { "version": 140, "date": 20261102, "show": "yes", "notes": ["Hi."] },
+      "errors": [
+        { "code": "wrongType", "message": "\"version\" must be a string." },
+        { "code": "wrongType", "message": "\"date\" must be a string." },
+        { "code": "wrongType", "message": "\"show\" must be true or false." },
+        { "code": "wrongType", "message": "\"notes\" must be an object mapping locales to lists of strings." }
+      ]
+    },
+    {
+      "name": "show must be a JSON boolean, not a number",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.0", "show": 1, "notes": { "en": ["Hi."] } },
+      "errors": [{ "code": "wrongType", "message": "\"show\" must be true or false." }]
+    },
+    {
+      "name": "locale value is not a list of strings",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.0", "notes": { "en": ["Hi."], "fr": "Salut.", "de": ["Hallo.", 2] } },
+      "errors": [
+        { "code": "wrongType", "message": "\"notes.de\" must be a list of strings." },
+        { "code": "wrongType", "message": "\"notes.fr\" must be a list of strings." }
+      ]
+    },
+    {
+      "name": "version is not a valid version",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.x", "notes": { "en": ["Hi."] } },
+      "errors": [{ "code": "invalidVersion", "message": "\"version\" is not a valid version: \"1.4.x\"." }]
+    },
+    {
+      "name": "file name does not match the version (stale notes copied from the previous release)",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.3.0", "notes": { "en": ["Hi."] } },
+      "errors": [{ "code": "fileNameMismatch", "message": "File name \"1.4.0.json\" does not match version \"1.3.0\"; expected \"1.3.0.json\"." }]
+    },
+    {
+      "name": "file name is not <version>.json",
+      "fileName": "notes.txt",
+      "file": { "version": "1.3.0", "show": false },
+      "errors": [{ "code": "fileNameMismatch", "message": "File name \"notes.txt\" does not match version \"1.3.0\"; expected \"1.3.0.json\"." }]
+    },
+    {
+      "name": "show true without English notes",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.0", "show": true, "notes": { "de": ["Hallo."] } },
+      "errors": [{ "code": "missingEnglish", "message": "\"show\" is true but there are no \"en\" notes." }]
+    },
+    {
+      "name": "too many and too few bullets",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.0", "notes": { "en": ["1", "2", "3", "4", "5"], "de": [] } },
+      "errors": [
+        { "code": "bulletCount", "message": "\"notes.de\" has 0 bullets; use 1 to 4." },
+        { "code": "bulletCount", "message": "\"notes.en\" has 5 bullets; use 1 to 4." }
+      ]
+    },
+    {
+      "name": "empty and whitespace-only bullets, even when show is false",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.0", "show": false, "notes": { "en": ["Fine.", "", "  \t"] } },
+      "errors": [
+        { "code": "emptyBullet", "message": "\"notes.en\" bullet 2 is empty." },
+        { "code": "emptyBullet", "message": "\"notes.en\" bullet 3 is empty." }
+      ]
+    },
+    { "name": "store text over Play's 500 characters",
+      "fileName": "1.4.0.json",
+      "file": { "version": "1.4.0", "notes": { "en": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ] } },
+      "errors": [{ "code": "storeTextTooLong", "message": "\"notes.en\" is 605 characters as store text; Play allows 500." }]
+    }
+  ]
+}

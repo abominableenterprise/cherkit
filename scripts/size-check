@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Fail if a tracked source file is over 800 lines or 50 KB.
+
+Oversized files must be listed in size-baseline.json:
+  {"files": {"path/to/File.swift": {"lines": 900, "bytes": 52000}}}
+A listed file may never grow past its baseline entry. Entries may only shrink, so
+`--check-baseline-against <git-ref>` (used by scripts/test.sh with origin/main)
+also fails if the baseline adds a file or raises a limit compared with that ref.
+"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+MAX_LINES = 800
+MAX_BYTES = 50 * 1024
+SOURCE_SUFFIXES = {".swift", ".kt", ".kts", ".py", ".sh", ".js", ".ts", ".json", ".md", ".toml"}
+SOURCE_NAMES = {"size-check"}
+SKIP_PREFIXES = ("gradle/wrapper/",)
+ROOT = Path(__file__).resolve().parent.parent
+BASELINE = "size-baseline.json"
+
+
+def git(*args, text=True):
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=text)
+
+
+def tracked_files():
+    # -z: NUL-separated, unquoted names, so non-ASCII and special-character names are checked too.
+    out = git("ls-files", "-z", "--cached", "--others", "--exclude-standard", text=False)
+    if out.returncode != 0:
+        sys.exit(f"size-check: git ls-files failed: {out.stderr.decode(errors='replace').strip()}")
+    for raw in out.stdout.split(b"\0"):
+        if not raw:
+            continue
+        name = os.fsdecode(raw)
+        path = ROOT / name
+        if name.startswith(SKIP_PREFIXES) or not path.is_file():
+            continue
+        if path.suffix in SOURCE_SUFFIXES or path.name in SOURCE_NAMES:
+            yield name, path
+
+
+def load_baseline(text):
+    entries = json.loads(text).get("files", {}) if text.strip() else {}
+    return {k: {"lines": int(v["lines"]), "bytes": int(v["bytes"])} for k, v in entries.items()}
+
+
+def baseline_at(ref):
+    """The baseline at <ref>: empty if the ref exists but has no baseline file; exits on any other failure."""
+    commit = git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+    if commit.returncode != 0:
+        sys.exit(f"size-check: cannot check {BASELINE} against {ref}: not a valid git ref")
+    sha = commit.stdout.strip()
+    listed = git("ls-tree", "-z", sha, "--", BASELINE)
+    if listed.returncode != 0:
+        sys.exit(f"size-check: cannot list {BASELINE} at {ref}: {listed.stderr.strip()}")
+    if not listed.stdout:
+        return {}
+    old = git("show", f"{sha}:{BASELINE}")
+    if old.returncode != 0:
+        sys.exit(f"size-check: cannot read {BASELINE} at {ref}: {old.stderr.strip()}")
+    try:
+        return load_baseline(old.stdout)
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        sys.exit(f"size-check: {BASELINE} at {ref} is not a valid baseline: {e!r}")
+
+
+def main(argv):
+    errors = []
+    baseline_path = ROOT / BASELINE
+    baseline = load_baseline(baseline_path.read_text()) if baseline_path.exists() else {}
+
+    if len(argv) == 2 and argv[0] == "--check-baseline-against":
+        previous = baseline_at(argv[1])
+        for name, limits in baseline.items():
+            before = previous.get(name)
+            if before is None:
+                errors.append(f"{BASELINE}: new entry {name} (entries may only shrink; split the file instead)")
+            elif limits["lines"] > before["lines"] or limits["bytes"] > before["bytes"]:
+                errors.append(f"{BASELINE}: {name} limit raised above {argv[1]} (entries may only shrink)")
+    elif argv:
+        sys.exit("usage: scripts/size-check [--check-baseline-against <git-ref>]")
+
+    for name, path in tracked_files():
+        data = path.read_bytes()
+        lines, size = data.count(b"\n") + (0 if data.endswith(b"\n") or not data else 1), len(data)
+        limit = baseline.get(name, {"lines": MAX_LINES, "bytes": MAX_BYTES})
+        if lines > max(limit["lines"], 0) or size > max(limit["bytes"], 0):
+            errors.append(f"{name}: {lines} lines / {size} bytes (limit {limit['lines']} lines / {limit['bytes']} bytes)")
+
+    if errors:
+        print("size-check failed. Split the file (one job per file) rather than growing the baseline:")
+        print("\n".join(f"  {e}" for e in errors))
+        return 1
+    print(f"size-check: ok (max {MAX_LINES} lines / {MAX_BYTES // 1024} KB per file)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

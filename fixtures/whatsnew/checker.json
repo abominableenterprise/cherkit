@@ -1,0 +1,159 @@
+{
+  "description": "WhatsNewChecker over a bundled notes source and a store. Each case starts from `files` (file name -> notes file JSON, or a string holding the raw file text) and `store` (lastSeen and install history as stored strings), then runs `steps` in order. A `launch` step calls onLaunch(installedVersion, locale) and expects `show` (version, date, bullets; newest first). A `markSeen` step calls markSeen(). A `history` step calls history(locale) with the given locales and expects `entries` (every bundled version newest first, isInstalled on the last install-history entry). After every step the store must equal `store`. onLaunch updates the install history at once, stores lastSeen at once when there is nothing to show, and otherwise only on markSeen, so a crash before display keeps the notes. Only `.json` files are read; invalid ones are skipped, and `skipped` lists every skipped file name (default none).",
+  "cases": [
+    {
+      "name": "first launch shows nothing and marks the version seen",
+      "files": {
+        "1.0.0.json": { "version": "1.0.0", "notes": { "en": ["First release."] } },
+        "1.1.0.json": { "version": "1.1.0", "notes": { "en": ["Dark mode."] } }
+      },
+      "store": { "lastSeen": null, "history": [] },
+      "steps": [
+        { "launch": "1.1.0", "locale": ["en-US"], "show": [], "store": { "lastSeen": "1.1.0", "history": ["1.1.0"] } },
+        { "markSeen": true, "store": { "lastSeen": "1.1.0", "history": ["1.1.0"] } },
+        { "launch": "1.1.0", "locale": ["en-US"], "show": [], "store": { "lastSeen": "1.1.0", "history": ["1.1.0"] } }
+      ]
+    },
+    {
+      "name": "update across several versions shows each one newest first in the user's locale",
+      "files": {
+        "1.0.0.json": { "version": "1.0.0", "notes": { "en": ["First release."] } },
+        "1.1.0.json": { "version": "1.1.0", "date": "2026-03-01", "notes": { "en": ["Dark mode."], "de": ["Dunkelmodus."] } },
+        "1.2.0.json": { "version": "1.2.0", "show": false },
+        "1.3.json": { "version": "1.3.0", "date": "2026-05-10", "notes": { "en": ["CSV export.", "Faster sync."] } }
+      },
+      "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] },
+      "steps": [
+        {
+          "launch": "1.3.0 (42)", "locale": ["de-DE"],
+          "show": [
+            { "version": "1.3.0", "date": "2026-05-10", "bullets": ["CSV export.", "Faster sync."] },
+            { "version": "1.1.0", "date": "2026-03-01", "bullets": ["Dunkelmodus."] }
+          ],
+          "store": { "lastSeen": "1.0.0", "history": ["1.0.0", "1.3.0"] }
+        },
+        { "markSeen": true, "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0"] } },
+        { "markSeen": true, "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0"] } },
+        { "launch": "1.3.0", "locale": ["de-DE"], "show": [], "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0"] } },
+        {
+          "history": ["de-DE"],
+          "entries": [
+            { "version": "1.3.0", "date": "2026-05-10", "bullets": ["CSV export.", "Faster sync."], "isInstalled": true },
+            { "version": "1.2.0", "date": null, "bullets": [], "isInstalled": false },
+            { "version": "1.1.0", "date": "2026-03-01", "bullets": ["Dunkelmodus."], "isInstalled": false },
+            { "version": "1.0.0", "date": null, "bullets": ["First release."], "isInstalled": false }
+          ],
+          "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0"] }
+        }
+      ]
+    },
+    {
+      "name": "a crash before markSeen shows the same notes on the next launch",
+      "files": {
+        "1.1.0.json": { "version": "1.1.0", "notes": { "en": ["Dark mode."] } }
+      },
+      "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] },
+      "steps": [
+        { "launch": "1.1.0", "locale": ["en"], "show": [{ "version": "1.1.0", "date": null, "bullets": ["Dark mode."] }], "store": { "lastSeen": "1.0.0", "history": ["1.0.0", "1.1.0"] } },
+        { "launch": "1.1.0", "locale": ["en"], "show": [{ "version": "1.1.0", "date": null, "bullets": ["Dark mode."] }], "store": { "lastSeen": "1.0.0", "history": ["1.0.0", "1.1.0"] } },
+        { "markSeen": true, "store": { "lastSeen": "1.1.0", "history": ["1.0.0", "1.1.0"] } },
+        { "launch": "1.1.0", "locale": ["en"], "show": [], "store": { "lastSeen": "1.1.0", "history": ["1.0.0", "1.1.0"] } }
+      ]
+    },
+    {
+      "name": "an update with nothing to show marks the version seen at once",
+      "files": {
+        "1.1.0.json": { "version": "1.1.0", "show": false }
+      },
+      "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] },
+      "steps": [
+        { "launch": "1.1.0", "locale": ["en"], "show": [], "store": { "lastSeen": "1.1.0", "history": ["1.0.0", "1.1.0"] } }
+      ]
+    },
+    {
+      "name": "a corrupt store counts as a first launch",
+      "files": {
+        "1.1.0.json": { "version": "1.1.0", "notes": { "en": ["Dark mode."] } }
+      },
+      "store": { "lastSeen": "not a version", "history": ["???"] },
+      "steps": [
+        { "launch": "1.1.0", "locale": ["en"], "show": [], "store": { "lastSeen": "1.1.0", "history": ["???", "1.1.0"] } },
+        {
+          "history": ["en"],
+          "entries": [{ "version": "1.1.0", "date": null, "bullets": ["Dark mode."], "isInstalled": true }],
+          "store": { "lastSeen": "1.1.0", "history": ["???", "1.1.0"] }
+        }
+      ]
+    },
+    {
+      "name": "a bundle with one invalid file skips only that file",
+      "files": {
+        "1.1.0.json": { "version": "1.1.0", "notes": { "en": ["Dark mode."] } },
+        "1.2.0.json": "{ \"version\": \"1.2.0\", \"notes\": ",
+        "1.3.0.json": { "version": "1.3.0", "notes": { "en": ["CSV export."] } },
+        "notes.txt": "not a notes file"
+      },
+      "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] },
+      "skipped": ["1.2.0.json"],
+      "steps": [
+        {
+          "launch": "1.3.0", "locale": ["en"],
+          "show": [
+            { "version": "1.3.0", "date": null, "bullets": ["CSV export."] },
+            { "version": "1.1.0", "date": null, "bullets": ["Dark mode."] }
+          ],
+          "store": { "lastSeen": "1.0.0", "history": ["1.0.0", "1.3.0"] }
+        },
+        { "markSeen": true, "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0"] } },
+        {
+          "history": ["en"],
+          "entries": [
+            { "version": "1.3.0", "date": null, "bullets": ["CSV export."], "isInstalled": true },
+            { "version": "1.1.0", "date": null, "bullets": ["Dark mode."], "isInstalled": false }
+          ],
+          "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0"] }
+        }
+      ]
+    },
+    {
+      "name": "a downgrade shows nothing, keeps the higher last-seen and does not repeat notes on re-upgrade",
+      "files": {
+        "1.2.0.json": { "version": "1.2.0", "notes": { "en": ["Widgets."] } },
+        "1.3.0.json": { "version": "1.3.0", "notes": { "en": ["CSV export."] } }
+      },
+      "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0"] },
+      "steps": [
+        { "launch": "1.2.0", "locale": ["en"], "show": [], "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0", "1.2.0"] } },
+        {
+          "history": ["en"],
+          "entries": [
+            { "version": "1.3.0", "date": null, "bullets": ["CSV export."], "isInstalled": false },
+            { "version": "1.2.0", "date": null, "bullets": ["Widgets."], "isInstalled": true }
+          ],
+          "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0", "1.2.0"] }
+        },
+        { "launch": "1.3.0", "locale": ["en"], "show": [], "store": { "lastSeen": "1.3.0", "history": ["1.0.0", "1.3.0", "1.2.0", "1.3.0"] } }
+      ]
+    },
+    {
+      "name": "an unreadable installed version shows nothing and changes nothing",
+      "files": {
+        "1.1.0.json": { "version": "1.1.0", "notes": { "en": ["Dark mode."] } }
+      },
+      "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] },
+      "steps": [
+        { "launch": "", "locale": ["en"], "show": [], "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] } },
+        { "markSeen": true, "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] } }
+      ]
+    },
+    {
+      "name": "no bundled notes",
+      "files": {},
+      "store": { "lastSeen": "1.0.0", "history": ["1.0.0"] },
+      "steps": [
+        { "launch": "1.1.0", "locale": ["en"], "show": [], "store": { "lastSeen": "1.1.0", "history": ["1.0.0", "1.1.0"] } },
+        { "history": ["en"], "entries": [], "store": { "lastSeen": "1.1.0", "history": ["1.0.0", "1.1.0"] } }
+      ]
+    }
+  ]
+}

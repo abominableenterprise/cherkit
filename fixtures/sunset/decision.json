@@ -1,0 +1,187 @@
+{
+  "description": "Sunset decision contract. Each case parses a config (`config` names an entry in `configs`, serialized back to JSON; `configText` is raw text; neither means no config), then decides for `platform`, the installed `appVersion`, the device `osVersion` and the user's preferred `languages`. `decision` is upToDate, softUpdate or hardUpdate; prompts carry `storeURL` and the resolved `message` (null: the UI shows its default text). Anything missing, malformed or unknown fails open (upToDate).",
+  "configs": {
+    "standard": {
+      "schemaVersion": 1,
+      "ios": {
+        "minimumVersion": "1.2.0",
+        "latestVersion": "1.4.0",
+        "latestMinimumOS": "17.0",
+        "storeURL": "https://apps.apple.com/app/id123456789",
+        "message": { "en": "Please update.", "de": "Bitte aktualisieren." }
+      },
+      "android": {
+        "minimumVersion": "1.2.0",
+        "latestVersion": "1.4.0",
+        "latestMinimumOS": "26",
+        "storeURL": "https://play.google.com/store/apps/details?id=com.example.app",
+        "message": { "en": "Please update from Google Play." }
+      }
+    },
+    "ios-only": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "unknown-fields": {
+      "schemaVersion": 1,
+      "web": { "minimumVersion": "9.0.0" },
+      "comment": "ignored",
+      "ios": { "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1", "channel": "beta", "rollout": 0.5 }
+    },
+    "latest-only": {
+      "schemaVersion": 1,
+      "ios": { "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "minimum-only": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "null-minimum": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": null, "latestVersion": "1.4.0", "latestMinimumOS": null, "storeURL": "https://apps.apple.com/app/id1", "message": null }
+    },
+    "no-versions": {
+      "schemaVersion": 1,
+      "ios": { "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "schema-2": {
+      "schemaVersion": 2,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "schema-missing": {
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "schema-string": {
+      "schemaVersion": "1",
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "schema-bool": {
+      "schemaVersion": true,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "platform-not-object": {
+      "schemaVersion": 1,
+      "ios": "1.4.0"
+    },
+    "store-url-missing": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0" }
+    },
+    "store-url-http": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "http://apps.apple.com/app/id1" }
+    },
+    "store-url-custom-scheme": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "itms-apps://apps.apple.com/app/id1" }
+    },
+    "store-url-no-host": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https:///app/id1" }
+    },
+    "store-url-empty-host": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://" }
+    },
+    "store-url-space": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app id1" }
+    },
+    "store-url-userinfo": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com@example.com/app" }
+    },
+    "store-url-number": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "storeURL": 42 }
+    },
+    "minimum-invalid": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "latest", "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "minimum-number": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": 2, "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "latest-invalid": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "min-os-invalid": {
+      "schemaVersion": 1,
+      "ios": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "latestMinimumOS": "seventeen", "storeURL": "https://apps.apple.com/app/id1" }
+    },
+    "min-os-number": {
+      "schemaVersion": 1,
+      "android": { "minimumVersion": "1.2.0", "latestVersion": "1.4.0", "latestMinimumOS": 26, "storeURL": "https://play.google.com/store/apps/details?id=a" }
+    },
+    "message-not-object": {
+      "schemaVersion": 1,
+      "ios": { "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1", "message": ["Please update."] }
+    },
+    "message-bad-entry": {
+      "schemaVersion": 1,
+      "ios": { "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1", "message": { "de": 5, "en": "Update, please." } }
+    },
+    "message-german-only": {
+      "schemaVersion": 1,
+      "ios": { "latestVersion": "1.4.0", "storeURL": "https://apps.apple.com/app/id1", "message": { "de": "Bitte aktualisieren." } }
+    }
+  },
+  "cases": [
+    { "name": "installed equals latest", "config": "standard", "platform": "ios", "appVersion": "1.4.0", "osVersion": "18.0", "languages": ["en-US"], "decision": "upToDate" },
+    { "name": "installed above latest", "config": "standard", "platform": "ios", "appVersion": "1.5", "osVersion": "18.0", "languages": ["en-US"], "decision": "upToDate" },
+    { "name": "installed equals latest with build suffix", "config": "standard", "platform": "ios", "appVersion": "1.4 (812)", "osVersion": "18.0", "languages": ["en-US"], "decision": "upToDate" },
+    { "name": "between minimum and latest: soft", "config": "standard", "platform": "ios", "appVersion": "1.3.0", "osVersion": "18.0", "languages": ["en-US"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id123456789", "message": "Please update." },
+    { "name": "installed equals minimum (1.2 == 1.2.0): soft", "config": "standard", "platform": "ios", "appVersion": "1.2", "osVersion": "18.0", "languages": ["en-US"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id123456789", "message": "Please update." },
+    { "name": "below minimum: hard", "config": "standard", "platform": "ios", "appVersion": "1.1.9", "osVersion": "18.0", "languages": ["en-US"], "decision": "hardUpdate", "storeURL": "https://apps.apple.com/app/id123456789", "message": "Please update." },
+    { "name": "below minimum with build suffix: hard", "config": "standard", "platform": "ios", "appVersion": "1.1.9 (77)", "osVersion": "18.0", "languages": ["en-US"], "decision": "hardUpdate", "storeURL": "https://apps.apple.com/app/id123456789", "message": "Please update." },
+    { "name": "German user gets the German message", "config": "standard", "platform": "ios", "appVersion": "1.0", "osVersion": "18.0", "languages": ["de-DE"], "decision": "hardUpdate", "storeURL": "https://apps.apple.com/app/id123456789", "message": "Bitte aktualisieren." },
+    { "name": "French user falls back to English", "config": "standard", "platform": "ios", "appVersion": "1.3", "osVersion": "18.0", "languages": ["fr-FR"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id123456789", "message": "Please update." },
+    { "name": "OS equal to latestMinimumOS: soft", "config": "standard", "platform": "ios", "appVersion": "1.3", "osVersion": "17", "languages": ["en"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id123456789", "message": "Please update." },
+    { "name": "OS below latestMinimumOS: no soft prompt (cannot install)", "config": "standard", "platform": "ios", "appVersion": "1.3", "osVersion": "16.7.2", "languages": ["en"], "decision": "upToDate" },
+    { "name": "OS below latestMinimumOS: hard becomes no prompt (fail open)", "config": "standard", "platform": "ios", "appVersion": "1.0", "osVersion": "16.7.2", "languages": ["en"], "decision": "upToDate" },
+    { "name": "unparseable OS version with latestMinimumOS set: no prompt", "config": "standard", "platform": "ios", "appVersion": "1.0", "osVersion": "unknown", "languages": ["en"], "decision": "upToDate" },
+    { "name": "android between minimum and latest: soft", "config": "standard", "platform": "android", "appVersion": "1.3.0", "osVersion": "34", "languages": ["en-GB"], "decision": "softUpdate", "storeURL": "https://play.google.com/store/apps/details?id=com.example.app", "message": "Please update from Google Play." },
+    { "name": "android below minimum: hard, German falls back to English", "config": "standard", "platform": "android", "appVersion": "1.1", "osVersion": "26", "languages": ["de_DE"], "decision": "hardUpdate", "storeURL": "https://play.google.com/store/apps/details?id=com.example.app", "message": "Please update from Google Play." },
+    { "name": "android API level below latestMinimumOS: no prompt", "config": "standard", "platform": "android", "appVersion": "1.1", "osVersion": "25", "languages": ["en"], "decision": "upToDate" },
+    { "name": "unparseable installed version", "config": "standard", "platform": "ios", "appVersion": "dev", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "empty installed version", "config": "standard", "platform": "ios", "appVersion": "", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "requested platform missing from config", "config": "ios-only", "platform": "android", "appVersion": "1.0", "osVersion": "34", "languages": ["en"], "decision": "upToDate" },
+    { "name": "no latestMinimumOS: OS version is not checked", "config": "ios-only", "platform": "ios", "appVersion": "1.0", "osVersion": "not-a-version", "languages": ["en"], "decision": "hardUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": null },
+    { "name": "unknown fields and platforms are ignored", "config": "unknown-fields", "platform": "ios", "appVersion": "1.3", "osVersion": "18.0", "languages": ["en"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": null },
+    { "name": "only latestVersion: never hard", "config": "latest-only", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": null },
+    { "name": "only minimumVersion: hard below it", "config": "minimum-only", "platform": "ios", "appVersion": "1.1", "osVersion": "18.0", "languages": ["en"], "decision": "hardUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": null },
+    { "name": "only minimumVersion: nothing at or above it", "config": "minimum-only", "platform": "ios", "appVersion": "1.2.0", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "null fields count as absent", "config": "null-minimum", "platform": "ios", "appVersion": "0.1", "osVersion": "1.0", "languages": ["en"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": null },
+    { "name": "no versions: nothing to prompt", "config": "no-versions", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "no config at all", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "empty config text", "configText": "", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "truncated JSON", "configText": "{\"schemaVersion\": 1, \"ios\": {\"minimumVersion\": \"9.0\"", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "not JSON (HTML error page)", "configText": "<html><body>502 Bad Gateway</body></html>", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "JSON null", "configText": "null", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "JSON array", "configText": "[{\"schemaVersion\": 1}]", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "JSON string", "configText": "\"schemaVersion\"", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "unknown schemaVersion", "config": "schema-2", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "missing schemaVersion", "config": "schema-missing", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "schemaVersion as string", "config": "schema-string", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "schemaVersion as boolean", "config": "schema-bool", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "platform block is not an object", "config": "platform-not-object", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL missing", "config": "store-url-missing", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL not https", "config": "store-url-http", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL custom scheme", "config": "store-url-custom-scheme", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL without host", "config": "store-url-no-host", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL is only the scheme", "config": "store-url-empty-host", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL with a space", "config": "store-url-space", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL with userinfo", "config": "store-url-userinfo", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "storeURL not a string", "config": "store-url-number", "platform": "ios", "appVersion": "0.1", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "invalid minimumVersion drops the whole platform block", "config": "minimum-invalid", "platform": "ios", "appVersion": "1.3", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "numeric minimumVersion drops the whole platform block", "config": "minimum-number", "platform": "ios", "appVersion": "1.3", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "invalid latestVersion drops the whole platform block", "config": "latest-invalid", "platform": "ios", "appVersion": "1.0", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "invalid latestMinimumOS drops the whole platform block", "config": "min-os-invalid", "platform": "ios", "appVersion": "1.0", "osVersion": "18.0", "languages": ["en"], "decision": "upToDate" },
+    { "name": "numeric latestMinimumOS drops the whole platform block", "config": "min-os-number", "platform": "android", "appVersion": "1.0", "osVersion": "34", "languages": ["en"], "decision": "upToDate" },
+    { "name": "message not an object: no custom message", "config": "message-not-object", "platform": "ios", "appVersion": "1.3", "osVersion": "18.0", "languages": ["en"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": null },
+    { "name": "non-string message entry is skipped", "config": "message-bad-entry", "platform": "ios", "appVersion": "1.3", "osVersion": "18.0", "languages": ["de-DE"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": "Update, please." },
+    { "name": "no matching language and no English: no custom message", "config": "message-german-only", "platform": "ios", "appVersion": "1.3", "osVersion": "18.0", "languages": ["fr-FR"], "decision": "softUpdate", "storeURL": "https://apps.apple.com/app/id1", "message": null }
+  ]
+}

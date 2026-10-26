@@ -1,0 +1,556 @@
+{
+  "description": "Lifecycle sequences for Analytics. Each case builds a fresh Analytics(buildEnabled) over a recording backend (consentGranted and sessionActive start false), applies `operations` in order and expects the backend to have received exactly `calls`. Operations: setConsent/setSession assign the property; track tracks `event` and expects the return value `sent`; failNext makes the backend's next call of that kind (start, capture or stop) throw. The recording backend records a call before throwing, so failed attempts appear in `calls`. Calls are 'start', 'stop' or 'capture:<name>'.",
+  "cases": [
+    {
+      "description": "creating the facade never touches the backend",
+      "buildEnabled": true,
+      "operations": [],
+      "calls": []
+    },
+    {
+      "description": "consent alone does not open the gate",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        }
+      ],
+      "calls": []
+    },
+    {
+      "description": "session alone does not open the gate",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        }
+      ],
+      "calls": []
+    },
+    {
+      "description": "gate opens when consent then session are set; backend starts once, before the first capture",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        },
+        {
+          "op": "track",
+          "event": "item_added",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "capture:app_opened",
+        "capture:item_added"
+      ]
+    },
+    {
+      "description": "gate opens in either order",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "capture:app_opened"
+      ]
+    },
+    {
+      "description": "backend starts as soon as the gate opens, even with no event tracked",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        }
+      ],
+      "calls": [
+        "start"
+      ]
+    },
+    {
+      "description": "buildEnabled false: nothing ever reaches the backend",
+      "buildEnabled": false,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        },
+        {
+          "op": "setConsent",
+          "value": false
+        },
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        }
+      ],
+      "calls": []
+    },
+    {
+      "description": "setting the same value again does not restart the backend",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "capture:app_opened"
+      ]
+    },
+    {
+      "description": "revoking consent stops the backend and later events are dropped",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        },
+        {
+          "op": "setConsent",
+          "value": false
+        },
+        {
+          "op": "track",
+          "event": "item_added",
+          "sent": false
+        }
+      ],
+      "calls": [
+        "start",
+        "capture:app_opened",
+        "stop"
+      ]
+    },
+    {
+      "description": "ending the session stops the backend",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": false
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        }
+      ],
+      "calls": [
+        "start",
+        "stop"
+      ]
+    },
+    {
+      "description": "re-opening the gate restarts the backend",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": false
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "stop",
+        "start",
+        "capture:app_opened"
+      ]
+    },
+    {
+      "description": "closing a gate that never opened does not call stop",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setConsent",
+          "value": false
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": false
+        }
+      ],
+      "calls": []
+    },
+    {
+      "description": "closing both conditions stops only once",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setConsent",
+          "value": false
+        },
+        {
+          "op": "setSession",
+          "value": false
+        }
+      ],
+      "calls": [
+        "start",
+        "stop"
+      ]
+    },
+    {
+      "description": "an invalid name is never captured, even with the gate open",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "App_Opened",
+          "sent": false
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "capture:app_opened"
+      ]
+    },
+    {
+      "description": "a failing start is rolled back with stop; the next track retries start",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "failNext",
+          "call": "start"
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "stop",
+        "start",
+        "capture:app_opened"
+      ]
+    },
+    {
+      "description": "a failing start inside track is rolled back and drops that event; the following one retries",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "failNext",
+          "call": "start"
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "failNext",
+          "call": "start"
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        },
+        {
+          "op": "track",
+          "event": "item_added",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "stop",
+        "start",
+        "stop",
+        "start",
+        "capture:item_added"
+      ]
+    },
+    {
+      "description": "a failing capture returns false and the backend stays started",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "failNext",
+          "call": "capture"
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "capture:app_opened",
+        "capture:app_opened"
+      ]
+    },
+    {
+      "description": "a failing stop still counts as stopped: events are dropped and re-opening starts again",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "failNext",
+          "call": "stop"
+        },
+        {
+          "op": "setConsent",
+          "value": false
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": false
+        },
+        {
+          "op": "setConsent",
+          "value": true
+        }
+      ],
+      "calls": [
+        "start",
+        "stop",
+        "start"
+      ]
+    },
+    {
+      "description": "a failed start is stopped at once (rollback) and not stopped again when the gate closes",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "failNext",
+          "call": "start"
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": false
+        }
+      ],
+      "calls": [
+        "start",
+        "stop"
+      ]
+    },
+    {
+      "description": "a failing rollback stop is swallowed; re-opening the gate starts again",
+      "buildEnabled": true,
+      "operations": [
+        {
+          "op": "setConsent",
+          "value": true
+        },
+        {
+          "op": "failNext",
+          "call": "start"
+        },
+        {
+          "op": "failNext",
+          "call": "stop"
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "setSession",
+          "value": false
+        },
+        {
+          "op": "setSession",
+          "value": true
+        },
+        {
+          "op": "track",
+          "event": "app_opened",
+          "sent": true
+        }
+      ],
+      "calls": [
+        "start",
+        "stop",
+        "start",
+        "capture:app_opened"
+      ]
+    }
+  ]
+}

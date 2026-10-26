@@ -1,0 +1,72 @@
+{
+  "description": "Store \"What's New\" text for one store locale. The locale is resolved like the app (locale.json, falling back to en). Each bullet is trimmed, empty ones are skipped, and each is written as \"• <bullet>\", one per line (joined with \\n, no trailing newline). show=false gives \"Bug fixes and improvements.\" Length is counted in UTF-16 code units (never less than what Play counts); over the limit (default 500, Play's) the result is tooLong with the length, never a truncated text. No bullets for any matching locale gives noNotes.",
+  "cases": [
+    {
+      "name": "bullets joined one per line",
+      "notes": { "show": true, "notes": { "en": ["You can now export to CSV.", "  Fixed a crash on launch. "] } },
+      "locale": "en-US",
+      "expected": { "text": "• You can now export to CSV.\n• Fixed a crash on launch." }
+    },
+    {
+      "name": "translation used when present",
+      "notes": { "show": true, "notes": { "en": ["New look."], "de-DE": ["Neues Design."] } },
+      "locale": "de-DE",
+      "expected": { "text": "• Neues Design." }
+    },
+    {
+      "name": "missing translation falls back to language, then en",
+      "notes": { "show": true, "notes": { "en": ["New look."], "pt": ["Novo visual."] } },
+      "locale": "pt-BR",
+      "expected": { "text": "• Novo visual." }
+    },
+    {
+      "name": "missing translation falls back to en",
+      "notes": { "show": true, "notes": { "en": ["New look."] } },
+      "locale": "ja-JP",
+      "expected": { "text": "• New look." }
+    },
+    {
+      "name": "fix-only release",
+      "notes": { "show": false, "notes": { "en": ["Fixed sync."] } },
+      "locale": "en-US",
+      "expected": { "text": "Bug fixes and improvements." }
+    },
+    {
+      "name": "exactly 500 is allowed",
+      "notes": { "show": true, "notes": { "en": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] } },
+      "locale": "en",
+      "expected": { "length": 500 }
+    },
+    {
+      "name": "501 is too long",
+      "notes": { "show": true, "notes": { "en": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] } },
+      "locale": "en",
+      "expected": { "tooLong": 501 }
+    },
+    {
+      "name": "custom limit",
+      "notes": { "show": true, "notes": { "en": ["Twelve chars"] } },
+      "locale": "en",
+      "limit": 10,
+      "expected": { "tooLong": 14 }
+    },
+    {
+      "name": "emoji count as two UTF-16 units",
+      "notes": { "show": true, "notes": { "en": ["🎉 Party"] } },
+      "locale": "en",
+      "expected": { "text": "• 🎉 Party", "length": 10 }
+    },
+    {
+      "name": "no notes for any matching locale",
+      "notes": { "show": true, "notes": { "de": ["Hallo."] } },
+      "locale": "fr-FR",
+      "expected": { "noNotes": true }
+    },
+    {
+      "name": "only empty bullets",
+      "notes": { "show": true, "notes": { "en": ["", " "] } },
+      "locale": "en",
+      "expected": { "noNotes": true }
+    }
+  ]
+}

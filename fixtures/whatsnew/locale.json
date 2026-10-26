@@ -1,0 +1,18 @@
+{
+  "description": "Which notes locale to use. Inputs: the user's preferred locales in order and the locales a notes file has. For each preferred locale, try it, then drop trailing subtags one by one (pt-BR -> pt, zh-Hant-TW -> zh-Hant -> zh); after all preferred locales, try en. Matching is ASCII case-insensitive and treats _ like -. The result is the available key as spelled in the file, or null when nothing matches.",
+  "cases": [
+    { "name": "exact match", "preferred": ["pt-BR"], "available": ["en", "pt", "pt-BR"], "expected": "pt-BR" },
+    { "name": "region falls back to language", "preferred": ["pt-BR"], "available": ["en", "pt"], "expected": "pt" },
+    { "name": "language falls back to en", "preferred": ["pt-BR"], "available": ["en", "de"], "expected": "en" },
+    { "name": "script and region are dropped one at a time", "preferred": ["zh-Hant-TW"], "available": ["en", "zh", "zh-Hant"], "expected": "zh-Hant" },
+    { "name": "second preferred locale beats en", "preferred": ["pt-BR", "de-AT"], "available": ["en", "de"], "expected": "de" },
+    { "name": "earlier preferred locale wins even via fallback", "preferred": ["de-AT", "fr"], "available": ["en", "fr", "de"], "expected": "de" },
+    { "name": "case and underscore are ignored, key returned as spelled", "preferred": ["PT_br"], "available": ["en", "pt-BR"], "expected": "pt-BR" },
+    { "name": "regional en request", "preferred": ["en-GB"], "available": ["en", "de"], "expected": "en" },
+    { "name": "language request does not pick a regional variant", "preferred": ["pt"], "available": ["en", "pt-BR"], "expected": "en" },
+    { "name": "no preferred locales", "preferred": [], "available": ["en"], "expected": "en" },
+    { "name": "blank preferred entries are skipped", "preferred": ["", "  ", "de"], "available": ["en", "de"], "expected": "de" },
+    { "name": "nothing matches and no en", "preferred": ["fr"], "available": ["de"], "expected": null },
+    { "name": "no notes at all", "preferred": ["en"], "available": [], "expected": null }
+  ]
+}

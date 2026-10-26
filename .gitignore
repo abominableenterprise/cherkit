@@ -1,0 +1,15 @@
+# Swift
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj/xcuserdata/
+DerivedData/
+# Gradle / Kotlin / Android
+.gradle/
+.kotlin/
+build/
+local.properties
+# IDEs and OS
+.idea/
+*.iml
+.DS_Store

@@ -1,0 +1,95 @@
+{
+  "description": "What to show on launch. Inputs: every bundled notes file (version + show), the installed version and the last-seen version (null on first launch). Output: the versions whose notes to show, newest first, and the last-seen version to store. Rules: first launch (or an unreadable stored last-seen) shows nothing and stores the installed version; an update shows show=true notes with lastSeen < version <= installed and stores the installed version; same version or downgrade shows nothing and keeps lastSeen (so re-upgrading does not repeat notes). An invalid installed version fails open: nothing shown, lastSeen unchanged. For duplicate versions (1.3 and 1.3.0) the first one wins. Stored versions are normalized (AppVersion description, no build suffix).",
+  "cases": [
+    {
+      "name": "first launch ever shows nothing",
+      "notes": [{ "version": "1.3.0", "show": true }, { "version": "1.4.0", "show": true }],
+      "installed": "1.4.0", "lastSeen": null,
+      "expected": { "show": [], "lastSeen": "1.4.0" }
+    },
+    {
+      "name": "update shows every newer version up to installed, newest first",
+      "notes": [
+        { "version": "1.1.0", "show": true }, { "version": "1.2.0", "show": true },
+        { "version": "1.4.0", "show": true }, { "version": "1.3.0", "show": true }
+      ],
+      "installed": "1.4.0", "lastSeen": "1.1.0",
+      "expected": { "show": ["1.4.0", "1.3.0", "1.2.0"], "lastSeen": "1.4.0" }
+    },
+    {
+      "name": "fix-only releases are skipped",
+      "notes": [{ "version": "1.2.0", "show": true }, { "version": "1.2.1", "show": false }, { "version": "1.3.0", "show": true }],
+      "installed": "1.3.0", "lastSeen": "1.1.0",
+      "expected": { "show": ["1.3.0", "1.2.0"], "lastSeen": "1.3.0" }
+    },
+    {
+      "name": "update to a fix-only release shows nothing but stores it",
+      "notes": [{ "version": "1.2.0", "show": true }, { "version": "1.2.1", "show": false }],
+      "installed": "1.2.1", "lastSeen": "1.2.0",
+      "expected": { "show": [], "lastSeen": "1.2.1" }
+    },
+    {
+      "name": "notes newer than installed are not shown",
+      "notes": [{ "version": "1.2.0", "show": true }, { "version": "1.3.0", "show": true }],
+      "installed": "1.2.0", "lastSeen": "1.1.0",
+      "expected": { "show": ["1.2.0"], "lastSeen": "1.2.0" }
+    },
+    {
+      "name": "update without a notes file for the installed version",
+      "notes": [{ "version": "1.2.0", "show": true }],
+      "installed": "1.3.0", "lastSeen": "1.1.0",
+      "expected": { "show": ["1.2.0"], "lastSeen": "1.3.0" }
+    },
+    {
+      "name": "same version shows nothing",
+      "notes": [{ "version": "1.4.0", "show": true }],
+      "installed": "1.4.0", "lastSeen": "1.4.0",
+      "expected": { "show": [], "lastSeen": "1.4.0" }
+    },
+    {
+      "name": "same version with a different build suffix and spelling",
+      "notes": [{ "version": "1.4.0", "show": true }],
+      "installed": "1.4 (52)", "lastSeen": "1.4.0",
+      "expected": { "show": [], "lastSeen": "1.4.0" }
+    },
+    {
+      "name": "downgrade shows nothing and keeps the higher last-seen",
+      "notes": [{ "version": "1.3.0", "show": true }, { "version": "1.4.0", "show": true }],
+      "installed": "1.3.0", "lastSeen": "1.4.0",
+      "expected": { "show": [], "lastSeen": "1.4.0" }
+    },
+    {
+      "name": "installed version with a build suffix is normalized when stored",
+      "notes": [{ "version": "2.0", "show": true }],
+      "installed": "2.0.0 (101)", "lastSeen": "1.9",
+      "expected": { "show": ["2.0"], "lastSeen": "2.0.0" }
+    },
+    {
+      "name": "invalid installed version fails open",
+      "notes": [{ "version": "1.4.0", "show": true }],
+      "installed": "unknown", "lastSeen": "1.3.0",
+      "expected": { "show": [], "lastSeen": "1.3.0" }
+    },
+    {
+      "name": "unreadable stored last-seen counts as first launch",
+      "notes": [{ "version": "1.4.0", "show": true }],
+      "installed": "1.4.0", "lastSeen": "garbage",
+      "expected": { "show": [], "lastSeen": "1.4.0" }
+    },
+    {
+      "name": "duplicate versions are shown once, first wins",
+      "notes": [
+        { "version": "1.3", "show": true },
+        { "version": "1.3.0", "show": true }, { "version": "1.2.0", "show": true }
+      ],
+      "installed": "1.3.0", "lastSeen": "1.2.0",
+      "expected": { "show": ["1.3"], "lastSeen": "1.3.0" }
+    },
+    {
+      "name": "no bundled notes at all",
+      "notes": [],
+      "installed": "1.4.0", "lastSeen": "1.3.0",
+      "expected": { "show": [], "lastSeen": "1.4.0" }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Which config to use. `fetched` is the body just downloaded (null: the fetch failed or timed out); `cached` is the last good config saved by the app (null: none). A usable fetched config wins and should be cached; otherwise a usable cached config; otherwise none (upToDate). An unusable fetch never replaces the cache.",
+  "cases": [
+    { "name": "good fetch wins over cache", "fetched": "{\"schemaVersion\": 1, \"ios\": {\"latestVersion\": \"2.0\", \"storeURL\": \"https://apps.apple.com/app/id1\"}}", "cached": "{\"schemaVersion\": 1}", "source": "fetched" },
+    { "name": "good fetch, no cache", "fetched": "{\"schemaVersion\": 1}", "cached": null, "source": "fetched" },
+    { "name": "fetch failed: use cache", "fetched": null, "cached": "{\"schemaVersion\": 1, \"ios\": {\"latestVersion\": \"2.0\", \"storeURL\": \"https://apps.apple.com/app/id1\"}}", "source": "cached" },
+    { "name": "fetch returned an error page: use cache", "fetched": "<html>503</html>", "cached": "{\"schemaVersion\": 1}", "source": "cached" },
+    { "name": "fetch returned an unknown schema: use cache", "fetched": "{\"schemaVersion\": 2}", "cached": "{\"schemaVersion\": 1}", "source": "cached" },
+    { "name": "fetch failed, no cache: none", "fetched": null, "cached": null, "source": "missing" },
+    { "name": "fetch failed, cache corrupt: none", "fetched": null, "cached": "{\"schemaVers", "source": "missing" },
+    { "name": "both unusable: none", "fetched": "", "cached": "[]", "source": "missing" }
+  ]
+}

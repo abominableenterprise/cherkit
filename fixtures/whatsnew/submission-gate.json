@@ -1,0 +1,88 @@
+{
+  "description": "Store submission gate: does the version being submitted have a valid notes file? Inputs: the version and the available notes files (file name or path -> JSON content). A file belongs to the version when its name is <v>.json and AppVersion(v) equals the version, so 1.4.json counts for 1.4.0. Result: ok, missing (no such file), or invalid with the errors from notes-file.json (also used for an invalid version or for two files for the same version). Files for other versions are not checked.",
+  "cases": [
+    {
+      "name": "valid notes file",
+      "version": "1.4.0",
+      "files": {
+        "whatsnew/1.3.0.json": { "version": "1.3.0", "notes": { "en": ["Old."] } },
+        "whatsnew/1.4.0.json": { "version": "1.4.0", "notes": { "en": ["New."] } }
+      },
+      "expected": { "status": "ok", "errors": [] }
+    },
+    {
+      "name": "fix-only release passes",
+      "version": "1.4.1",
+      "files": { "1.4.1.json": { "version": "1.4.1", "show": false } },
+      "expected": { "status": "ok", "errors": [] }
+    },
+    {
+      "name": "version spelled differently, build suffix ignored",
+      "version": "1.4 (52)",
+      "files": { "1.4.0.json": { "version": "1.4.0", "notes": { "en": ["New."] } } },
+      "expected": { "status": "ok", "errors": [] }
+    },
+    {
+      "name": "no notes file for the version",
+      "version": "1.5.0",
+      "files": { "1.4.0.json": { "version": "1.4.0", "notes": { "en": ["New."] } } },
+      "expected": { "status": "missing", "errors": [] }
+    },
+    {
+      "name": "no notes files at all",
+      "version": "1.0.0",
+      "files": {},
+      "expected": { "status": "missing", "errors": [] }
+    },
+    {
+      "name": "other file types are not notes files",
+      "version": "1.4.0",
+      "files": { "1.4.0.md": { "version": "1.4.0" }, "notes.json": { "version": "1.4.0" } },
+      "expected": { "status": "missing", "errors": [] }
+    },
+    {
+      "name": "notes file is invalid",
+      "version": "1.4.0",
+      "files": { "1.4.0.json": { "version": "1.4.0", "notes": { "en": [""] } } },
+      "expected": { "status": "invalid", "errors": [
+        { "code": "emptyBullet", "message": "\"notes.en\" bullet 1 is empty." }
+      ] }
+    },
+    {
+      "name": "stale file copied from the previous release",
+      "version": "1.4.0",
+      "files": { "1.4.0.json": { "version": "1.3.0", "notes": { "en": ["Old."] } } },
+      "expected": { "status": "invalid", "errors": [
+        { "code": "fileNameMismatch", "message": "File name \"1.4.0.json\" does not match version \"1.3.0\"; expected \"1.3.0.json\"." }
+      ] }
+    },
+    {
+      "name": "an invalid file for another version does not fail the gate",
+      "version": "1.4.0",
+      "files": {
+        "1.3.0.json": { "version": "9.9.9" },
+        "1.4.0.json": { "version": "1.4.0", "show": false }
+      },
+      "expected": { "status": "ok", "errors": [] }
+    },
+    {
+      "name": "two files for the same version",
+      "version": "1.4.0",
+      "files": {
+        "1.4.json": { "version": "1.4", "show": false },
+        "1.4.0.json": { "version": "1.4.0", "show": false }
+      },
+      "expected": { "status": "invalid", "errors": [
+        { "code": "duplicateFile", "message": "More than one notes file for version \"1.4.0\": 1.4.0.json, 1.4.json." }
+      ] }
+    },
+    {
+      "name": "submitted version is not a valid version",
+      "version": "next",
+      "files": { "1.4.0.json": { "version": "1.4.0", "show": false } },
+      "expected": { "status": "invalid", "errors": [
+        { "code": "invalidVersion", "message": "Version \"next\" is not a valid version." }
+      ] }
+    }
+  ]
+}

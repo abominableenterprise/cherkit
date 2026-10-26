@@ -1,0 +1,25 @@
+{
+  "description": "Message localization contract. Given a config's `messages` (language tag -> text) and the user's preferred `languages` in order, the result is the first match among: each preferred tag, then that tag with trailing subtags removed one at a time (de-DE -> de), then `en`; null when nothing matches (the UI uses its default text). Tags and keys match case-insensitively (ASCII) with `_` treated as `-`; empty texts, empty tags and tags or keys with non-ASCII characters are skipped; when two keys collide after that, the one sorting first (by original key) wins.",
+  "cases": [
+    { "name": "region falls back to language", "messages": { "en": "Update", "de": "Aktualisieren" }, "languages": ["de-DE"], "expected": "Aktualisieren" },
+    { "name": "exact language", "messages": { "en": "Update", "de": "Aktualisieren" }, "languages": ["de"], "expected": "Aktualisieren" },
+    { "name": "exact region wins over language", "messages": { "pt": "Atualize", "pt-BR": "Atualize, por favor" }, "languages": ["pt-BR"], "expected": "Atualize, por favor" },
+    { "name": "other region falls back to language", "messages": { "pt": "Atualize", "pt-BR": "Atualize, por favor" }, "languages": ["pt-PT"], "expected": "Atualize" },
+    { "name": "script and region subtags removed one at a time", "messages": { "zh": "更新", "zh-Hant": "更新應用程式" }, "languages": ["zh-Hant-TW"], "expected": "更新應用程式" },
+    { "name": "second preferred language before English", "messages": { "en": "Update", "de": "Aktualisieren" }, "languages": ["fr-FR", "de-DE"], "expected": "Aktualisieren" },
+    { "name": "no match falls back to English", "messages": { "en": "Update", "de": "Aktualisieren" }, "languages": ["fr-FR"], "expected": "Update" },
+    { "name": "English region variant via fallback", "messages": { "en": "Update" }, "languages": ["en-AU"], "expected": "Update" },
+    { "name": "no preferred languages: English", "messages": { "en": "Update" }, "languages": [], "expected": "Update" },
+    { "name": "no match and no English: null", "messages": { "de": "Aktualisieren" }, "languages": ["fr-FR"], "expected": null },
+    { "name": "no messages: null", "messages": {}, "languages": ["en-US"], "expected": null },
+    { "name": "underscore tag (Android Locale.toString)", "messages": { "en": "Update", "de": "Aktualisieren" }, "languages": ["de_AT"], "expected": "Aktualisieren" },
+    { "name": "case-insensitive tags", "messages": { "en": "Update", "pt-br": "Atualize" }, "languages": ["PT-BR"], "expected": "Atualize" },
+    { "name": "case-insensitive keys, including the English fallback", "messages": { "EN": "Update", "de_CH": "Aktualisieren" }, "languages": ["fr"], "expected": "Update" },
+    { "name": "underscore key", "messages": { "en": "Update", "de_CH": "Aktualisieren" }, "languages": ["de-CH"], "expected": "Aktualisieren" },
+    { "name": "empty text is skipped", "messages": { "en": "Update", "de": "" }, "languages": ["de-DE"], "expected": "Update" },
+    { "name": "empty tag is skipped", "messages": { "en": "Update", "de": "Aktualisieren" }, "languages": ["", "de"], "expected": "Aktualisieren" },
+    { "name": "non-ASCII key is skipped", "messages": { "en": "Update", "dé": "Aktualisieren" }, "languages": ["dé"], "expected": "Update" },
+    { "name": "non-ASCII tag is skipped", "messages": { "en": "Update", "de": "Aktualisieren" }, "languages": ["dé-DE", "de"], "expected": "Aktualisieren" },
+    { "name": "colliding keys: first by original key wins", "messages": { "de": "klein", "DE": "GROSS" }, "languages": ["de"], "expected": "GROSS" }
+  ]
+}

@@ -1,0 +1,237 @@
+{
+  "description": "Decision table for Analytics.track: an event is sent only when buildEnabled, consentGranted and sessionActive are all true AND its name matches ^[a-z][a-z0-9_]{0,63}$ (ASCII only). Each case builds a fresh Analytics with a recording backend, sets consentGranted then sessionActive, tracks one event, and expects track to return `sent` and the backend to have captured the event exactly when `sent` is true.",
+  "cases": [
+    {
+      "description": "gate buildEnabled=False consentGranted=False sessionActive=False",
+      "buildEnabled": false,
+      "consentGranted": false,
+      "sessionActive": false,
+      "event": "app_opened",
+      "sent": false
+    },
+    {
+      "description": "gate buildEnabled=False consentGranted=False sessionActive=True",
+      "buildEnabled": false,
+      "consentGranted": false,
+      "sessionActive": true,
+      "event": "app_opened",
+      "sent": false
+    },
+    {
+      "description": "gate buildEnabled=False consentGranted=True sessionActive=False",
+      "buildEnabled": false,
+      "consentGranted": true,
+      "sessionActive": false,
+      "event": "app_opened",
+      "sent": false
+    },
+    {
+      "description": "gate buildEnabled=False consentGranted=True sessionActive=True",
+      "buildEnabled": false,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "app_opened",
+      "sent": false
+    },
+    {
+      "description": "gate buildEnabled=True consentGranted=False sessionActive=False",
+      "buildEnabled": true,
+      "consentGranted": false,
+      "sessionActive": false,
+      "event": "app_opened",
+      "sent": false
+    },
+    {
+      "description": "gate buildEnabled=True consentGranted=False sessionActive=True",
+      "buildEnabled": true,
+      "consentGranted": false,
+      "sessionActive": true,
+      "event": "app_opened",
+      "sent": false
+    },
+    {
+      "description": "gate buildEnabled=True consentGranted=True sessionActive=False",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": false,
+      "event": "app_opened",
+      "sent": false
+    },
+    {
+      "description": "gate buildEnabled=True consentGranted=True sessionActive=True",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "app_opened",
+      "sent": true
+    },
+    {
+      "description": "valid name: shortest name: one lowercase letter",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "a",
+      "sent": true
+    },
+    {
+      "description": "valid name: digits after the first letter",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "a1",
+      "sent": true
+    },
+    {
+      "description": "valid name: underscores",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "item_added",
+      "sent": true
+    },
+    {
+      "description": "valid name: trailing underscore",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "x_",
+      "sent": true
+    },
+    {
+      "description": "valid name: 64 characters, the maximum",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb9",
+      "sent": true
+    },
+    {
+      "description": "invalid name rejected: empty",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: uppercase first letter",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "App_opened",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: uppercase later letter",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "app_Opened",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: starts with a digit",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "1st_event",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: starts with an underscore",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "_private",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: hyphen",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "app-opened",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: space",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "app opened",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: dot",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "app.opened",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: trailing newline",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "app_opened\n",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: leading space",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": " app_opened",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: non-ASCII letter",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "caf\u00e9",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: full-width letter",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "\uff41pp",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: Kelvin sign (lowercases to k)",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "\u212aelvin",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: 65 characters, one over the maximum",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb9x",
+      "sent": false
+    },
+    {
+      "description": "invalid name rejected: provider-reserved prefix",
+      "buildEnabled": true,
+      "consentGranted": true,
+      "sessionActive": true,
+      "event": "$screen",
+      "sent": false
+    },
+    {
+      "description": "invalid name with the gate closed",
+      "buildEnabled": true,
+      "consentGranted": false,
+      "sessionActive": true,
+      "event": "App",
+      "sent": false
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+gradlew text eol=lf
+*.sh text eol=lf
+scripts/size-check text eol=lf
+*.bat text eol=crlf
+gradle/wrapper/gradle-wrapper.jar binary
