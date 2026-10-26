@@ -16,22 +16,6 @@ struct SunsetPromptModifier: ViewModifier {
 
     @Environment(\.openURL) private var openURL
 
-    init(
-        decision: Binding<SunsetDecision?>,
-        latestVersion: String?,
-        installedVersion: String,
-        memory: SunsetSoftPromptMemory,
-        strings: SunsetStrings,
-        appIcon: Image?
-    ) {
-        _decision = decision
-        self.latestVersion = latestVersion
-        self.installedVersion = installedVersion
-        self.memory = memory
-        self.strings = strings
-        self.appIcon = appIcon
-    }
-
     /// The version "Not now" is remembered for when `prompt` is answered: the `latestVersion` parameter, else the
     /// prompt's ``SunsetPrompt/latestVersion``, else the installed version.
     func version(for prompt: SunsetPrompt?) -> String {
