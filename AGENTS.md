@@ -101,7 +101,7 @@ A release is its own small PR, then a tag:
 - Main risks: locking users out (Sunset bugs), privacy leaks (Analytics) and app crashes. Ordinary input validation on
   local data is low severity.
 
-## Review and merge (Paxton's process)
+## Review and merge
 
 - Small, modular code: one job per file; no source file over ~800 lines / 50 KB; new features in new modules.
 - Small PRs: one area, about 500 changed lines or fewer (tests and pure moves excluded). Split bigger work into parts
@@ -111,7 +111,7 @@ A release is its own small PR, then a tag:
   `@checknorrisbot re-review`, `@checknorrisbot rescore`.
 - Findings (reply in the thread, mention first, one reply per thread):
   - real P0/P1: fix with a test, `@checknorrisbot Fixed in <sha> (<what changed>)`;
-  - false positive: explain citing code (the only reply that clears a P0/P1 besides an owner risk acceptance by Paxton);
+  - false positive: explain citing code (the only reply that clears a P0/P1 besides a risk acceptance by the repo owner);
   - minor P2: fix if small, else `@checknorrisbot Deferred to #N: <why minor>` into one `follow-up` issue per PR
     (`Follow-ups from #<PR>: <title>`). Answer every P2 before pushing again.
   - Resolve each thread after its verdict.
