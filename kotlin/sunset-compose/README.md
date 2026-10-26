@@ -37,7 +37,8 @@ fun Root(okHttp: OkHttpClient) {
 }
 ```
 
-It checks with `AndroidSunset.check(checker, context)`:
+It checks with the same app version, OS version and locales as `AndroidSunset.check(checker, context)`, through
+`checker.checkReportingFailure(...)` so it knows when a check failed:
 
 - Once at launch, on the first composition. Only once per process: recomposition, rebuilding the root or recreating
   the activity (rotation) neither fetches again nor drops a hard block.
@@ -45,6 +46,10 @@ It checks with `AndroidSunset.check(checker, context)`:
   `minimumInterval` (1 hour by default; `Duration.ZERO` re-checks on every return). The first `ON_RESUME` and
   `ON_PAUSE` → `ON_RESUME` (a system dialog, a permission prompt) do not count.
 - Never while a check is still running.
+- After a failed check, i.e. the fetch failed, timed out or did not parse and no usable config is cached (e.g. a
+  fresh install with a dropped connection), once more about 3 seconds later. A failed check does not count toward
+  `minimumInterval`: if the retry fails too, the next return from the background (`ON_STOP`, then `ON_RESUME`)
+  re-checks whatever the interval. After a successful check the interval applies again.
 
 A re-check replaces the decision: a hard block goes away once the config no longer requires the update, and a soft
 dialog answered with "Not now" stays hidden for that `latestVersion`. `SunsetChecker.disabled()` never shows anything.
@@ -66,6 +71,8 @@ instead of copying the "Not now" rule. The hard block is not reported: keep chec
 the config no longer requires the update.
 
 Put `SunsetPrompt` inside your `MaterialTheme`: the dialogs use Material 3 and take the theme's colors and type.
+The hard block's **Update** button is a Material `Button`, so its label uses the theme's `onPrimary` on `primary`;
+there is no separate tint parameter (iOS's `tint:` exists because the block runs in its own window there).
 
 - `SoftUpdate`: an `AlertDialog`, "Update available", with **Update** (opens `prompt.storeUrl` through
   `LocalUriHandler`) and **Not now**. "Not now", back and a tap outside are remembered for `prompt.latestVersion`

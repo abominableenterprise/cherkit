@@ -16,6 +16,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.abominableenterprise.cherkit.core.AppVersion
+import com.abominableenterprise.cherkit.sunset.SunsetCheckOutcome
 import com.abominableenterprise.cherkit.sunset.SunsetChecker
 import com.abominableenterprise.cherkit.sunset.SunsetDecision
 import com.abominableenterprise.cherkit.sunset.SunsetPrompt
@@ -75,7 +76,7 @@ class SunsetCheckerPromptUiTest {
                     onVisibilityChange = { visibility += it },
                     check = {
                         fetches++
-                        answers()
+                        SunsetCheckOutcome(answers(), failed = false)
                     },
                 )
             }
@@ -141,7 +142,7 @@ class SunsetCheckerPromptUiTest {
                 if (show) {
                     SunsetCheckerPrompt(runner, Duration.ZERO, memory, strings, null, {}) {
                         fetches++
-                        SunsetDecision.UpToDate
+                        SunsetCheckOutcome(SunsetDecision.UpToDate, failed = false)
                     }
                 }
             }

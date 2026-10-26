@@ -31,18 +31,42 @@ public class SunsetChecker(
     public val platform: SunsetPlatform = SunsetPlatform.ANDROID,
 ) {
     /**
+     * `true` only for [disabled]: [check] answers [SunsetDecision.UpToDate] at once. Read-only, so app tests can
+     * assert they wired the switched-off checker, e.g. `assertTrue(testEnvironment.sunsetChecker.isDisabled)`.
+     */
+    public val isDisabled: Boolean get() = this === DISABLED
+
+    /**
      * Decides for this launch.
      *
      * @param installedVersion The installed app version, e.g. `versionName`.
      * @param osVersion The device OS version: the Android API level (`"34"`) or the iOS version.
      * @param locale The user's preferred language tags in order, e.g. `["de-DE", "en-US"]`.
      */
-    public suspend fun check(installedVersion: String, osVersion: String, locale: List<String>): SunsetDecision {
-        if (this === DISABLED) return SunsetDecision.UpToDate
+    public suspend fun check(installedVersion: String, osVersion: String, locale: List<String>): SunsetDecision =
+        checkReportingFailure(installedVersion, osVersion, locale).decision
+
+    /**
+     * [check] plus whether it failed: [SunsetCheckOutcome.failed] is `true` when there was no usable config at all
+     * (the fetch failed, timed out or did not parse, and nothing usable was cached), so the fail-open
+     * [SunsetDecision.UpToDate] is not a real answer. sunset-compose's `SunsetPrompt(checker = ...)` uses it to retry;
+     * most apps call [check]. Like [check] it never throws, and [disabled] never fails.
+     *
+     * @param installedVersion The installed app version, e.g. `versionName`.
+     * @param osVersion The device OS version: the Android API level (`"34"`) or the iOS version.
+     * @param locale The user's preferred language tags in order, e.g. `["de-DE", "en-US"]`.
+     */
+    public suspend fun checkReportingFailure(
+        installedVersion: String,
+        osVersion: String,
+        locale: List<String>,
+    ): SunsetCheckOutcome {
+        if (isDisabled) return SunsetCheckOutcome(SunsetDecision.UpToDate, failed = false)
         val fetched = fetchWithDeadline()
         val choice = SunsetConfigChoice.choose(fetched, failOpen { cache.load() })
         if (choice.source == SunsetConfigChoice.Source.FETCHED && fetched != null) failOpen { cache.save(fetched) }
-        return SunsetDecider.decide(choice.config, platform, installedVersion, osVersion, locale)
+        val decision = SunsetDecider.decide(choice.config, platform, installedVersion, osVersion, locale)
+        return SunsetCheckOutcome(decision, failed = choice.source == SunsetConfigChoice.Source.MISSING)
     }
 
     /**

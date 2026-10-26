@@ -53,7 +53,8 @@ One public JSON file per app (e.g. on a CDN). Unknown fields are ignored; any `s
 | `protocol SunsetConfigSource` (`fetch(timeout:) async -> Data?`) | `fun interface SunsetConfigSource` (`suspend fetch(timeout): String?`) |
 | `protocol SunsetConfigCache` (`load`, `save`) | `interface SunsetConfigCache` (`load`, `save`) |
 | `SunsetChecker(source:cache:timeout:platform:)`, `check(installedVersion:osVersion:locale:) async` | `SunsetChecker(source, cache, timeout, platform)`, `suspend check(installedVersion, osVersion, locale)` |
-| `SunsetChecker.disabled` | `SunsetChecker.disabled()` |
+| `SunsetChecker.disabled`, `isDisabled` | `SunsetChecker.disabled()`, `isDisabled` |
+| `checkReportingFailure(...)` (`package`, for CherKitUI) | `suspend checkReportingFailure(...): SunsetCheckOutcome(decision, failed)` |
 | `URLSessionSunsetConfigSource(url:session:)` | `FetchSunsetConfigSource(fetch: SunsetFetch)` |
 | `UserDefaultsSunsetConfigCache(defaults:key:)` | `KeyValueSunsetConfigCache(store: SunsetKeyValueStore, key)`; Android: `SharedPreferencesSunsetStore` |
 
@@ -116,6 +117,20 @@ let checker = isUITest ? .disabled : SunsetChecker(url: URL(string: "https://exa
 val checker = if (isUiTest) SunsetChecker.disabled() else AndroidSunset.checker(context) { /* your GET */ }
 ```
 
+`isDisabled` is public and read-only on both platforms, so app tests can assert they wired the switched-off checker:
+`assertTrue(testEnvironment.sunsetChecker.isDisabled)` (Kotlin), `XCTAssertTrue(...sunsetChecker.isDisabled)` (Swift).
+
+## Failed checks
+
+A check *fails* when there is no usable config at all: the fetch failed, timed out or did not parse, and nothing
+usable is cached (e.g. a fresh install whose connection dropped). `check` still fails open and answers `upToDate`.
+Kotlin's `checker.checkReportingFailure(installedVersion, osVersion, locale)` returns the same decision as a
+`SunsetCheckOutcome(decision, failed)`, for code that schedules checks; Swift's twin is `package`-only.
+`SunsetCheckScheduler.checkFinished(failed)` does not count a failed check toward `minimumInterval`, asks for one quick
+retry after the first failure in a row (`shouldRetry(now)`), and while the last check failed lets the next return from
+the background re-check whatever the interval. `SunsetPrompt(checker = ...)` (sunset-compose) and
+`.sunsetPrompt(checker:)` (CherKitUI) do this for you, retrying after about 3 seconds.
+
 ## Hosting the config
 
 Put the JSON on any static HTTPS host; no server code is needed.
@@ -142,5 +157,5 @@ Validate the JSON before publishing: a malformed file never blocks anyone, but a
 - Android: the Compose screens are in the `sunset-compose` module; `SunsetPrompt(checker = ...)` there also runs the
   checks.
 - `SunsetCheckScheduler` (Kotlin, common code) holds the rule both use for when to re-check: once at launch, again
-  only on a return from the background, never two at once, at most once per `minimumInterval`. Use it if you run the
-  checks yourself.
+  only on a return from the background, never two at once, at most once per `minimumInterval`, and a failed check is
+  retried once and does not count (see Failed checks). Use it if you run the checks yourself.
