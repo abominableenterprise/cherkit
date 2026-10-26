@@ -58,14 +58,23 @@ scripts/test.sh                 # everything that runs on Linux; run it before o
 ```
 
 - `scripts/test.sh` runs `scripts/size-check`, `swift test` and `./gradlew :<module>:jvmTest :<module>:testAndroidHostTest`.
-- Linux tasks run on large VMs (4 CPU / 8 GB); `gradle.properties` uses `-Xmx3g` and `test.sh` runs swift + Gradle in
-  parallel.
+  With a module selected it fails if Swift or Gradle ran 0 tests (a `--filter` that matches nothing still passes on
+  its own). At the end it stops the Gradle and Kotlin compile daemons, pass or fail, so no java processes are left.
+- Always use large VMs for Linux tasks (4 CPU / 8 GB); `gradle.properties` uses `-Xmx3g` and `test.sh` runs swift +
+  Gradle in parallel.
+- After a rebase that doesn't touch your module, rerun only that module (`scripts/test.sh <module>`).
+- For a one-off probe on a Mac, use `xcodebuild test -only-testing:<Target>/<Test>` (e.g. with
+  `-scheme CherKit-Package -destination 'platform=iOS Simulator,name=<iPhone>'`) instead of the full script.
+- Hand off right after pushing: hub-merge is on, so don't sit in pr-wait.
 - Needs macOS (not verifiable on Linux): `CherKitUI` (its sources compile to nothing on Linux), building for iOS, and
   any iOS simulator check. Linux tasks say in the PR what they could not verify.
 - On macOS, `scripts/test-mac.sh [module]` (same module selection as `test.sh`) runs the size check, host `swift build`
   + `swift test`, an iOS Simulator build of every library scheme including `CherKitUI`, the Swift tests on an iPhone
   simulator, and the Kotlin `jvmTest` + Android host tests. Steps without a simulator, JDK 17+ or Android SDK are
-  skipped with a message; it ends with a pass/fail summary and timings. **UI or platform-sensitive PRs** (anything in
+  skipped with a message; it ends with a pass/fail summary and timings. Full logs go to `.build/test-mac-logs/`; a
+  failed step (and the simulator test step always) prints only its `error:` lines and last 60 lines, plus the log's
+  path. Like `test.sh`, it fails a
+  selected module whose tests ran 0 times and stops the Gradle and Kotlin daemons at the end. **UI or platform-sensitive PRs** (anything in
   `CherKitUI`, `#if os`/`canImport`/`@available`, `Package.swift` platforms, fixture loading) must be checked with it
   on a macOS task.
 - The PR body lists the commands run with their results, and what was not verified.

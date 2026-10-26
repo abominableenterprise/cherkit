@@ -7,7 +7,9 @@
 # tests on an iPhone simulator, and the Kotlin jvmTest + Android host tests. The simulator tests
 # and the Kotlin tests are skipped with a message when no iPhone simulator, JDK 17+ or Android SDK
 # is available. Steps run one after another so each gets its own time; logs stay in
-# .build/test-mac-logs/.
+# .build/test-mac-logs/ (a failed step prints its `error:` lines and last 60 lines, plus the log's path).
+# With a module selected, a swift test, xcodebuild test or Gradle run that executed 0 tests fails. The
+# Gradle and Kotlin compile daemons are stopped at the end, pass or fail.
 # Env: DEVELOPER_DIR picks the Xcode; CHERKIT_IOS_DESTINATION overrides the simulator
 # (e.g. 'platform=iOS Simulator,name=iPhone 17').
 # Written for macOS's stock bash 3.2: no associative arrays, no empty-array expansion under set -u.
@@ -17,6 +19,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 # shellcheck source=lib/test-mac-helpers.sh
 . "$ROOT/scripts/lib/test-mac-helpers.sh"
+# shellcheck source=lib/test-guards.sh
+. "$ROOT/scripts/lib/test-guards.sh"
 
 [ "$(uname -s)" = "Darwin" ] || { echo "scripts/test-mac.sh runs on macOS; use scripts/test.sh on Linux" >&2; exit 1; }
 command -v xcodebuild >/dev/null || { echo "xcodebuild not found: install Xcode" >&2; exit 1; }
@@ -38,6 +42,8 @@ swift_name() {
 }
 
 SELECTED=("${MODULES[@]}")
+MODULES_SELECTED=0
+[ $# -eq 0 ] || MODULES_SELECTED=1
 if [ $# -gt 0 ]; then
   for m in "$@"; do
     [ -f "kotlin/$m/build.gradle.kts" ] || { echo "unknown module '$m' (known: ${MODULES[*]})" >&2; exit 2; }
@@ -54,20 +60,43 @@ SUMMARY=()
 FAILED=0
 record() { SUMMARY+=("$(printf '%-4s %-55s %s' "$1" "$2" "$3")"); }
 
-# run <log-name> <label> <command...>: runs the command with its output in a log; prints the tail on failure.
+# The Gradle daemon stays up during the run (faster) and is stopped on exit, pass or fail, with the Kotlin
+# compile daemons. Only once a JDK was found: without one, Gradle never ran.
+JAVA_MAJOR=""
+trap '[ -z "$JAVA_MAJOR" ] || stop_build_daemons ./gradlew' EXIT
+trap 'exit 130' INT TERM
+
+# run <log-name> <label> <command...>: runs the command with its full output in a log. On failure prints the
+# log's `error:` lines and last 60 lines (log_excerpt); either way prints the log's path. LAST_RC = exit code.
+LAST_RC=0
 run() {
   local log="$LOGS/$1.log" label="$2" start=$SECONDS rc=0
   shift 2
   echo "==> $label"
   "$@" >"$log" 2>&1 || rc=$?
+  LAST_RC=$rc
   local took=$((SECONDS - start))
   if [ "$rc" -eq 0 ]; then
+    echo "    ok, log: $log"
     record PASS "$label" "${took}s"
   else
-    echo "--- $label failed (exit $rc), last lines of $log ---"
-    tail -n 40 "$log"
+    echo "--- $label failed (exit $rc) ---"
+    log_excerpt "$log" 60
     record FAIL "$label" "${took}s"
     FAILED=1
+  fi
+}
+
+# require_tests <count> <label>: with a module selected, a passing step that executed 0 tests fails (a filter
+# or -only-testing that matches nothing still exits 0).
+require_tests() {
+  [ "$MODULES_SELECTED" -eq 1 ] && [ "$LAST_RC" -eq 0 ] || return 0
+  if [ "$1" -eq 0 ]; then
+    echo "ERROR: $2 executed 0 tests: the module's filter matched no tests"
+    record FAIL "$2: executed 0 tests" ""
+    FAILED=1
+  else
+    echo "    $1 tests"
   fi
 }
 
@@ -112,6 +141,7 @@ fi
 for target in ${TEST_TARGETS[@]+"${TEST_TARGETS[@]}"}; do SWIFT_TEST+=(--filter "$target"); done
 run swift-build "swift build (macOS host)" swift build
 run swift-test "${SWIFT_TEST[*]} (macOS host)" "${SWIFT_TEST[@]}"
+require_tests "$(tests_run_count "$LOGS/swift-test.log")" "${SWIFT_TEST[*]} (macOS host)"
 
 # 3. iOS Simulator build of every library scheme (the package's auto-generated schemes, minus the
 #    aggregate CherKit-Package). With modules selected: their schemes, plus CherKitUI when the module
@@ -170,13 +200,15 @@ else
   run ios-test "xcodebuild test -scheme CherKit-Package (iOS Simulator)" \
     xcodebuild -scheme CherKit-Package -destination "$DESTINATION" -derivedDataPath "$DERIVED" \
     test ${ONLY[@]+"${ONLY[@]}"}
+  # Its tail holds the test summary: print it on success too (run already did on failure).
+  [ "$LAST_RC" -ne 0 ] || log_excerpt "$LOGS/ios-test.log" 60
+  require_tests "$(tests_run_count "$LOGS/ios-test.log")" "xcodebuild test (iOS Simulator)"
 fi
 
 # 5. Kotlin: jvmTest needs JDK 17+; the Android host tests also need an Android SDK. Linux covers both.
 # Candidates in order: $JAVA_HOME, java on PATH, macOS's registered JDK 17+. The first one that is 17+ wins and
 # becomes JAVA_HOME for Gradle; FOUND lists the versions seen, for the skip message.
 java_home_of() { "$1" -XshowSettings:properties -version 2>&1 | sed -n 's/^ *java\.home = //p' | head -n 1; }
-JAVA_MAJOR=""
 FOUND=""
 for candidate in "${JAVA_HOME:+$JAVA_HOME/bin/java}" "$(command -v java || true)" \
   "$(/usr/libexec/java_home -v 17+ 2>/dev/null | sed 's|$|/bin/java|' || true)"; do
@@ -202,6 +234,12 @@ else
   done
   if [ -n "$SDK" ]; then use_android_sdk "$SDK"; fi
   run gradle "./gradlew ${GRADLE_TASKS[*]} (JDK $JAVA_MAJOR)" ./gradlew --console=plain "${GRADLE_TASKS[@]}"
+  # With modules selected, each must have run tests (JUnit reports under kotlin/<module>/build/test-results/).
+  GRADLE_RC=$LAST_RC
+  for m in "${SELECTED[@]}"; do
+    LAST_RC=$GRADLE_RC
+    require_tests "$(gradle_tests_count "kotlin/$m" jvmTest testAndroidHostTest)" "./gradlew :$m tests"
+  done
   [ -n "$SDK" ] || skip "./gradlew testAndroidHostTest" "no Android SDK (ANDROID_HOME); Linux covers it"
 fi
 
