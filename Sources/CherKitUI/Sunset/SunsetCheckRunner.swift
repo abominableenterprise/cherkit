@@ -4,11 +4,14 @@ import Combine
 import Foundation
 import SwiftUI
 
-/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)``
+/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)``
 /// when ``SunsetCheckScheduler`` says so, and holds the latest decision for the prompts.
 ///
 /// The modifier uses one ``shared`` runner for the process, so the launch check runs once per process and the
 /// decision (a hard block included) survives the root view being rebuilt.
+///
+/// A check that finds no usable config (the fetch failed and nothing is cached) is retried once after
+/// ``retryDelay``; if that fails too, the scheduler re-checks on the next return from the background.
 @MainActor
 final class SunsetCheckRunner: ObservableObject {
     /// The runner every `.sunsetPrompt(checker:)` uses.
@@ -20,10 +23,22 @@ final class SunsetCheckRunner: ObservableObject {
     private(set) var scheduler: SunsetCheckScheduler
     /// The running check, if any.
     private(set) var task: Task<Void, Never>?
+    /// The quick retry waiting for ``retryDelay`` after a failed check, if any.
+    private(set) var retryTask: Task<Void, Never>?
+    /// How long to wait, in seconds, before the one quick retry after a failed check.
+    let retryDelay: TimeInterval
     private let now: () -> Date
 
-    init(minimumInterval: TimeInterval = SunsetCheckScheduler.defaultMinimumInterval, now: @escaping () -> Date = Date.init) {
+    /// The default ``retryDelay``: 3 seconds.
+    nonisolated static let defaultRetryDelay: TimeInterval = 3
+
+    init(
+        minimumInterval: TimeInterval = SunsetCheckScheduler.defaultMinimumInterval,
+        retryDelay: TimeInterval = defaultRetryDelay,
+        now: @escaping () -> Date = Date.init
+    ) {
         scheduler = SunsetCheckScheduler(minimumInterval: minimumInterval)
+        self.retryDelay = retryDelay
         self.now = now
     }
 
@@ -43,16 +58,30 @@ final class SunsetCheckRunner: ObservableObject {
     }
 
     private func run(_ request: Request) {
+        retryTask?.cancel()
+        retryTask = nil
         task = Task { [weak self] in
-            let decision = await request.checker.check(
+            let result = await request.checker.checkReportingFailure(
                 installedVersion: request.installedVersion,
                 osVersion: SunsetChecker.osVersion(),
                 locale: request.locale
             )
             guard let self else { return }
-            self.decision = decision
-            self.scheduler.checkFinished()
+            self.decision = result.decision
+            let retry = self.scheduler.checkFinished(failed: result.failed)
             self.task = nil
+            if retry { self.scheduleRetry(request) }
+        }
+    }
+
+    /// The one quick retry after a failed check, unless another check started meanwhile.
+    private func scheduleRetry(_ request: Request) {
+        let nanoseconds = UInt64(max(retryDelay, 0) * 1_000_000_000)
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard let self, !Task.isCancelled else { return }
+            self.retryTask = nil
+            if self.scheduler.shouldRetry(now: self.now()) { self.run(request) }
         }
     }
 

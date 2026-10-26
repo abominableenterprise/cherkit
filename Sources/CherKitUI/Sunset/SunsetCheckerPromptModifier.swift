@@ -2,7 +2,7 @@
 import CherKitSunset
 import SwiftUI
 
-/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)``:
+/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)``:
 /// runs the checks through a ``SunsetCheckRunner`` and shows its decision with ``SunsetPromptModifier``.
 @available(iOS 16, macOS 13, *)
 struct SunsetCheckerPromptModifier: ViewModifier {
@@ -12,6 +12,7 @@ struct SunsetCheckerPromptModifier: ViewModifier {
     let strings: SunsetStrings
     let appIcon: Image?
     let tint: Color?
+    let tintLabel: Color?
     @ObservedObject var runner: SunsetCheckRunner
 
     @Environment(\.scenePhase) private var scenePhase
@@ -25,7 +26,8 @@ struct SunsetCheckerPromptModifier: ViewModifier {
                 memory: memory,
                 strings: strings,
                 appIcon: appIcon,
-                tint: tint
+                tint: tint,
+                tintLabel: tintLabel
             ))
             .onAppear {
                 runner.setMinimumInterval(minimumInterval)
@@ -39,7 +41,7 @@ struct SunsetCheckerPromptModifier: ViewModifier {
 
 @available(iOS 16, macOS 13, *)
 extension View {
-    /// Checks for an update and shows the Sunset prompt (see ``sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:)``
+    /// Checks for an update and shows the Sunset prompt (see ``sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:)``
     /// for what each decision shows). Attach it once, to your root view:
     ///
     /// ```swift
@@ -53,6 +55,9 @@ extension View {
     ///   most once per `minimumInterval`. The initial `.active` and `.inactive` → `.active` (Control Center, a system
     ///   alert) do not check, so the launch fetch never runs twice.
     /// - Never while a check is still running.
+    /// - After a failed check (the fetch failed or did not parse, and no usable config is cached), once more a few
+    ///   seconds later. A failed check does not count toward `minimumInterval`: while the last one failed, the next
+    ///   return from the background re-checks whatever the interval.
     ///
     /// A re-check replaces the decision: a hard block goes away once the config no longer requires the update, and
     /// a soft prompt answered with "Not now" stays hidden for that `latestVersion`. ``SunsetChecker/disabled`` never
@@ -69,6 +74,8 @@ extension View {
     ///   - appIcon: Optional icon for the hard block.
     ///   - tint: The hard block's button and accent color; on iOS it runs in its own window that does not inherit the
     ///     app's tint. `nil` keeps the system tint. The soft alert always uses the app's tint.
+    ///   - tintLabel: The hard block's button label color on the `tint` fill. `nil` (the default) picks black or
+    ///     white, whichever contrasts more with `tint` in the current light or dark mode. Ignored without a `tint`.
     public func sunsetPrompt(
         checker: SunsetChecker,
         installedVersion: String? = nil,
@@ -77,7 +84,8 @@ extension View {
         memory: SunsetSoftPromptMemory = SunsetSoftPromptMemory(),
         strings: SunsetStrings = SunsetStrings(),
         appIcon: Image? = nil,
-        tint: Color? = nil
+        tint: Color? = nil,
+        tintLabel: Color? = nil
     ) -> some View {
         modifier(SunsetCheckerPromptModifier(
             request: SunsetCheckRunner.Request(
@@ -90,6 +98,7 @@ extension View {
             strings: strings,
             appIcon: appIcon,
             tint: tint,
+            tintLabel: tintLabel,
             runner: .shared
         ))
     }

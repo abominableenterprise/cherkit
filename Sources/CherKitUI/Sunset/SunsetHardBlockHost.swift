@@ -11,6 +11,7 @@ struct SunsetHardBlockHost: UIViewRepresentable {
     let strings: SunsetStrings
     let appIcon: Image?
     let tint: Color?
+    var tintLabel: Color? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -24,7 +25,7 @@ struct SunsetHardBlockHost: UIViewRepresentable {
     func updateUIView(_ view: SceneTrackingView, context: Context) {
         let coordinator = context.coordinator
         coordinator.view = view
-        coordinator.show(prompt, strings: strings, appIcon: appIcon, tint: tint)
+        coordinator.show(prompt, strings: strings, appIcon: appIcon, tint: tint, tintLabel: tintLabel)
     }
 
     static func dismantleUIView(_ view: SceneTrackingView, coordinator: Coordinator) {
@@ -41,8 +42,10 @@ struct SunsetHardBlockHost: UIViewRepresentable {
         private var host: UIHostingController<SunsetUpdateView>?
 
         /// Shows the block for `prompt` (hides it for `nil`), tinted with `tint` when set.
-        func show(_ prompt: SunsetPrompt?, strings: SunsetStrings, appIcon: Image?, tint: Color?) {
-            block = prompt.map { SunsetUpdateView(prompt: $0, strings: strings, appIcon: appIcon, tint: tint) }
+        func show(_ prompt: SunsetPrompt?, strings: SunsetStrings, appIcon: Image?, tint: Color?, tintLabel: Color? = nil) {
+            block = prompt.map {
+                SunsetUpdateView(prompt: $0, strings: strings, appIcon: appIcon, tint: tint, tintLabel: tintLabel)
+            }
             tintColor = tint.map { UIColor($0) }
             update()
         }
