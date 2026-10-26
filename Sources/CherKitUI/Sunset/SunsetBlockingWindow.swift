@@ -12,12 +12,20 @@ final class SunsetBlockingWindow {
     /// The window while the block is shown.
     private(set) var window: UIWindow?
 
-    /// Shows `controller` above everything in `scene`. Calling it again with the same controller and scene does nothing.
-    func show(_ controller: UIViewController, in scene: UIWindowScene) {
-        if let window, window.windowScene === scene, window.rootViewController === controller { return }
+    /// Shows `controller` above everything in `scene`. Calling it again with the same controller and scene keeps the
+    /// window and only updates its tint.
+    ///
+    /// - Parameter tintColor: The window's `tintColor`, e.g. the app's accent: this window does not inherit the tint
+    ///   of the app's windows. `nil` keeps the system tint.
+    func show(_ controller: UIViewController, in scene: UIWindowScene, tintColor: UIColor? = nil) {
+        if let window, window.windowScene === scene, window.rootViewController === controller {
+            window.tintColor = tintColor
+            return
+        }
         hide()
         let window = UIWindow(windowScene: scene)
         window.windowLevel = Self.level
+        window.tintColor = tintColor
         window.rootViewController = controller
         // VoiceOver ignores the app's windows underneath.
         controller.view.accessibilityViewIsModal = true

@@ -1,5 +1,7 @@
 #if canImport(SwiftUI) && canImport(UIKit) && !os(watchOS)
+import CherKitSunset
 @testable import CherKitUI
+import SwiftUI
 import UIKit
 import XCTest
 
@@ -56,6 +58,36 @@ final class SunsetBlockingWindowTests: XCTestCase {
         let first = blocking.window
         blocking.show(block, in: scene)
         XCTAssertIdentical(blocking.window, first)
+    }
+
+    func testTintSetsTheWindowsTintColor() throws {
+        let scene = try XCTUnwrap(appWindow.windowScene)
+        let block = UIViewController()
+        blocking.show(block, in: scene, tintColor: .systemPink)
+        XCTAssertEqual(blocking.window?.tintColor, .systemPink)
+        // Showing the same block with a new tint keeps the window and updates it.
+        let first = blocking.window
+        blocking.show(block, in: scene, tintColor: .systemGreen)
+        XCTAssertIdentical(blocking.window, first)
+        XCTAssertEqual(blocking.window?.tintColor, .systemGreen)
+    }
+
+    func testHardBlockHostPassesTheTintToTheWindow() throws {
+        let host = SunsetHardBlockHost.Coordinator()
+        let view = SunsetHardBlockHost.SceneTrackingView()
+        appWindow.rootViewController?.view.addSubview(view)
+        host.view = view
+        let prompt = SunsetPrompt(storeURL: URL(string: "https://apps.apple.com/app/id1")!, message: nil)
+        host.show(prompt, strings: SunsetStrings(), appIcon: nil, tint: .orange)
+        XCTAssertEqual(host.blockingWindow.window?.tintColor, UIColor(Color.orange))
+
+        host.show(prompt, strings: SunsetStrings(), appIcon: nil, tint: nil)
+        XCTAssertNotNil(host.blockingWindow.window)
+        XCTAssertNotEqual(host.blockingWindow.window?.tintColor, UIColor(Color.orange), "no tint: back to the system's")
+
+        host.show(nil, strings: SunsetStrings(), appIcon: nil, tint: .orange)
+        XCTAssertNil(host.blockingWindow.window)
+        view.removeFromSuperview()
     }
 
     func testHideRemovesTheBlock() throws {

@@ -2,7 +2,8 @@
 import CherKitSunset
 import SwiftUI
 
-/// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:)``.
+/// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:)``
+/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)``.
 @available(iOS 16, macOS 13, *)
 struct SunsetPromptModifier: ViewModifier {
     @Binding var decision: SunsetDecision?
@@ -13,6 +14,8 @@ struct SunsetPromptModifier: ViewModifier {
     let memory: SunsetSoftPromptMemory
     let strings: SunsetStrings
     let appIcon: Image?
+    /// The hard block's tint; the soft alert keeps the app's.
+    var tint: Color?
 
     @Environment(\.openURL) private var openURL
 
@@ -41,7 +44,7 @@ struct SunsetPromptModifier: ViewModifier {
             } message: { prompt in
                 Text(strings.softText(for: prompt))
             }
-            .modifier(SunsetHardBlockPresenter(prompt: hardPrompt, strings: strings, appIcon: appIcon))
+            .modifier(SunsetHardBlockPresenter(prompt: hardPrompt, strings: strings, appIcon: appIcon, tint: tint))
     }
 
     private var softPrompt: SunsetPrompt? {
@@ -71,12 +74,13 @@ struct SunsetHardBlockPresenter: ViewModifier {
     let prompt: SunsetPrompt?
     let strings: SunsetStrings
     let appIcon: Image?
+    let tint: Color?
 
     func body(content: Content) -> some View {
         #if canImport(UIKit)
         // iOS: its own window above the scene's windows rather than a `fullScreenCover`, which cannot appear while
         // the app already presents a sheet or cover (onboarding, an editor), leaving the old version usable.
-        content.background(SunsetHardBlockHost(prompt: prompt, strings: strings, appIcon: appIcon))
+        content.background(SunsetHardBlockHost(prompt: prompt, strings: strings, appIcon: appIcon, tint: tint))
         #else
         // macOS: an overlay instead of a sheet, so neither Escape nor a window command can dismiss it. The content
         // below is disabled and hidden from VoiceOver so it cannot be reached from the keyboard either.
@@ -86,7 +90,7 @@ struct SunsetHardBlockPresenter: ViewModifier {
             .accessibilityHidden(blocked)
             .overlay {
                 if let prompt {
-                    SunsetUpdateView(prompt: prompt, strings: strings, appIcon: appIcon)
+                    SunsetUpdateView(prompt: prompt, strings: strings, appIcon: appIcon, tint: tint)
                 }
             }
         #endif
@@ -106,8 +110,9 @@ extension View {
     ///   overlay).
     /// - ``SunsetDecision/upToDate`` or `nil`: nothing.
     ///
-    /// The modifier only displays a decision; it never fetches. Get one from the Sunset checker (or
-    /// ``SunsetDecider``) and assign it to `decision`.
+    /// This modifier only displays a decision; it never fetches. Get one from the Sunset checker (or
+    /// ``SunsetDecider``) and assign it to `decision`, or let
+    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)`` run the checks.
     ///
     /// - Parameters:
     ///   - decision: The decision to show, `nil` while unknown.
@@ -119,12 +124,16 @@ extension View {
     ///     ``SunsetSoftPromptMemory/defaultKey``.
     ///   - strings: The text; English defaults.
     ///   - appIcon: Optional icon for the hard block.
+    ///   - tint: The hard block's button and accent color, e.g. your accent color. On iOS the block runs in its own
+    ///     window, which does not inherit your app's tint, so pass it to match. `nil` (the default) keeps the system
+    ///     tint. The soft alert always uses the app's tint.
     public func sunsetPrompt(
         decision: Binding<SunsetDecision?>,
         latestVersion: String? = nil,
         memory: SunsetSoftPromptMemory = SunsetSoftPromptMemory(),
         strings: SunsetStrings = SunsetStrings(),
-        appIcon: Image? = nil
+        appIcon: Image? = nil,
+        tint: Color? = nil
     ) -> some View {
         modifier(SunsetPromptModifier(
             decision: decision,
@@ -132,13 +141,14 @@ extension View {
             installedVersion: installedAppVersion(),
             memory: memory,
             strings: strings,
-            appIcon: appIcon
+            appIcon: appIcon,
+            tint: tint
         ))
     }
 }
 
 /// The installed app's `CFBundleShortVersionString`, or `""` when it has none.
-private func installedAppVersion() -> String {
+func installedAppVersion() -> String {
     Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 }
 #endif

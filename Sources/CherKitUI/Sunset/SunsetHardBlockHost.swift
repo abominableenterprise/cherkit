@@ -10,6 +10,7 @@ struct SunsetHardBlockHost: UIViewRepresentable {
     let prompt: SunsetPrompt?
     let strings: SunsetStrings
     let appIcon: Image?
+    let tint: Color?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -23,8 +24,7 @@ struct SunsetHardBlockHost: UIViewRepresentable {
     func updateUIView(_ view: SceneTrackingView, context: Context) {
         let coordinator = context.coordinator
         coordinator.view = view
-        coordinator.block = prompt.map { SunsetUpdateView(prompt: $0, strings: strings, appIcon: appIcon) }
-        coordinator.update()
+        coordinator.show(prompt, strings: strings, appIcon: appIcon, tint: tint)
     }
 
     static func dismantleUIView(_ view: SceneTrackingView, coordinator: Coordinator) {
@@ -35,8 +35,17 @@ struct SunsetHardBlockHost: UIViewRepresentable {
     final class Coordinator {
         let blockingWindow = SunsetBlockingWindow()
         weak var view: SceneTrackingView?
-        var block: SunsetUpdateView?
+        private(set) var block: SunsetUpdateView?
+        /// The block window's `tintColor`: the window does not inherit the app's tint.
+        private(set) var tintColor: UIColor?
         private var host: UIHostingController<SunsetUpdateView>?
+
+        /// Shows the block for `prompt` (hides it for `nil`), tinted with `tint` when set.
+        func show(_ prompt: SunsetPrompt?, strings: SunsetStrings, appIcon: Image?, tint: Color?) {
+            block = prompt.map { SunsetUpdateView(prompt: $0, strings: strings, appIcon: appIcon, tint: tint) }
+            tintColor = tint.map { UIColor($0) }
+            update()
+        }
 
         func update() {
             guard let block, let scene = view?.window?.windowScene else {
@@ -45,7 +54,7 @@ struct SunsetHardBlockHost: UIViewRepresentable {
                 return
             }
             if let host { host.rootView = block } else { host = UIHostingController(rootView: block) }
-            blockingWindow.show(host!, in: scene)
+            blockingWindow.show(host!, in: scene, tintColor: tintColor)
         }
     }
 

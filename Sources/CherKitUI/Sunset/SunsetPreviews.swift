@@ -49,6 +49,11 @@ private struct SunsetPromptPreviewHost: View {
 }
 
 @available(iOS 17, macOS 14, *)
+#Preview("Hard block, tinted") {
+    SunsetUpdateView(prompt: SunsetPreviewData.prompt, appIcon: SunsetPreviewData.icon, tint: .orange)
+}
+
+@available(iOS 17, macOS 14, *)
 #Preview("Hard block via modifier") {
     SunsetPromptPreviewHost(decision: .hardUpdate(SunsetPreviewData.prompt))
 }
