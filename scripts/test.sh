@@ -19,9 +19,14 @@ for dir in kotlin/*/; do
   [ -f "$dir/build.gradle.kts" ] && MODULES+=("$(basename "$dir")")
 done
 
-# kotlin/<module> -> Swift test target, from the Sources/CherKit<Module> folder name.
+# kotlin/<module> -> Swift test target, from the Sources/CherKit<Module> folder name. With a
+# Sources/CherKitUI/<Module> folder (the module's views), CherKitUITests runs too.
 swift_test_target() {
   local dir
+  for dir in Sources/CherKitUI/*/; do
+    [ -d "$dir" ] || continue
+    if [ "$(basename "$dir" | tr '[:upper:]' '[:lower:]')" = "$1" ]; then echo CherKitUITests; break; fi
+  done
   for dir in Sources/CherKit*/; do
     dir="$(basename "$dir")"
     if [ "$(echo "${dir#CherKit}" | tr '[:upper:]' '[:lower:]')" = "$1" ]; then echo "${dir}Tests"; return; fi
@@ -59,8 +64,9 @@ SWIFT_ARGS=(test --parallel)
 GRADLE_TASKS=()
 for m in "${SELECTED[@]}"; do
   if [ $# -gt 0 ]; then
-    target="$(swift_test_target "$m")"
-    [ -n "$target" ] && SWIFT_ARGS+=(--filter "$target")
+    for target in $(swift_test_target "$m"); do
+      case " ${SWIFT_ARGS[*]} " in *" $target "*) ;; *) SWIFT_ARGS+=(--filter "$target") ;; esac
+    done
   fi
   GRADLE_TASKS+=(":$m:jvmTest" ":$m:testAndroidHostTest")
 done

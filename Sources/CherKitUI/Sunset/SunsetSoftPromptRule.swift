@@ -2,8 +2,6 @@
 import CherKitSunset
 
 /// Whether the soft "update available" prompt should appear. Pure, so it is unit-tested on its own.
-///
-/// Uses no SwiftUI, so `Tests/CherKitSunsetTests` compiles this file too (through a symlink) and tests it.
 public enum SunsetSoftPromptRule {
     /// `true` only for ``SunsetDecision/softUpdate(_:)`` when the user has not tapped "Not now" for `version`.
     ///

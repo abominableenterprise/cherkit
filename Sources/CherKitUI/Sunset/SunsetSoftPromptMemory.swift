@@ -6,8 +6,6 @@ import Foundation
 ///
 /// Stores one string under ``key`` in ``defaults``. Inject your own `UserDefaults` (an app group suite, or a throwaway
 /// suite in tests and previews) or key.
-///
-/// Uses no SwiftUI, so `Tests/CherKitSunsetTests` compiles this file too (through a symlink) and tests it.
 public struct SunsetSoftPromptMemory {
     /// The `UserDefaults` key used unless you pass another.
     public static let defaultKey = "cherkit.sunset.softPromptDismissedVersion"

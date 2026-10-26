@@ -95,12 +95,21 @@ fi
 # 2. Host (macOS) swift build + swift test. Unlike Linux, this compiles CherKitUI's SwiftUI code.
 SWIFT_TEST=(swift test --parallel)
 SWIFT_TARGETS=()
+# Test targets for the selected modules: CherKit<Module>Tests, plus CherKitUITests when the module has views in
+# Sources/CherKitUI/<Module>. With no modules selected, every test target runs (CherKitUITests included).
+TEST_TARGETS=()
 if [ $# -gt 0 ]; then
   for m in "${SELECTED[@]}"; do
     target="$(swift_name "$m" "Sources/CherKit*/")"
-    [ -n "$target" ] && SWIFT_TARGETS+=("$target") && SWIFT_TEST+=(--filter "${target}Tests")
+    [ -n "$target" ] && SWIFT_TARGETS+=("$target") && TEST_TARGETS+=("${target}Tests")
+  done
+  for m in "${SELECTED[@]}"; do
+    if [ -n "$(swift_name "$m" "Sources/CherKitUI/*/")" ] && [ -d Tests/CherKitUITests ]; then
+      case " ${TEST_TARGETS[*]-} " in *" CherKitUITests "*) ;; *) TEST_TARGETS+=(CherKitUITests) ;; esac
+    fi
   done
 fi
+for target in ${TEST_TARGETS[@]+"${TEST_TARGETS[@]}"}; do SWIFT_TEST+=(--filter "$target"); done
 run swift-build "swift build (macOS host)" swift build
 run swift-test "${SWIFT_TEST[*]} (macOS host)" "${SWIFT_TEST[@]}"
 
@@ -157,7 +166,7 @@ if [ -z "$DESTINATION" ]; then
 else
   echo "Simulator: $SIM_LABEL"
   ONLY=()
-  for target in ${SWIFT_TARGETS[@]+"${SWIFT_TARGETS[@]}"}; do ONLY+=("-only-testing:${target}Tests"); done
+  for target in ${TEST_TARGETS[@]+"${TEST_TARGETS[@]}"}; do ONLY+=("-only-testing:$target"); done
   run ios-test "xcodebuild test -scheme CherKit-Package (iOS Simulator)" \
     xcodebuild -scheme CherKit-Package -destination "$DESTINATION" -derivedDataPath "$DERIVED" \
     test ${ONLY[@]+"${ONLY[@]}"}
