@@ -78,7 +78,10 @@ case .hardUpdate(let prompt): showUpdateRequired(prompt)   // blocking
 
 Kotlin (Android): CherKit has no HTTP client, so pass your own GET. Return the body for a 2xx response, else `null`
 (`SunsetFetch.bodyIfSuccess(code, body)` does that check); turn off HTTP caching for this request. The call is wrapped in
-`withTimeoutOrNull`. `check(context)` reads `versionName`, `Build.VERSION.SDK_INT` and the user's locales.
+`withTimeoutOrNull`. `AndroidSunset.check(checker, context)` reads `versionName`, `Build.VERSION.SDK_INT` and the user's
+locales (pass `locale` to override them). It needs no import beyond `AndroidSunset`; the older
+`checker.check(context)` extension still works but is deprecated, because its import
+(`com.abominableenterprise.cherkit.sunset.check`) is easy to confuse with Kotlin's `check(Boolean)`.
 
 ```kotlin
 val checker = AndroidSunset.checker(context) {
@@ -87,7 +90,7 @@ val checker = AndroidSunset.checker(context) {
         okHttp.newCall(request).execute().use { SunsetFetch.bodyIfSuccess(it.code, it.body?.string()) }
     }
 }
-when (val decision = checker.check(context)) {
+when (val decision = AndroidSunset.check(checker, context)) {
     SunsetDecision.UpToDate -> Unit
     is SunsetDecision.SoftUpdate -> showUpdateAvailable(decision.prompt)
     is SunsetDecision.HardUpdate -> showUpdateRequired(decision.prompt)

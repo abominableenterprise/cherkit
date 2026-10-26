@@ -68,6 +68,13 @@ dependencies {
 The Kotlin packages stay `com.abominableenterprise.cherkit.<module>`; only the Maven group follows JitPack's
 `com.github.<owner>.<repo>` convention.
 
+The `.module` files JitPack serves name the component `com.github.abominableenterprise:cherkit` (JitPack rewrites that
+block for every artifact of a multi-module build) instead of `com.github.abominableenterprise.cherkit:<module>`. Gradle
+ignores those fields: it identifies each artifact by the coordinates you request, takes capabilities from them and
+follows the correct `available-at` references, so several CherKit modules on one classpath resolve without capability
+conflicts. The build itself writes the right coordinates and refuses to publish metadata that names any other (see
+`build.gradle.kts`).
+
 ## Running the tests
 
 ```sh

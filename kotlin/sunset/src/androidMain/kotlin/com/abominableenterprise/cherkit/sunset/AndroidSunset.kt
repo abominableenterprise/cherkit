@@ -41,10 +41,24 @@ public object AndroidSunset {
     /** The user's locales, most preferred first (e.g. `["de-DE", "en-US"]`). */
     public fun preferredLocales(): List<String> =
         LocaleList.getDefault().toLanguageTags().split(',').filter { it.isNotEmpty() }
+
+    /**
+     * [SunsetChecker.check] for the running app: its [installedVersion], [osVersion] and [locale] (by default the
+     * user's [preferredLocales]). Like [SunsetChecker.check] it never throws and fails open.
+     */
+    public suspend fun check(
+        checker: SunsetChecker,
+        context: Context,
+        locale: List<String> = preferredLocales(),
+    ): SunsetDecision = checker.check(installedVersion(context), osVersion(), locale)
 }
 
 /** [SunsetChecker.check] for the running app: its `versionName`, `Build.VERSION.SDK_INT` and the user's locales. */
+@Deprecated(
+    "Use AndroidSunset.check(checker, context)",
+    ReplaceWith("AndroidSunset.check(this, context, locale)", "com.abominableenterprise.cherkit.sunset.AndroidSunset"),
+)
 public suspend fun SunsetChecker.check(
     context: Context,
     locale: List<String> = AndroidSunset.preferredLocales(),
-): SunsetDecision = check(AndroidSunset.installedVersion(context), AndroidSunset.osVersion(), locale)
+): SunsetDecision = AndroidSunset.check(this, context, locale)
