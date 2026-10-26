@@ -1,5 +1,6 @@
 package com.abominableenterprise.cherkit.sunset
 
+import android.content.ContextWrapper
 import android.content.SharedPreferences
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -27,6 +28,37 @@ class AndroidSunsetTest {
 
         val offline = SunsetChecker(FetchSunsetConfigSource { null }, cache)
         assertIs<SunsetDecision.SoftUpdate>(offline.check("1.0", "34", listOf("en")))
+    }
+
+    @Test
+    fun checkRunsTheCheckerForTheAppAndFailsOpenWithoutAVersionName() = runBlocking<Unit> {
+        // android.jar stubs have no PackageManager, so versionName reads as "" and the decision fails open.
+        val context = ContextWrapper(null)
+        assertEquals("", AndroidSunset.installedVersion(context))
+        val cache = MemoryCache()
+        var fetches = 0
+        val checker = SunsetChecker(FetchSunsetConfigSource { fetches++; soft }, cache)
+
+        assertEquals(SunsetDecision.UpToDate, AndroidSunset.check(checker, context, listOf("en")))
+        assertEquals(1, fetches)
+        assertEquals(soft, cache.load())
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun deprecatedExtensionStillDelegatesToAndroidSunsetCheck() = runBlocking<Unit> {
+        var fetches = 0
+        val checker = SunsetChecker(FetchSunsetConfigSource { fetches++; soft }, MemoryCache())
+        assertEquals(SunsetDecision.UpToDate, checker.check(ContextWrapper(null), listOf("en")))
+        assertEquals(1, fetches)
+    }
+
+    private class MemoryCache : SunsetConfigCache {
+        private var saved: String? = null
+        override suspend fun load(): String? = saved
+        override suspend fun save(text: String) {
+            saved = text
+        }
     }
 
     /** Map-backed SharedPreferences whose getString throws ClassCastException for non-strings, like Android's. */
