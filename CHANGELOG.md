@@ -4,6 +4,60 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.2.0
+
+No breaking changes. New Android module `sunset-compose`; one Kotlin extension is deprecated (see Sunset).
+
+### All modules
+
+- fixed: every project gets its Maven group and version before any module is configured, and publishing fails if a
+  generated Gradle `.module` file names coordinates other than `com.github.abominableenterprise.cherkit:<module>`
+  (component, `available-at` references, capabilities). The `.module` files JitPack serves still name the component
+  `com.github.abominableenterprise:cherkit` because JitPack rewrites that block; Gradle ignores it and resolves
+  `sunset`, `whatsnew` and `analytics` together without capability conflicts (see the README's Install section).
+
+### Sunset
+
+- added: `AndroidSunset.check(checker, context, locale = AndroidSunset.preferredLocales())` runs the launch check for
+  the running app (`versionName`, `Build.VERSION.SDK_INT`, the user's locales) with no import beyond `AndroidSunset`.
+- deprecated: the `SunsetChecker.check(context, locale)` extension (its import
+  `com.abominableenterprise.cherkit.sunset.check` was easy to confuse with Kotlin's `check(Boolean)`). It still works;
+  the IDE quick fix replaces `checker.check(context)` with `AndroidSunset.check(checker, context)`.
+- added: `SunsetChecker.disabled` (Swift) / `SunsetChecker.disabled()` (Kotlin), a checker that always answers
+  `upToDate` without touching the network or the cache. Use it in UI tests and on simulators or emulators, e.g.
+  `let checker = isUITest ? .disabled : SunsetChecker(url: url)`.
+- added: `SunsetPrompt.latestVersion` (`AppVersion?`, Swift and Kotlin): the config's `latestVersion` for the
+  platform, or `nil` / `null` when the block has none. `SunsetDecider` (and so `SunsetChecker`) fills it in; the
+  parameter defaults to `nil`, so existing code keeps compiling.
+
+### Sunset Compose (Android, `:sunset-compose`)
+
+- added: new Android-only module `com.github.abominableenterprise.cherkit:sunset-compose` (Jetpack Compose,
+  Material 3; brings `:sunset`), the Android counterpart of CherKitUI's `.sunsetPrompt`.
+  `SunsetPrompt(decision, onDecisionHandled)` shows a dismissible "Update available" dialog for `SoftUpdate` and a
+  full-screen "Update required" block that back cannot dismiss for `HardUpdate`. See
+  [kotlin/sunset-compose/README.md](kotlin/sunset-compose/README.md).
+- "Not now" is remembered in SharedPreferences for `prompt.latestVersion` (else the installed version) by
+  `SunsetSoftPromptMemory`; `SunsetSoftPromptRule` is the same rule as on iOS (`fixtures/sunset/soft-prompt.json`).
+- `SunsetStrings` has the iOS English defaults, all overridable. `SunsetUpdateScreen` and `SunsetSoftPromptDialog`
+  can be used on their own.
+- Requirements: androidx Compose `runtime` / `ui` / `foundation` 1.9.5+ and `material3` 1.4.0+ (floors; newer
+  versions in the app win), `compileSdk` 35+ and the Kotlin Compose compiler plugin in your app.
+
+### UI (SwiftUI, `CherKitUI`)
+
+- added: `.sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)` runs the
+  Sunset check for you: once per process at launch, again only when the app returns from the background
+  (`.background` then `.active`, not `.inactive` then `.active`), never while a check is running, and at most once
+  per `minimumInterval` (default 1 hour). It never fetches twice at cold launch, so it replaces your own
+  `scenePhase` / `didBecomeActive` re-check. Pass `SunsetChecker.disabled` in UI tests. `.sunsetPrompt(decision:)`
+  is unchanged.
+- added: `tint: Color?` on both `.sunsetPrompt` modifiers and on `SunsetUpdateView` colors the hard "Update
+  required" button and accents. On iOS the block's own window (which does not inherit the app's tint and so showed
+  system blue) gets that `tintColor` too. Defaults to `nil` (unchanged); the soft alert keeps the app's tint.
+- changed: `.sunsetPrompt(decision:)` remembers "Not now" for `prompt.latestVersion`, so you no longer need to pass
+  `latestVersion:`. When given, the parameter still wins; with neither, the installed app version is used as before.
+
 ## 0.1.0
 
 First release.
