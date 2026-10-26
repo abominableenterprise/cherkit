@@ -1,9 +1,11 @@
 package com.abominableenterprise.cherkit.sunset.compose
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -24,7 +26,9 @@ import com.abominableenterprise.cherkit.sunset.SunsetDecision
  *   dismiss. "Update" opens the store and the block stays, so [onDecisionHandled] is never called for it.
  * - [SunsetDecision.UpToDate] or `null`: nothing.
  *
- * It only displays a decision; it never fetches. Get one from `SunsetChecker.check(context)`.
+ * This overload only displays a decision; it never fetches. Most apps use `SunsetPrompt(checker = ...)` instead,
+ * which runs the checks too (at launch and on return from the background). To check yourself, get a decision from
+ * `AndroidSunset.check(checker, context)`.
  *
  * @param decision The decision to show, `null` while unknown.
  * @param onDecisionHandled Called once the soft dialog is answered; set your decision to `null` there.
@@ -32,6 +36,10 @@ import com.abominableenterprise.cherkit.sunset.SunsetDecision
  *   [SunsetSoftPromptMemory.DEFAULT_KEY].
  * @param strings The text; English defaults.
  * @param appIcon Optional icon above the "Update required" title. Decorative: TalkBack skips it.
+ * @param onVisibilityChange Called with `true` when the soft "Update available" dialog appears and `false` when it
+ *   goes away (answered, cleared, or this composable leaves the composition), so an app that runs its own checks can
+ *   skip them while the dialog is open. Not called for the hard block: keep checking behind it, so it goes away
+ *   once the config no longer requires the update.
  */
 @Composable
 public fun SunsetPrompt(
@@ -40,16 +48,23 @@ public fun SunsetPrompt(
     memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
     strings: SunsetStrings = SunsetStrings(),
     appIcon: Painter? = null,
+    onVisibilityChange: (Boolean) -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val softVersion = (decision as? SunsetDecision.SoftUpdate)?.let { soft ->
+        remember(soft, context) { SunsetSoftPromptRule.version(soft.prompt, AndroidSunset.installedVersion(context)) }
+    }
+    // Answered for this decision: hidden even before the app clears it, so it shows once per check.
+    var answered by remember(decision) { mutableStateOf(false) }
+    val showsSoft = softVersion != null && !answered && memory.shouldShowSoftPrompt(decision, softVersion)
+    val currentOnVisibilityChange by rememberUpdatedState(onVisibilityChange)
+    DisposableEffect(showsSoft) {
+        if (showsSoft) currentOnVisibilityChange(true)
+        onDispose { if (showsSoft) currentOnVisibilityChange(false) }
+    }
+
     when (decision) {
-        is SunsetDecision.SoftUpdate -> {
-            val context = LocalContext.current
-            val version = remember(decision, context) {
-                SunsetSoftPromptRule.version(decision.prompt, AndroidSunset.installedVersion(context))
-            }
-            // Answered for this decision: hidden even before the app clears it, so it shows once per check.
-            var answered by remember(decision) { mutableStateOf(false) }
-            if (answered || !memory.shouldShowSoftPrompt(decision, version)) return
+        is SunsetDecision.SoftUpdate -> if (showsSoft && softVersion != null) {
             SunsetSoftPromptDialog(
                 prompt = decision.prompt,
                 strings = strings,
@@ -58,7 +73,7 @@ public fun SunsetPrompt(
                     onDecisionHandled()
                 },
                 onNotNow = {
-                    memory.rememberNotNow(version)
+                    memory.rememberNotNow(softVersion)
                     answered = true
                     onDecisionHandled()
                 },
@@ -80,4 +95,17 @@ public fun SunsetPrompt(
         }
         SunsetDecision.UpToDate, null -> Unit
     }
+}
+
+/** The 0.2.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun SunsetPrompt(
+    decision: SunsetDecision?,
+    onDecisionHandled: () -> Unit,
+    memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
+    strings: SunsetStrings = SunsetStrings(),
+    appIcon: Painter? = null,
+) {
+    SunsetPrompt(decision, onDecisionHandled, memory, strings, appIcon, onVisibilityChange = {})
 }
