@@ -10,6 +10,7 @@ its own product, so an app imports only what it needs.
 | --- | --- | --- | --- |
 | [Analytics](kotlin/analytics/README.md) | Typed, opt-in PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
 | [Sunset](kotlin/sunset/README.md) | Soft or hard "please update" from a hosted min-version config | `CherKitSunset` | `:sunset` |
+| [Sunset Compose](kotlin/sunset-compose/README.md) | Jetpack Compose update dialog and blocking screen for Sunset (Android) | n/a | `:sunset-compose` |
 | [WhatsNew](kotlin/whatsnew/README.md) | "What's new" notes and installed-version history | `CherKitWhatsNew` | `:whatsnew` |
 | [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew | `CherKitUI` | n/a |
 
