@@ -1,3 +1,4 @@
+import CherKitCore
 import CherKitSunset
 import CherKitTestSupport
 import Foundation
@@ -15,6 +16,7 @@ final class SunsetDecisionFixtureTests: XCTestCase {
         let languages: [String]
         let decision: String
         let storeURL: String?
+        let latestVersion: String?
         let message: String?
     }
 
@@ -51,7 +53,8 @@ final class SunsetDecisionFixtureTests: XCTestCase {
     private func expected(_ testCase: DecisionCase) throws -> SunsetDecision {
         if testCase.decision == "upToDate" { return .upToDate }
         let url = try XCTUnwrap(URL(string: try XCTUnwrap(testCase.storeURL, testCase.name)), testCase.name)
-        let prompt = SunsetPrompt(storeURL: url, message: testCase.message)
+        let latest = try testCase.latestVersion.map { try XCTUnwrap(AppVersion($0), testCase.name) }
+        let prompt = SunsetPrompt(storeURL: url, message: testCase.message, latestVersion: latest)
         switch testCase.decision {
         case "softUpdate": return .softUpdate(prompt)
         case "hardUpdate": return .hardUpdate(prompt)

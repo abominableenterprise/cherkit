@@ -6,7 +6,8 @@ import com.abominableenterprise.cherkit.core.AppVersion
 public object SunsetDecider {
     /**
      * Decides for one launch: [SunsetDecision.HardUpdate] when [appVersion] is below the block's `minimumVersion`,
-     * else [SunsetDecision.SoftUpdate] when it is below `latestVersion`, else [SunsetDecision.UpToDate].
+     * else [SunsetDecision.SoftUpdate] when it is below `latestVersion`, else [SunsetDecision.UpToDate]. The prompt
+     * carries the block's `latestVersion` (`null` when the block has none).
      *
      * Fails open (`UpToDate`) when [config] is `null`, has no block for [platform], or [appVersion] does not parse.
      * When the block has a `latestMinimumOS` and [osVersion] is below it or does not parse, the device cannot install
@@ -32,7 +33,7 @@ public object SunsetDecider {
             val os = AppVersion.parse(osVersion)
             if (os == null || os < minimumOS) return SunsetDecision.UpToDate
         }
-        val prompt = SunsetPrompt(block.storeUrl, SunsetMessages.resolve(block.messages, languages))
+        val prompt = SunsetPrompt(block.storeUrl, SunsetMessages.resolve(block.messages, languages), block.latestVersion)
         block.minimumVersion?.let { if (installed < it) return SunsetDecision.HardUpdate(prompt) }
         block.latestVersion?.let { if (installed < it) return SunsetDecision.SoftUpdate(prompt) }
         return SunsetDecision.UpToDate

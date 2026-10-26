@@ -34,6 +34,7 @@ final class SunsetCheckerFixtureTests: XCTestCase {
         let cachedText: String?
         let decision: String
         let storeURL: String?
+        let latestVersion: String?
         let cacheAfter: String
     }
 
@@ -75,6 +76,7 @@ final class SunsetCheckerFixtureTests: XCTestCase {
 
             XCTAssertEqual(name(of: decision), testCase.decision, testCase.name)
             XCTAssertEqual(decision.prompt?.storeURL.absoluteString, testCase.storeURL, testCase.name)
+            XCTAssertEqual(decision.prompt?.latestVersion?.description, testCase.latestVersion, testCase.name)
             XCTAssertEqual(cache.saved, testCase.cacheAfter == "fetched" ? [try XCTUnwrap(fetchedBody)] : [], testCase.name)
             let cachedAfter = await cache.load()
             XCTAssertEqual(cachedAfter, testCase.cacheAfter == "fetched" ? fetchedBody : cached, testCase.name)

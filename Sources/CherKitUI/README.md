@@ -31,13 +31,14 @@ struct RootView: View {
 }
 ```
 
-If you know the config's `latestVersion`, pass it (`.sunsetPrompt(decision: $sunset, latestVersion: "1.4.0")`) so
-"Not now" is remembered for that version exactly.
+The decision's prompt carries the config's `latestVersion`, so there is nothing else to pass: "Not now" is remembered
+for that version exactly. In UI tests and on the simulator, use `SunsetChecker.disabled` instead (see the Sunset
+module README); it always answers `upToDate`, so nothing is shown.
 
 - `softUpdate`: a dismissible alert, "Update available", with **Update** (opens the store URL) and **Not now**.
-  "Not now" is remembered for `latestVersion` (the config's `latestVersion`, as a string), so it is not shown again on
-  every launch; a newer `latestVersion` shows it again. Without `latestVersion` the installed app version is used, so
-  "Not now" lasts until the app is updated.
+  "Not now" is remembered for `prompt.latestVersion` (the config's `latestVersion`), so it is not shown again on
+  every launch; a newer `latestVersion` shows it again. If the config has no `latestVersion`, the installed app
+  version is used, so "Not now" lasts until the app is updated.
 - `hardUpdate`: `SunsetUpdateView` ("Update required") over everything, with no way to dismiss it: a
   window above the app's windows on iOS (so it also covers sheets and covers the app is presenting), an overlay on
   macOS (the content below is disabled).
@@ -45,6 +46,8 @@ If you know the config's `latestVersion`, pass it (`.sunsetPrompt(decision: $sun
 
 Options, all with defaults:
 
+- `latestVersion: String?`: overrides the version "Not now" is remembered for. Defaults to `nil`, which uses
+  `prompt.latestVersion`; you rarely need it.
 - `memory: SunsetSoftPromptMemory(defaults:key:)`: where "Not now" is stored (`UserDefaults.standard` under
   `SunsetSoftPromptMemory.defaultKey`). Pass an app group suite or your own key.
 - `strings: SunsetStrings(...)`: every text, English by default. Pass already localized text to override any of it.

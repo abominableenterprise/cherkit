@@ -37,6 +37,7 @@ class SunsetCheckerFixtureTest {
         val cachedText: String? = null,
         val decision: String,
         val storeURL: String? = null,
+        val latestVersion: String? = null,
         val cacheAfter: String,
     )
 
@@ -71,6 +72,7 @@ class SunsetCheckerFixtureTest {
 
             assertEquals(case.decision, decision.name(), case.name)
             assertEquals(case.storeURL, decision.prompt?.storeUrl, case.name)
+            assertEquals(case.latestVersion, decision.prompt?.latestVersion?.toString(), case.name)
             val saved = if (case.cacheAfter == "fetched") listOf(assertNotNull(fetchedBody, case.name)) else emptyList()
             assertEquals(saved, cache.saved, case.name)
             assertEquals(if (case.cacheAfter == "fetched") fetchedBody else cached, cache.load(), case.name)
