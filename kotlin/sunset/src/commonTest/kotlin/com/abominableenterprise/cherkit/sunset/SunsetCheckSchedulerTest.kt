@@ -4,6 +4,7 @@ import com.abominableenterprise.cherkit.sunset.SunsetCheckScheduler.Phase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -11,7 +12,7 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * When a Sunset check runs: once at launch, again only on a real return from the background, never two at once, and
- * re-checks no more often than `minimumInterval`. The same cases as Swift's `SunsetCheckSchedulerTests`.
+ * re-checks no more often than `minimumInterval`; a failed check is retried once and does not count. The same cases as Swift's `SunsetCheckSchedulerTests`.
  */
 class SunsetCheckSchedulerTest {
     private val start = 1_000_000.seconds
@@ -124,5 +125,73 @@ class SunsetCheckSchedulerTest {
             assertTrue(scheduler.shouldCheck(Phase.ACTIVE, at(second)))
             scheduler.checkFinished()
         }
+    }
+
+    @Test
+    fun failedLaunchCheckDoesNotConsumeTheIntervalAndAsksForOneRetry() {
+        val scheduler = SunsetCheckScheduler(1.hours)
+        assertTrue(scheduler.shouldCheckAtLaunch(start))
+        assertTrue(scheduler.checkFinished(failed = true), "the first failure asks for the quick retry")
+        assertFalse(scheduler.isChecking)
+        assertNull(scheduler.lastCheckStarted, "a failed check does not count toward the interval")
+        assertTrue(scheduler.isRetryPending)
+
+        assertTrue(scheduler.shouldRetry(at(3)))
+        assertFalse(scheduler.shouldRetry(at(3)), "the retry starts once")
+        assertFalse(scheduler.checkFinished(failed = true), "a second failure in a row does not retry again")
+        assertFalse(scheduler.shouldRetry(at(6)))
+        assertNull(scheduler.lastCheckStarted)
+        assertEquals(2, scheduler.failuresInARow)
+    }
+
+    @Test
+    fun afterTwoFailuresTheNextForegroundRechecksDespiteTheInterval() {
+        val scheduler = SunsetCheckScheduler(1.hours)
+        assertTrue(scheduler.shouldCheckAtLaunch(start))
+        scheduler.checkFinished(failed = true)
+        assertTrue(scheduler.shouldRetry(at(3)))
+        scheduler.checkFinished(failed = true)
+
+        // INACTIVE → ACTIVE (a system dialog) still never checks.
+        assertFalse(scheduler.shouldCheck(Phase.INACTIVE, at(10)))
+        assertFalse(scheduler.shouldCheck(Phase.ACTIVE, at(10)))
+        // A real return from the background does, long before the interval.
+        scheduler.shouldCheck(Phase.BACKGROUND, at(20))
+        assertTrue(scheduler.shouldCheck(Phase.ACTIVE, at(30)))
+        // It succeeds: from now on the interval counts from it again.
+        assertFalse(scheduler.checkFinished(failed = false))
+        assertEquals(0, scheduler.failuresInARow)
+        assertEquals(at(30), scheduler.lastCheckStarted)
+        scheduler.shouldCheck(Phase.BACKGROUND, at(40))
+        assertFalse(scheduler.shouldCheck(Phase.ACTIVE, at(50)), "the interval applies again")
+    }
+
+    @Test
+    fun failedRecheckKeepsTheLastGoodCheckForTheInterval() {
+        val scheduler = launched(minimumInterval = 1.hours)
+        scheduler.shouldCheck(Phase.BACKGROUND, at(3600))
+        assertTrue(scheduler.shouldCheck(Phase.ACTIVE, at(3600)))
+        assertTrue(scheduler.checkFinished(failed = true))
+        assertEquals(start, scheduler.lastCheckStarted, "the failed re-check is not counted; the launch check still is")
+    }
+
+    @Test
+    fun aCheckDuringTheRetryDelayMakesTheRetryStale() {
+        val scheduler = SunsetCheckScheduler(1.hours)
+        assertTrue(scheduler.shouldCheckAtLaunch(start))
+        scheduler.checkFinished(failed = true)
+        // The app goes away and back before the retry fires: that return re-checks instead.
+        scheduler.shouldCheck(Phase.BACKGROUND, at(1))
+        assertTrue(scheduler.shouldCheck(Phase.ACTIVE, at(2)))
+        assertFalse(scheduler.shouldRetry(at(3)), "the pending retry is dropped once another check starts")
+    }
+
+    @Test
+    fun successfulChecksNeverAskForARetry() {
+        val scheduler = SunsetCheckScheduler()
+        assertTrue(scheduler.shouldCheckAtLaunch(start))
+        assertFalse(scheduler.checkFinished(failed = false))
+        assertFalse(scheduler.shouldRetry(at(3)))
+        assertEquals(start, scheduler.lastCheckStarted)
     }
 }

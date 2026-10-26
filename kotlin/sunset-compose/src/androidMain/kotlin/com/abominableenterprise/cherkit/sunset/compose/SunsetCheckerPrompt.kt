@@ -14,9 +14,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.abominableenterprise.cherkit.sunset.AndroidSunset
+import com.abominableenterprise.cherkit.sunset.SunsetCheckOutcome
 import com.abominableenterprise.cherkit.sunset.SunsetCheckScheduler
 import com.abominableenterprise.cherkit.sunset.SunsetChecker
-import com.abominableenterprise.cherkit.sunset.SunsetDecision
 import kotlin.time.Duration
 
 /**
@@ -27,7 +27,7 @@ import kotlin.time.Duration
  * SunsetPrompt(checker = if (isUiTest) SunsetChecker.disabled() else checker)
  * ```
  *
- * When it checks (with `AndroidSunset.check(checker, context)`):
+ * When it checks (with the same app version, OS version and locales as `AndroidSunset.check(checker, context)`):
  *
  * - Once at launch, on the first composition. Only once per process, even if it is recomposed, the root is rebuilt
  *   or the activity is recreated (a rotation is not a return from the background either).
@@ -35,6 +35,9 @@ import kotlin.time.Duration
  *   [minimumInterval]. The first `ON_RESUME` and `ON_PAUSE` → `ON_RESUME` (a system dialog, a permission prompt) do
  *   not check, so the launch fetch never runs twice.
  * - Never while a check is still running.
+ * - After a failed check (the fetch failed, timed out or did not parse, and no usable config is cached, e.g. a fresh
+ *   install with a dropped connection), once more about 3 seconds later. A failed check does not count toward
+ *   [minimumInterval]: if the retry fails too, the next return from the background re-checks whatever the interval.
  *
  * What each decision shows is described on the decision-based [SunsetPrompt]. A re-check replaces the decision: a
  * hard block goes away once the config no longer requires the update, and a soft dialog answered with "Not now"
@@ -66,7 +69,13 @@ public fun SunsetPrompt(
         strings = strings,
         appIcon = appIcon,
         onVisibilityChange = onVisibilityChange,
-        check = { AndroidSunset.check(checker, context) },
+        check = {
+            checker.checkReportingFailure(
+                AndroidSunset.installedVersion(context),
+                AndroidSunset.osVersion(),
+                AndroidSunset.preferredLocales(),
+            )
+        },
     )
 }
 
@@ -79,7 +88,7 @@ internal fun SunsetCheckerPrompt(
     strings: SunsetStrings,
     appIcon: Painter?,
     onVisibilityChange: (Boolean) -> Unit,
-    check: suspend () -> SunsetDecision,
+    check: suspend () -> SunsetCheckOutcome,
 ) {
     val currentCheck by rememberUpdatedState(check)
     val lifecycleOwner = LocalLifecycleOwner.current
