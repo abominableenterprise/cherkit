@@ -6,34 +6,55 @@ A module PR edits only its own folder here.
 
 ## Sunset
 
-The views only display a `SunsetDecision` (`upToDate`, `softUpdate`, `hardUpdate`); they never fetch anything. Get the
-decision from `SunsetChecker` in `CherKitSunset` (or `SunsetDecider.decide`), then attach `.sunsetPrompt` to your
-root view:
+Attach `.sunsetPrompt(checker:)` to your root view. It runs the checks and shows the prompt:
 
 ```swift
 import CherKitSunset
 import CherKitUI
 import SwiftUI
 
-struct RootView: View {
-    private let checker = SunsetChecker(url: URL(string: "https://example.github.io/myapp/sunset.json")!)
-    @State private var sunset: SunsetDecision?
+@main
+struct ExampleApp: App {
+    private let sunset = ProcessInfo.processInfo.arguments.contains("-uiTesting")
+        ? SunsetChecker.disabled   // UI tests: always `upToDate`, no network
+        : SunsetChecker(url: URL(string: "https://example.github.io/myapp/sunset.json")!)
 
-    var body: some View {
-        ContentView()
-            .sunsetPrompt(decision: $sunset)
-            .task {
-                // Fetches with a timeout, falls back to the cached config, decides.
-                // It fails open, so a missing or broken config gives `.upToDate` and nothing is shown.
-                sunset = await checker.check()
-            }
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .sunsetPrompt(checker: sunset, tint: .accentColor)
+        }
     }
 }
 ```
 
+When it checks:
+
+- Once at launch, on the first appear. Only once per process, even if the root view appears again or is rebuilt.
+- Again when the app returns from the background (scene phase `.background`, then `.active`), at most once per
+  `minimumInterval` (default 1 hour; `0` re-checks on every return). The initial `.active`, and `.inactive` →
+  `.active` (Control Center, a system alert), do not check, so the launch fetch never runs twice.
+- Never while a check is still running.
+
+The checker fetches with a timeout and falls back to the cached config. It fails open, so a missing or broken config
+gives `.upToDate` and nothing is shown. A re-check replaces the decision, so a hard block goes away once the config
+stops requiring the update. Optional parameters: `installedVersion:` (default `CFBundleShortVersionString`),
+`locale:` (default `Locale.preferredLanguages`), `minimumInterval:`, plus `memory:`, `strings:`, `appIcon:` and
+`tint:` below.
+
+To fetch on your own schedule, pass the decision instead. This modifier only displays it:
+
+```swift
+@State private var sunset: SunsetDecision?
+
+ContentView()
+    .sunsetPrompt(decision: $sunset, tint: .accentColor)
+    .task { sunset = await checker.check() }
+```
+
 The decision's prompt carries the config's `latestVersion`, so there is nothing else to pass: "Not now" is remembered
-for that version exactly. In UI tests and on the simulator, use `SunsetChecker.disabled` instead (see the Sunset
-module README); it always answers `upToDate`, so nothing is shown.
+for that version exactly. In UI tests and on the simulator, use `SunsetChecker.disabled` (see the Sunset module
+README); it always answers `upToDate`, so nothing is shown.
 
 - `softUpdate`: a dismissible alert, "Update available", with **Update** (opens the store URL) and **Not now**.
   "Not now" is remembered for `prompt.latestVersion` (the config's `latestVersion`), so it is not shown again on
@@ -46,15 +67,18 @@ module README); it always answers `upToDate`, so nothing is shown.
 
 Options, all with defaults:
 
-- `latestVersion: String?`: overrides the version "Not now" is remembered for. Defaults to `nil`, which uses
-  `prompt.latestVersion`; you rarely need it.
+- `latestVersion: String?` (`decision:` form only): overrides the version "Not now" is remembered for. Defaults to
+  `nil`, which uses `prompt.latestVersion`; you rarely need it.
 - `memory: SunsetSoftPromptMemory(defaults:key:)`: where "Not now" is stored (`UserDefaults.standard` under
   `SunsetSoftPromptMemory.defaultKey`). Pass an app group suite or your own key.
 - `strings: SunsetStrings(...)`: every text, English by default. Pass already localized text to override any of it.
   The config's custom message, when present, replaces the default body text.
 - `appIcon: Image?`: shown above the "Update required" title.
+- `tint: Color?`: the "Update required" button and accents, e.g. `.accentColor`. On iOS the block runs in its own
+  window, which does not inherit the app's tint, so without it the button is system blue. The soft alert always uses
+  the app's tint.
 
-`SunsetUpdateView(prompt:strings:appIcon:)` can also be used on its own. It scrolls, so it does not clip on small
+`SunsetUpdateView(prompt:strings:appIcon:tint:)` can also be used on its own. It scrolls, so it does not clip on small
 screens or at the largest Dynamic Type sizes. `SunsetSoftPromptRule.shouldShow(_:version:dismissedVersion:)` is the
 pure "show the soft prompt?" rule the modifier uses.
 

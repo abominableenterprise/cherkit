@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The hard "Update required" block: optional app icon, title, message and an "Update" button that opens the store.
 ///
-/// It has no way to dismiss it. Present it full screen (``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:)``
+/// It has no way to dismiss it. Present it full screen (``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:)``
 /// does) for ``SunsetDecision/hardUpdate(_:)``. The text scrolls when it does not fit, so nothing clips on small
 /// screens or at the largest Dynamic Type sizes, while the "Update" button stays pinned at the bottom, always visible.
 @available(iOS 16, macOS 13, *)
@@ -12,6 +12,7 @@ public struct SunsetUpdateView: View {
     private let prompt: SunsetPrompt
     private let strings: SunsetStrings
     private let appIcon: Image?
+    private let tint: Color?
 
     @Environment(\.openURL) private var openURL
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 88
@@ -22,13 +23,29 @@ public struct SunsetUpdateView: View {
     ///   - prompt: From ``SunsetDecision/hardUpdate(_:)``: the store URL and the optional custom message.
     ///   - strings: The text; English defaults.
     ///   - appIcon: Shown above the title when set, e.g. `Image("AppIconImage")`. Decorative: VoiceOver skips it.
-    public init(prompt: SunsetPrompt, strings: SunsetStrings = SunsetStrings(), appIcon: Image? = nil) {
+    ///   - tint: The "Update" button's and accents' color, e.g. your app's accent color. `nil` (the default) keeps the
+    ///     inherited tint. On iOS the block runs in its own window, which does not inherit the app's tint, so pass it.
+    public init(
+        prompt: SunsetPrompt,
+        strings: SunsetStrings = SunsetStrings(),
+        appIcon: Image? = nil,
+        tint: Color? = nil
+    ) {
         self.prompt = prompt
         self.strings = strings
         self.appIcon = appIcon
+        self.tint = tint
     }
 
     public var body: some View {
+        if let tint {
+            screen.tint(tint)
+        } else {
+            screen
+        }
+    }
+
+    private var screen: some View {
         GeometryReader { geometry in
             ScrollView {
                 content

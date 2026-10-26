@@ -138,4 +138,5 @@ Minimal file (only a soft prompt on iOS; add `minimumVersion` for a hard block):
 
 Validate the JSON before publishing: a malformed file never blocks anyone, but apps then keep the last good config.
 
-Status: logic, fetcher, cache and checker. The update screens (CherKitUI) come in a later PR.
+- iOS: the SwiftUI screens are in CherKitUI (`.sunsetPrompt`).
+- Android: the Compose screens are in the `sunset-compose` module.
