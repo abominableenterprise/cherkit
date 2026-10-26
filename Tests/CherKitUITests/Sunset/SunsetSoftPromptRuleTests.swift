@@ -1,12 +1,10 @@
 #if canImport(SwiftUI)
 import CherKitSunset
+@testable import CherKitUI
 import Foundation
 import XCTest
 
-/// Tests the soft prompt's "remember Not now" rule from CherKitUI.
-///
-/// Package.swift has no CherKitUI test target yet, so the two SwiftUI-free files (`SunsetSoftPromptRule.swift`,
-/// `SunsetSoftPromptMemory.swift`) are compiled into this target through symlinks in this folder.
+/// Tests the soft prompt's "remember Not now" rule (`SunsetSoftPromptRule`, `SunsetSoftPromptMemory`).
 final class SunsetSoftPromptRuleTests: XCTestCase {
     private let prompt = SunsetPrompt(storeURL: URL(string: "https://apps.apple.com/app/id1")!, message: nil)
     private var defaults: UserDefaults!

@@ -40,5 +40,10 @@ let package = Package(
         .testTarget(name: "CherKitAnalyticsTests", dependencies: ["CherKitAnalytics", "CherKitTestSupport"]),
         .testTarget(name: "CherKitSunsetTests", dependencies: ["CherKitSunset", "CherKitTestSupport"]),
         .testTarget(name: "CherKitWhatsNewTests", dependencies: ["CherKitWhatsNew", "CherKitTestSupport"]),
+        // The logic behind the CherKitUI views. Its files are wrapped in `#if canImport(SwiftUI)`, so empty on Linux.
+        .testTarget(
+            name: "CherKitUITests",
+            dependencies: ["CherKitUI", "CherKitCore", "CherKitSunset", "CherKitWhatsNew"]
+        ),
     ]
 )

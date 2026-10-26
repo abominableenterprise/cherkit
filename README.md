@@ -13,7 +13,7 @@ its own product, so an app imports only what it needs.
 | [WhatsNew](kotlin/whatsnew/README.md) | "What's new" notes and installed-version history | `CherKitWhatsNew` | `:whatsnew` |
 | [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew | `CherKitUI` | n/a |
 
-Status: scaffold only; modules contain placeholders.
+Status: v0.1.0: Analytics (PostHog), Sunset and WhatsNew logic plus SwiftUI views; Android UI not included.
 
 ## Running the tests
 

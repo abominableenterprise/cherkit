@@ -1,11 +1,10 @@
-#if canImport(UIKit) && !os(watchOS)
+#if canImport(SwiftUI) && canImport(UIKit) && !os(watchOS)
+@testable import CherKitUI
 import UIKit
 import XCTest
 
 /// Tests that the iOS hard block takes over even while the app is presenting a sheet: a `fullScreenCover` cannot be
 /// presented from a presenter that is already busy, so the block lives in its own window above the app's windows.
-///
-/// `SunsetBlockingWindow.swift` comes from CherKitUI through a symlink in this folder (no CherKitUI test target yet).
 @MainActor
 final class SunsetBlockingWindowTests: XCTestCase {
     private var appWindow: UIWindow!
