@@ -14,7 +14,7 @@ its own product, so an app imports only what it needs.
 | [WhatsNew](kotlin/whatsnew/README.md) | "What's new" notes and installed-version history | `CherKitWhatsNew` | `:whatsnew` |
 | [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew | `CherKitUI` | n/a |
 
-Status: v0.1.0: Analytics (PostHog), Sunset and WhatsNew logic plus SwiftUI views; Android UI not included.
+Status: v0.2.0: Analytics (PostHog), Sunset and WhatsNew logic plus SwiftUI views; Android UI: Sunset Compose only.
 
 ## Install
 
@@ -23,13 +23,13 @@ Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
 ### iOS / macOS (SwiftPM)
 
 Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
-"Up to Next Major Version" from 0.1.0), then link only the products you use:
+"Up to Next Major Version" from 0.2.0), then link only the products you use:
 `CherKitAnalytics`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.1.0"),
+    .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.2.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -59,10 +59,11 @@ JVM variant automatically, and from a Kotlin Multiplatform module you can add th
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:analytics:v0.1.0")
-    implementation("com.github.abominableenterprise.cherkit:sunset:v0.1.0")
-    implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.1.0")
-    implementation("com.github.abominableenterprise.cherkit:core:v0.1.0") // already included by sunset and whatsnew
+    implementation("com.github.abominableenterprise.cherkit:analytics:v0.2.0")
+    implementation("com.github.abominableenterprise.cherkit:sunset:v0.2.0")
+    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.2.0") // Android only; brings sunset
+    implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.2.0")
+    implementation("com.github.abominableenterprise.cherkit:core:v0.2.0") // already included by sunset and whatsnew
 }
 ```
 
