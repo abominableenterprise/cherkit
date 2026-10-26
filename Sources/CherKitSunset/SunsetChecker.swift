@@ -14,6 +14,9 @@ import Foundation
 /// It never throws and fails open: an unreachable, slow, non-2xx or malformed config uses the cached last good config,
 /// and with no usable config at all the answer is ``SunsetDecision/upToDate``. Only a fetched body that parses is
 /// saved to the cache.
+///
+/// To turn the check off (UI tests, simulators), use ``disabled``:
+/// `let checker = isUITest ? .disabled : SunsetChecker(url: url)`.
 public struct SunsetChecker: Sendable {
     /// The default fetch timeout in seconds. A launch never waits longer than this for the network.
     public static let defaultTimeout: TimeInterval = 5
@@ -26,6 +29,8 @@ public struct SunsetChecker: Sendable {
     public let timeout: TimeInterval
     /// Which block of the config applies to this app.
     public let platform: SunsetPlatform
+    /// `true` only for ``disabled``: ``check(installedVersion:osVersion:locale:)`` answers `upToDate` at once.
+    let isDisabled: Bool
 
     /// A checker over any `source` and `cache`.
     public init(
@@ -34,10 +39,15 @@ public struct SunsetChecker: Sendable {
         timeout: TimeInterval = defaultTimeout,
         platform: SunsetPlatform = .ios
     ) {
+        self.init(source: source, cache: cache, timeout: timeout, platform: platform, isDisabled: false)
+    }
+
+    init(source: SunsetConfigSource, cache: SunsetConfigCache, timeout: TimeInterval, platform: SunsetPlatform, isDisabled: Bool) {
         self.source = source
         self.cache = cache
         self.timeout = timeout
         self.platform = platform
+        self.isDisabled = isDisabled
     }
 
     /// A checker that fetches `url` with `URLSession` and caches in `UserDefaults.standard`.
@@ -52,6 +62,7 @@ public struct SunsetChecker: Sendable {
     ///   - osVersion: The device OS version, e.g. `"17.4.1"` (on Android, the API level).
     ///   - locale: The user's preferred language tags in order, e.g. `Locale.preferredLanguages`.
     public func check(installedVersion: String, osVersion: String, locale: [String]) async -> SunsetDecision {
+        if isDisabled { return .upToDate }
         let source = self.source
         let timeout = self.timeout
         let fetched = await SunsetTimeout.run(seconds: timeout) { await source.fetch(timeout: timeout) }

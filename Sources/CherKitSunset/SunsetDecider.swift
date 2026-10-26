@@ -8,6 +8,8 @@ public enum SunsetDecider {
     /// - else `softUpdate` when it is below `latestVersion`;
     /// - else `upToDate`.
     ///
+    /// The prompt carries the block's `latestVersion` (`nil` when the block has none).
+    ///
     /// Fails open (`upToDate`) when `config` is `nil`, has no block for `platform`, or `appVersion` does not parse.
     /// When the block has a `latestMinimumOS` and `osVersion` is below it or does not parse, the device cannot install
     /// the update, so there is no prompt at all, not even a hard block: users on an old OS keep using the app they have
@@ -30,7 +32,11 @@ public enum SunsetDecider {
         if let minimumOS = block.latestMinimumOS {
             guard let os = AppVersion(osVersion), !(os < minimumOS) else { return .upToDate }
         }
-        let prompt = SunsetPrompt(storeURL: block.storeURL, message: SunsetMessages.resolve(block.messages, languages: languages))
+        let prompt = SunsetPrompt(
+            storeURL: block.storeURL,
+            message: SunsetMessages.resolve(block.messages, languages: languages),
+            latestVersion: block.latestVersion
+        )
         if let minimum = block.minimumVersion, installed < minimum { return .hardUpdate(prompt) }
         if let latest = block.latestVersion, installed < latest { return .softUpdate(prompt) }
         return .upToDate

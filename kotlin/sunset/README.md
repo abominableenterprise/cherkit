@@ -47,13 +47,13 @@ One public JSON file per app (e.g. on a CDN). Unknown fields are ignored; any `s
 | `SunsetConfig.parse(Data) -> SunsetConfig?` | `SunsetConfig.parse(String): SunsetConfig?` |
 | `SunsetDecider.decide(config:platform:appVersion:osVersion:languages:)` | `SunsetDecider.decide(config, platform, appVersion, osVersion, languages)` |
 | `SunsetDecision.upToDate / .softUpdate(p) / .hardUpdate(p)` | `SunsetDecision.UpToDate / SoftUpdate(p) / HardUpdate(p)` |
-| `SunsetPrompt(storeURL: URL, message: String?)` | `SunsetPrompt(storeUrl: String, message: String?)` |
+| `SunsetPrompt(storeURL: URL, message: String?, latestVersion: AppVersion?)` | `SunsetPrompt(storeUrl: String, message: String?, latestVersion: AppVersion?)` |
 | `SunsetMessages.resolve(_:languages:)` | `SunsetMessages.resolve(messages, languages)` |
 | `SunsetConfigChoice.choose(fetched:cached:)` | `SunsetConfigChoice.choose(fetched, cached)` |
 | `protocol SunsetConfigSource` (`fetch(timeout:) async -> Data?`) | `fun interface SunsetConfigSource` (`suspend fetch(timeout): String?`) |
 | `protocol SunsetConfigCache` (`load`, `save`) | `interface SunsetConfigCache` (`load`, `save`) |
-
 | `SunsetChecker(source:cache:timeout:platform:)`, `check(installedVersion:osVersion:locale:) async` | `SunsetChecker(source, cache, timeout, platform)`, `suspend check(installedVersion, osVersion, locale)` |
+| `SunsetChecker.disabled` | `SunsetChecker.disabled()` |
 | `URLSessionSunsetConfigSource(url:session:)` | `FetchSunsetConfigSource(fetch: SunsetFetch)` |
 | `UserDefaultsSunsetConfigCache(defaults:key:)` | `KeyValueSunsetConfigCache(store: SunsetKeyValueStore, key)`; Android: `SharedPreferencesSunsetStore` |
 
@@ -96,6 +96,22 @@ when (val decision = checker.check(context)) {
 
 Elsewhere (JVM, tests, an app's own storage): `SunsetChecker(FetchSunsetConfigSource { ... },
 KeyValueSunsetConfigCache(myStore)).check(installedVersion, osVersion, locale)`.
+
+A prompt carries `storeUrl`, the resolved `message` and the config's `latestVersion` for the platform (`null` when the
+block has none), e.g. to remember "Not now" for that version.
+
+## Turn it off in UI tests and on emulators or simulators
+
+`SunsetChecker.disabled` (Swift) / `SunsetChecker.disabled()` (Kotlin) always answers `upToDate` without touching the
+network or the cache. Use it instead of a flag of your own:
+
+```swift
+let checker = isUITest ? .disabled : SunsetChecker(url: URL(string: "https://example.github.io/myapp/sunset.json")!)
+```
+
+```kotlin
+val checker = if (isUiTest) SunsetChecker.disabled() else AndroidSunset.checker(context) { /* your GET */ }
+```
 
 ## Hosting the config
 

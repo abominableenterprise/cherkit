@@ -1,5 +1,6 @@
 package com.abominableenterprise.cherkit.sunset
 
+import com.abominableenterprise.cherkit.core.AppVersion
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
@@ -24,6 +25,7 @@ class SunsetDecisionFixtureTest {
         val languages: List<String>,
         val decision: String,
         val storeURL: String? = null,
+        val latestVersion: String? = null,
         val message: String? = null,
     )
 
@@ -47,7 +49,8 @@ class SunsetDecisionFixtureTest {
 
     private fun expected(case: DecisionCase): SunsetDecision {
         if (case.decision == "upToDate") return SunsetDecision.UpToDate
-        val prompt = SunsetPrompt(assertNotNull(case.storeURL, case.name), case.message)
+        val latest = case.latestVersion?.let { assertNotNull(AppVersion.parse(it), case.name) }
+        val prompt = SunsetPrompt(assertNotNull(case.storeURL, case.name), case.message, latest)
         return when (case.decision) {
             "softUpdate" -> SunsetDecision.SoftUpdate(prompt)
             "hardUpdate" -> SunsetDecision.HardUpdate(prompt)

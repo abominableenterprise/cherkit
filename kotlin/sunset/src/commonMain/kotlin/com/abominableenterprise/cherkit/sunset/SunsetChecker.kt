@@ -16,6 +16,9 @@ import kotlin.time.Duration.Companion.seconds
  * It never throws (only the caller's own cancellation propagates) and fails open: an unreachable, slow, non-2xx or
  * malformed config uses the cached last good config, and with no usable config at all the answer is
  * [SunsetDecision.UpToDate]. Only a fetched body that parses is saved to the [cache].
+ *
+ * To turn the check off (UI tests, emulators), use [disabled]:
+ * `val checker = if (isUiTest) SunsetChecker.disabled() else AndroidSunset.checker(context) { ... }`.
  */
 public class SunsetChecker(
     /** Where the hosted config comes from, e.g. `FetchSunsetConfigSource { myHttpGet(url) }`. */
@@ -35,6 +38,7 @@ public class SunsetChecker(
      * @param locale The user's preferred language tags in order, e.g. `["de-DE", "en-US"]`.
      */
     public suspend fun check(installedVersion: String, osVersion: String, locale: List<String>): SunsetDecision {
+        if (this === DISABLED) return SunsetDecision.UpToDate
         val fetched = fetchWithDeadline()
         val choice = SunsetConfigChoice.choose(fetched, failOpen { cache.load() })
         if (choice.source == SunsetConfigChoice.Source.FETCHED && fetched != null) failOpen { cache.save(fetched) }
@@ -67,5 +71,14 @@ public class SunsetChecker(
     public companion object {
         /** The default fetch timeout. */
         public val DEFAULT_TIMEOUT: Duration = 5.seconds
+
+        /**
+         * A checker that is switched off: [check] always answers [SunsetDecision.UpToDate] without fetching anything
+         * or reading or writing any cache. Use it wherever the app should never be prompted, e.g. UI tests and
+         * emulators.
+         */
+        public fun disabled(): SunsetChecker = DISABLED
+
+        private val DISABLED = SunsetChecker(DisabledSunsetConfigSource, DisabledSunsetConfigCache)
     }
 }

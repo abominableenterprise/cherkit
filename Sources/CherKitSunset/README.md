@@ -21,6 +21,17 @@ counts. The last good config is kept in `UserDefaults.standard` (pass
 `UserDefaultsSunsetConfigCache(defaults: UserDefaults(suiteName: "group.x")!, key: "...")` to change it), and a
 malformed fetch is never cached. Offline or with no usable config at all, the answer is `upToDate`.
 
+The prompt carries `storeURL`, the resolved `message` and the config's `latestVersion` (`AppVersion?`, `nil` when the
+platform block has none).
+
+## Turn it off in UI tests and on the simulator
+
+`SunsetChecker.disabled` always answers `upToDate` without touching the network or the cache:
+
+```swift
+let checker = isUITest ? .disabled : SunsetChecker(url: URL(string: "https://example.github.io/myapp/sunset.json")!)
+```
+
 ## Hosting
 
 Put the JSON on any static HTTPS host, e.g. GitHub Pages (`https://<user>.github.io/<app>/sunset.json`) or Firebase

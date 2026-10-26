@@ -6,19 +6,54 @@ import SwiftUI
 @available(iOS 16, macOS 13, *)
 struct SunsetPromptModifier: ViewModifier {
     @Binding var decision: SunsetDecision?
-    let version: String
+    /// The version passed to `.sunsetPrompt(latestVersion:)`, or `nil` to use the prompt's.
+    let latestVersion: String?
+    /// The installed app version: the last fallback for the "Not now" version.
+    let installedVersion: String
     let memory: SunsetSoftPromptMemory
     let strings: SunsetStrings
     let appIcon: Image?
 
     @Environment(\.openURL) private var openURL
 
+    init(
+        decision: Binding<SunsetDecision?>,
+        latestVersion: String?,
+        installedVersion: String,
+        memory: SunsetSoftPromptMemory,
+        strings: SunsetStrings,
+        appIcon: Image?
+    ) {
+        _decision = decision
+        self.latestVersion = latestVersion
+        self.installedVersion = installedVersion
+        self.memory = memory
+        self.strings = strings
+        self.appIcon = appIcon
+    }
+
+    /// The version "Not now" is remembered for when `prompt` is answered: the `latestVersion` parameter, else the
+    /// prompt's ``SunsetPrompt/latestVersion``, else the installed version.
+    func version(for prompt: SunsetPrompt?) -> String {
+        latestVersion ?? prompt?.latestVersion?.description ?? installedVersion
+    }
+
+    /// What "Not now" does for `prompt`.
+    func rememberNotNow(for prompt: SunsetPrompt) {
+        memory.rememberNotNow(for: version(for: prompt))
+    }
+
+    /// Whether the soft alert is up for the current decision.
+    var showsSoftPrompt: Bool {
+        memory.shouldShowSoftPrompt(for: decision, version: version(for: softPrompt))
+    }
+
     func body(content: Content) -> some View {
         content
             .alert(strings.softTitle, isPresented: softPresented, presenting: softPrompt) { prompt in
                 Button(strings.updateButton) { openURL(prompt.storeURL) }
                     .accessibilityHint(strings.updateHint)
-                Button(strings.notNowButton, role: .cancel) { memory.rememberNotNow(for: version) }
+                Button(strings.notNowButton, role: .cancel) { rememberNotNow(for: prompt) }
             } message: { prompt in
                 Text(strings.softText(for: prompt))
             }
@@ -38,7 +73,7 @@ struct SunsetPromptModifier: ViewModifier {
     /// Shown while the rule says so; answering the alert clears the decision so it is shown once per check.
     private var softPresented: Binding<Bool> {
         Binding(
-            get: { memory.shouldShowSoftPrompt(for: decision, version: version) },
+            get: { showsSoftPrompt },
             set: { presented in
                 if !presented, case .softUpdate = decision { decision = nil }
             }
@@ -79,7 +114,8 @@ extension View {
     /// Shows the Sunset prompt for `decision`:
     ///
     /// - ``SunsetDecision/softUpdate(_:)``: a dismissible alert with "Update" and "Not now". "Not now" is remembered
-    ///   for `latestVersion`, so the alert does not come back for that version (see ``SunsetSoftPromptRule``).
+    ///   for the config's latest version, so the alert does not come back for that version (see
+    ///   ``SunsetSoftPromptRule``).
     ///   Either answer sets `decision` to `nil`.
     /// - ``SunsetDecision/hardUpdate(_:)``: ``SunsetUpdateView`` over everything, with no way to dismiss it
     ///   (on iOS a window above the app's windows, so it also covers sheets the app is presenting; on macOS an
@@ -91,9 +127,10 @@ extension View {
     ///
     /// - Parameters:
     ///   - decision: The decision to show, `nil` while unknown.
-    ///   - latestVersion: The version the soft prompt is about, e.g. the config's `latestVersion`. A newer one shows
-    ///     the prompt again after "Not now". When `nil`, the installed app version is used, so "Not now" lasts until
-    ///     the app is updated.
+    ///   - latestVersion: Overrides the version "Not now" is remembered for. Leave it `nil` (the default) to use the
+    ///     prompt's ``SunsetPrompt/latestVersion`` (the config's `latestVersion`), so a newer one shows the prompt
+    ///     again. When both are `nil`, the installed app version is used, so "Not now" lasts until the app is
+    ///     updated.
     ///   - memory: Where "Not now" is stored. Defaults to `UserDefaults.standard` under
     ///     ``SunsetSoftPromptMemory/defaultKey``.
     ///   - strings: The text; English defaults.
@@ -107,7 +144,8 @@ extension View {
     ) -> some View {
         modifier(SunsetPromptModifier(
             decision: decision,
-            version: latestVersion ?? installedAppVersion(),
+            latestVersion: latestVersion,
+            installedVersion: installedAppVersion(),
             memory: memory,
             strings: strings,
             appIcon: appIcon
