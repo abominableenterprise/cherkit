@@ -21,14 +21,17 @@ the platform-free launch order (`UpdateLauncher`, `UpdateFlow`), the "Not now" s
 Once, in your root composable (it needs an `ActivityResultRegistryOwner`, i.e. a `ComponentActivity`):
 
 ```kotlin
+// Top level, per process like onFirstCheckComplete: survives rotation, starts over after process death.
+object LaunchGate { var sunsetSettled by mutableStateOf(false) }
+
+// In the root composable:
 val update = rememberPlayUpdateState()
 var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
-var sunsetSettled by rememberSaveable { mutableStateOf(false) }
 
-SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { sunsetSettled = true })
+SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { LaunchGate.sunsetSettled = true })
 PlayUpdatePrompt(
     update,
-    suppressed = !sunsetSettled || sunsetKind != null || showWhatsNew,
+    suppressed = !LaunchGate.sunsetSettled || sunsetKind != null || showWhatsNew,
     onVisibilityChange = { review.setInterruptionVisible(it, UpdateInterruption.SOURCE) },
 )
 
@@ -56,7 +59,7 @@ if (update.isDownloaded) {
   never show it again.
 - **`suppressed`:** while `true` the sheet waits (nothing is consumed) and shows once it turns `false`. Pass it while
   any other prompt is up or may still come: the Sunset prompt and its pending launch check
-  (`!sunsetSettled || sunsetKind != null`, see below), What's New, the review prompt, your own modals.
+  (`!LaunchGate.sunsetSettled || sunsetKind != null`, see below), What's New, the review prompt, your own modals.
 - **"Not now":** cancelling Play's sheet is remembered in `store` for that `availableVersionCode`, so the same build is
   never offered again; a newer versionCode is. Default store: `rememberUpdatePromptStore()`, the SharedPreferences
   file `cherkit.update` (`AndroidUpdate.DEFAULT_PREFERENCES_NAME`), key `cherkit.update.declinedVersionCode`.
@@ -84,13 +87,16 @@ the same.)
 
 ### Precedence with Sunset
 
-- **The Sunset hard block always wins.** Pass `suppressed = !sunsetSettled || sunsetKind != null` (from
+- **The Sunset hard block always wins.** Pass `suppressed = !LaunchGate.sunsetSettled || sunsetKind != null` (from
   `SunsetPrompt(onPromptChange =, onFirstCheckComplete =)`, as in the recipe above) so Play's sheet never opens over
   the Sunset prompt or block. `sunsetKind != null` alone is not enough: it stays `null` while Sunset's launch fetch
   runs (up to `SunsetChecker.timeout`, 5 s), and Play's `appUpdateInfo` is a local call that usually answers first,
   so the sheet would open and stay above a hard block that arrives later (the prompt cannot close Play's activity).
   `onFirstCheckComplete` also runs after a failed fetch, so an unreachable config still releases the sheet. Keep
-  `sunsetSettled` in `rememberSaveable` (see [sunset-compose](../sunset-compose/README.md#know-when-the-launch-check-is-done)).
+  `sunsetSettled` in process-scoped state (an `object`, or your app's own singleton), not `rememberSaveable`:
+  `onFirstCheckComplete` runs once per process, so `remember` would hold the sheet back for good after a rotation,
+  and `rememberSaveable` would restore a stale `true` after process death, before the new process's launch check
+  has answered (see [sunset-compose](../sunset-compose/README.md#know-when-the-launch-check-is-done)).
 - **Config `latestVersion` soft prompt vs. Play:** on a Play install, prefer the Play flow and don't show both. Leave
   `android.latestVersion` out of the hosted config (keep `minimumVersion` for hard blocks): Play knows about the new
   release on its own, and the Play flow downloads it in place. If you keep `latestVersion` for sideloaded or

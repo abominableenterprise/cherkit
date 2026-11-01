@@ -21,10 +21,22 @@ import com.google.android.play.core.install.model.InstallStatus
  * Put it once in your root composable:
  *
  * ```kotlin
+ * // Top level, per process like onFirstCheckComplete (not rememberSaveable: stale after process death).
+ * object LaunchGate { var sunsetSettled by mutableStateOf(false) }
+ *
+ * // In the root composable:
  * val update = rememberPlayUpdateState()
+ * var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
+ * SunsetPrompt(
+ *     checker = sunset,
+ *     onPromptChange = { sunsetKind = it },
+ *     onFirstCheckComplete = { LaunchGate.sunsetSettled = true },
+ * )
  * PlayUpdatePrompt(
  *     update,
- *     suppressed = sunsetKind != null || showWhatsNew,
+ *     // Not `sunsetKind != null` alone: it is null while Sunset's launch fetch runs, and a late hard block
+ *     // cannot close Play's sheet. See the README's "Precedence with Sunset".
+ *     suppressed = !LaunchGate.sunsetSettled || sunsetKind != null || showWhatsNew,
  *     onVisibilityChange = { review.setInterruptionVisible(it, UpdateInterruption.SOURCE) },
  * )
  * if (update.isDownloaded) { /* "Restart to install" -> update.completeUpdate() */ }
