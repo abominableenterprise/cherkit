@@ -16,6 +16,10 @@ junit = "4.13.2"
 espresso = "3.5.0"
 # Play In-App Review for :review-compose (Android only).
 play-review = "2.0.2"
+# Play In-App Updates for :update-compose (Android only). activity-compose: rememberLauncherForActivityResult for
+# the flexible flow; 1.7.0 is the activity version Compose ui 1.9.5 already brings, so it forces no upgrade.
+play-app-update = "2.1.0"
+activity-compose = "1.7.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -33,6 +37,8 @@ robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectr
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
 play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "play-review" }
+play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "play-app-update" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 # Catalog entry only; the analytics module adds it in its own PR.
 posthog-android = { module = "com.posthog:posthog-android", version.ref = "posthog-android" }
 
