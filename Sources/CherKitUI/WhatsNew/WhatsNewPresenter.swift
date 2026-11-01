@@ -20,6 +20,8 @@ final class WhatsNewPresenter: ObservableObject {
     private var onDismiss: (() -> Void)?
     /// Entries were presented and the user has not dismissed them yet.
     private var isPending = false
+    /// The sheet is on screen: it appeared (``sheetAppeared()``) and has not been dismissed since.
+    private var isSheetShown = false
     /// The sheet was taken away for ``isSuppressed`` and SwiftUI has not reported that dismissal yet.
     private var isHidingForSuppression = false
     private var hasRunLaunchCheck = false
@@ -42,7 +44,8 @@ final class WhatsNewPresenter: ObservableObject {
         isSuppressed = suppressed
         if suppressed {
             guard isPresented else { return }
-            isHidingForSuppression = true
+            // Only a sheet that is on screen reports its dismissal; one not shown yet just isn't presented.
+            isHidingForSuppression = isSheetShown
             isPresented = false
         } else if isPending && !isHidingForSuppression {
             isPresented = true
@@ -62,10 +65,16 @@ final class WhatsNewPresenter: ObservableObject {
         isPresented = false
     }
 
+    /// Called when the sheet's content appears.
+    func sheetAppeared() {
+        isSheetShown = true
+    }
+
     /// Called from the sheet's `onDismiss`: runs the pending dismiss action once.
     func sheetDismissed() {
         isPresented = false
-        if isHidingForSuppression {
+        isSheetShown = false
+        if isHidingForSuppression || isSuppressed {
             // Taken away by `setSuppressed(true)`, not by the user: keep the entries and the action.
             isHidingForSuppression = false
             if !isSuppressed && isPending { isPresented = true }

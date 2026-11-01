@@ -28,6 +28,7 @@ final class WhatsNewPresenterSuppressedTests: XCTestCase {
         var dismissals = 0
         presenter.offer(whatsNewEntries("2.0.0"), onDismiss: { dismissals += 1 })
         XCTAssertTrue(presenter.isPresented)
+        presenter.sheetAppeared()
 
         presenter.setSuppressed(true)
         XCTAssertFalse(presenter.isPresented)
@@ -47,6 +48,7 @@ final class WhatsNewPresenterSuppressedTests: XCTestCase {
         let presenter = WhatsNewPresenter()
         var dismissals = 0
         presenter.offer(whatsNewEntries("2.0.0"), onDismiss: { dismissals += 1 })
+        presenter.sheetAppeared()
         presenter.setSuppressed(true)
         presenter.setSuppressed(false)
         XCTAssertFalse(presenter.isPresented, "not re-presented while the old sheet is still going away")
@@ -54,6 +56,28 @@ final class WhatsNewPresenterSuppressedTests: XCTestCase {
         presenter.sheetDismissed()
         XCTAssertTrue(presenter.isPresented, "re-presented once the old sheet is gone")
         XCTAssertEqual(dismissals, 0)
+    }
+
+    func testSuppressedBeforeTheSheetAppearedDoesNotWaitForADismissal() {
+        let presenter = WhatsNewPresenter()
+        var dismissals = 0
+        presenter.offer(whatsNewEntries("2.0.0"), onDismiss: { dismissals += 1 })
+        presenter.setSuppressed(true)  // before SwiftUI showed it: no onDismiss will come
+        presenter.setSuppressed(false)
+        XCTAssertTrue(presenter.isPresented, "never stuck waiting for a dismissal that cannot come")
+        XCTAssertEqual(dismissals, 0)
+    }
+
+    func testDismissalWhileSuppressedIsNeverTheUsers() {
+        let presenter = WhatsNewPresenter()
+        var dismissals = 0
+        presenter.offer(whatsNewEntries("2.0.0"), onDismiss: { dismissals += 1 })
+        presenter.setSuppressed(true)  // requested but not yet shown, then SwiftUI shows and drops it anyway
+        presenter.sheetAppeared()
+        presenter.sheetDismissed()
+        XCTAssertEqual(dismissals, 0, "markSeen must not run")
+        presenter.setSuppressed(false)
+        XCTAssertTrue(presenter.isPresented)
     }
 
     func testCheckerNotesWaitWhileSuppressed() {

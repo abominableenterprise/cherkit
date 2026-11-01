@@ -104,6 +104,7 @@ extension View {
         sheet(isPresented: Binding(get: { presenter.isPresented }, set: { if !$0 { presenter.close() } }),
               onDismiss: presenter.sheetDismissed) {
             WhatsNewSheet(entries: presenter.entries, strings: strings, onContinue: presenter.close)
+                .onAppear(perform: presenter.sheetAppeared)
         }
         .onChange(of: suppressed) { presenter.setSuppressed($0) }
         .modifier(VisibilityChangeReporter(value: presenter.isPresented, hidden: false) { _, visible in
