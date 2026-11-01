@@ -13,7 +13,7 @@ its own product, so an app imports only what it needs.
 | [Sunset Compose](kotlin/sunset-compose/README.md) | Jetpack Compose update dialog and blocking screen for Sunset (Android) | n/a | `:sunset-compose` |
 | [Review Compose](kotlin/review-compose/README.md) | Play In-App Review and Compose effects for Review (Android) | n/a | `:review-compose` |
 | [WhatsNew](kotlin/whatsnew/README.md) | "What's new" notes and installed-version history | `CherKitWhatsNew` | `:whatsnew` |
-| [Review](kotlin/review/README.md) | Store-review prompt rules: when to ask, once per version, never over a modal (core only, no UI yet) | `CherKitReview` | `:review` |
+| [Review](kotlin/review/README.md) | Store-review prompt rules: when to ask, once per version, never over a modal (iOS prompt in `CherKitUI`; Android in Review Compose) | `CherKitReview` | `:review` |
 | [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew, and the App Store review prompt | `CherKitUI` | n/a |
 
 Status: v0.3.0: Analytics (PostHog), Sunset and WhatsNew logic plus SwiftUI views; Android UI: Sunset Compose only.
