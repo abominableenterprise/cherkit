@@ -51,6 +51,8 @@ import kotlin.time.Duration
  * @param appIcon Optional icon above the "Update required" title. Decorative: TalkBack skips it.
  * @param onVisibilityChange Called with `true` when the soft "Update available" dialog appears and `false` when it
  *   goes away, e.g. to hold back your own work while it is open. Not called for the hard block.
+ * @param onPromptChange Called with the prompt now showing whenever it changes: [SunsetPromptKind.SOFT],
+ *   [SunsetPromptKind.HARD] (the hard block) or `null` (neither). Never called for the initial `null`.
  */
 @Composable
 public fun SunsetPrompt(
@@ -59,6 +61,7 @@ public fun SunsetPrompt(
     memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
     strings: SunsetStrings = SunsetStrings(),
     appIcon: Painter? = null,
+    onPromptChange: (SunsetPromptKind?) -> Unit = {},
     onVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
@@ -69,6 +72,7 @@ public fun SunsetPrompt(
         strings = strings,
         appIcon = appIcon,
         onVisibilityChange = onVisibilityChange,
+        onPromptChange = onPromptChange,
         check = {
             checker.checkReportingFailure(
                 AndroidSunset.installedVersion(context),
@@ -88,6 +92,7 @@ internal fun SunsetCheckerPrompt(
     strings: SunsetStrings,
     appIcon: Painter?,
     onVisibilityChange: (Boolean) -> Unit,
+    onPromptChange: (SunsetPromptKind?) -> Unit = {},
     check: suspend () -> SunsetCheckOutcome,
 ) {
     val currentCheck by rememberUpdatedState(check)
@@ -113,6 +118,25 @@ internal fun SunsetCheckerPrompt(
         memory = memory,
         strings = strings,
         appIcon = appIcon,
+        onVisibilityChange = onVisibilityChange,
+        onPromptChange = onPromptChange,
+    )
+}
+
+/** The 0.3.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun SunsetPrompt(
+    checker: SunsetChecker,
+    minimumInterval: Duration = SunsetCheckScheduler.DEFAULT_MINIMUM_INTERVAL,
+    memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
+    strings: SunsetStrings = SunsetStrings(),
+    appIcon: Painter? = null,
+    onVisibilityChange: (Boolean) -> Unit = {},
+) {
+    SunsetPrompt(
+        checker, minimumInterval, memory, strings, appIcon,
+        onPromptChange = {},
         onVisibilityChange = onVisibilityChange,
     )
 }

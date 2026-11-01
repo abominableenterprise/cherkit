@@ -40,6 +40,10 @@ import com.abominableenterprise.cherkit.sunset.SunsetDecision
  *   goes away (answered, cleared, or this composable leaves the composition), so an app that runs its own checks can
  *   skip them while the dialog is open. Not called for the hard block: keep checking behind it, so it goes away
  *   once the config no longer requires the update.
+ * @param onPromptChange Called with the prompt now showing whenever it changes: [SunsetPromptKind.SOFT] for the soft
+ *   dialog, [SunsetPromptKind.HARD] for the hard block, `null` when neither shows (also when this composable leaves
+ *   the composition). Never called for the initial `null`. Use it to tell other features (e.g. the Review prompt)
+ *   which prompt is up. It comes before [onVisibilityChange], so a trailing lambda still means [onVisibilityChange].
  */
 @Composable
 public fun SunsetPrompt(
@@ -48,6 +52,7 @@ public fun SunsetPrompt(
     memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
     strings: SunsetStrings = SunsetStrings(),
     appIcon: Painter? = null,
+    onPromptChange: (SunsetPromptKind?) -> Unit = {},
     onVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -62,6 +67,12 @@ public fun SunsetPrompt(
         if (showsSoft) currentOnVisibilityChange(true)
         onDispose { if (showsSoft) currentOnVisibilityChange(false) }
     }
+    val kind = when {
+        showsSoft -> SunsetPromptKind.SOFT
+        decision is SunsetDecision.HardUpdate -> SunsetPromptKind.HARD
+        else -> null
+    }
+    ReportSunsetPromptKind(kind, onPromptChange)
 
     when (decision) {
         is SunsetDecision.SoftUpdate -> if (showsSoft && softVersion != null) {
@@ -97,6 +108,24 @@ public fun SunsetPrompt(
     }
 }
 
+/** The 0.3.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun SunsetPrompt(
+    decision: SunsetDecision?,
+    onDecisionHandled: () -> Unit,
+    memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
+    strings: SunsetStrings = SunsetStrings(),
+    appIcon: Painter? = null,
+    onVisibilityChange: (Boolean) -> Unit = {},
+) {
+    SunsetPrompt(
+        decision, onDecisionHandled, memory, strings, appIcon,
+        onPromptChange = {},
+        onVisibilityChange = onVisibilityChange,
+    )
+}
+
 /** The 0.2.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
 @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
 @Composable
@@ -107,5 +136,5 @@ public fun SunsetPrompt(
     strings: SunsetStrings = SunsetStrings(),
     appIcon: Painter? = null,
 ) {
-    SunsetPrompt(decision, onDecisionHandled, memory, strings, appIcon, onVisibilityChange = {})
+    SunsetPrompt(decision, onDecisionHandled, memory, strings, appIcon, onPromptChange = {}, onVisibilityChange = {})
 }

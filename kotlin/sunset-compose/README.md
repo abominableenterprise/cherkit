@@ -70,6 +70,19 @@ Both overloads take `onVisibilityChange: (Boolean) -> Unit`: `true` when the sof
 instead of copying the "Not now" rule. The hard block is not reported: keep checking behind it, so it goes away once
 the config no longer requires the update.
 
+To know which prompt is showing, including the hard block, pass `onPromptChange: (SunsetPromptKind?) -> Unit` (both
+overloads): `SunsetPromptKind.SOFT` for the soft dialog, `HARD` for the hard block, `null` when neither shows (also
+when `SunsetPrompt` leaves the composition). It is called on every change (soft to hard directly, without a `null` in
+between) and never for the initial `null`. For example, to hold back the store-review prompt
+([review-compose](../review-compose/README.md)):
+
+```kotlin
+SunsetPrompt(checker = checker, onPromptChange = { kind ->
+    review.setInterruptionVisible(kind == SunsetPromptKind.SOFT, ReviewInterruption.SUNSET_PROMPT)
+    review.setInterruptionVisible(kind == SunsetPromptKind.HARD, ReviewInterruption.SUNSET_BLOCK)
+})
+```
+
 Put `SunsetPrompt` inside your `MaterialTheme`: the dialogs use Material 3 and take the theme's colors and type.
 The hard block's **Update** button is a Material `Button`, so its label uses the theme's `onPrimary` on `primary`;
 there is no separate tint parameter (iOS's `tint:` exists because the block runs in its own window there).
@@ -94,14 +107,15 @@ Options, all with defaults (both overloads):
   override any of it. The config's custom message, when present, replaces the default body text.
 - `appIcon: Painter?`: shown above the "Update required" title. Decorative: TalkBack skips it.
 - `onVisibilityChange: (Boolean) -> Unit`: whether the soft dialog is showing (see above).
+- `onPromptChange: (SunsetPromptKind?) -> Unit`: which prompt is showing, soft, hard or none (see above).
 - `minimumInterval: Duration` (checker overload only): the least time between re-checks, 1 hour by default.
 
 ## API
 
 | Swift (CherKitUI) | Kotlin (`com.abominableenterprise.cherkit.sunset.compose`) |
 | --- | --- |
-| `.sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)` | `SunsetPrompt(checker, minimumInterval, memory, strings, appIcon, onVisibilityChange)` |
-| `.sunsetPrompt(decision:latestVersion:memory:strings:appIcon:)` | `SunsetPrompt(decision, onDecisionHandled, memory, strings, appIcon, onVisibilityChange)` |
+| `.sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)` | `SunsetPrompt(checker, minimumInterval, memory, strings, appIcon, onPromptChange, onVisibilityChange)` |
+| `.sunsetPrompt(decision:latestVersion:memory:strings:appIcon:)` | `SunsetPrompt(decision, onDecisionHandled, memory, strings, appIcon, onPromptChange, onVisibilityChange)` |
 | `SunsetCheckScheduler` (internal) | `SunsetCheckScheduler` (in `:sunset`, common code) |
 | `SunsetUpdateView(prompt:strings:appIcon:)` | `SunsetUpdateScreen(prompt, modifier, strings, appIcon)` |
 | system `.alert` | `SunsetSoftPromptDialog(prompt, onUpdate, onNotNow, strings)` |
