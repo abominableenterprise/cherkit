@@ -115,6 +115,16 @@ case "$( uname )" in                #(
 esac
 
 
+# CherKit: use the JDK from scripts/setup-linux.sh when JAVA_HOME is unset, so a bare ./gradlew works in a fresh
+# shell. No-op when env.sh is absent (macOS, JitPack, IDEs). A relative CHERKIT_TOOLS is relative to the caller's
+# directory, as in scripts/test.sh. Not part of the Gradle template: re-add it after `gradle wrapper` (checked by
+# scripts/tests/gradlew-env-test.sh).
+if [ -z "$JAVA_HOME" ] ; then
+    CHERKIT_ENV=${CHERKIT_TOOLS:-$HOME/.cherkit-tools}/env.sh
+    case $CHERKIT_ENV in /*) ;; *) CHERKIT_ENV=$PWD/$CHERKIT_ENV ;; esac
+    # shellcheck disable=SC1090
+    if [ -f "$CHERKIT_ENV" ] ; then . "$CHERKIT_ENV" ; fi
+fi
 
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then

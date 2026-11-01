@@ -59,6 +59,9 @@ scripts/test.sh <module>        # analytics | review | sunset | whatsnew: size c
 scripts/test.sh                 # everything that runs on Linux; run it before opening a PR that touches shared files
 ```
 
+- After `setup-linux.sh`, `./gradlew` and `scripts/test.sh` pick up the JDK and SDKs from `~/.cherkit-tools/env.sh` by
+  themselves (`./gradlew` only when `JAVA_HOME` is unset). After regenerating the wrapper, re-add the CherKit hook to
+  `gradlew` (`scripts/tests/gradlew-env-test.sh` fails without it).
 - `scripts/test.sh` runs `scripts/size-check`, `swift test` and `./gradlew :<module>:jvmTest :<module>:testAndroidHostTest`.
   With a module selected it fails if Swift or Gradle ran 0 tests (a `--filter` that matches nothing still passes on
   its own). At the end it stops the Gradle and Kotlin compile daemons, pass or fail, so no java processes are left.
