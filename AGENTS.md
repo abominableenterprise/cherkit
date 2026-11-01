@@ -125,3 +125,4 @@ A release is its own small PR, then a tag:
 
 hub-merge: on
 hub-merge-requires: checknorris
+hub-followups-size: large
