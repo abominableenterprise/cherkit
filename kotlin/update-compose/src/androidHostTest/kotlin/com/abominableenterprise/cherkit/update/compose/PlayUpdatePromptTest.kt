@@ -48,12 +48,16 @@ class PlayUpdatePromptTest {
         override val lifecycle: Lifecycle get() = registry
     }
 
-    private fun show(enabled: Boolean = true, manager: (Context) -> AppUpdateManager = { fake }) {
+    private fun show(
+        enabled: Boolean = true,
+        manager: (Context) -> AppUpdateManager = { fake },
+        isSuppressed: () -> Boolean = { suppressed },
+    ) {
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
                 state = rememberPlayUpdateState(manager)
                 PlayUpdatePrompt(
-                    state, suppressed, enabled, store,
+                    state, isSuppressed(), enabled, store,
                     onVisibilityChange = { visibility += it },
                     onDownloaded = { downloads++ },
                     onResult = { results += it },
@@ -110,6 +114,39 @@ class PlayUpdatePromptTest {
         assertNull(session.promptedVersionCode)
 
         suppressed = false
+        compose.waitForIdle()
+        assertEquals(UpdateLaunchResult.STARTED, results.last())
+        assertTrue(fake.isConfirmationDialogVisible)
+    }
+
+    @Test
+    fun theReadmeSunsetGateHoldsTheSheetUntilALateHardBlockArrives() {
+        // The README recipe: SunsetPrompt's launch fetch is still running (sunsetKind is null, not settled yet)
+        // while Play already answers. A late HARD must win: the sheet never opens.
+        var sunsetKind by mutableStateOf<String?>(null)
+        var sunsetSettled by mutableStateOf(false)
+        fake.setUpdateAvailable(42)
+        show(isSuppressed = { !sunsetSettled || sunsetKind != null })
+        assertEquals(listOf(UpdateLaunchResult.SUPPRESSED), results)
+
+        // onPromptChange(HARD) runs before onFirstCheckComplete.
+        sunsetKind = "HARD"
+        sunsetSettled = true
+        compose.waitForIdle()
+        assertFalse(fake.isConfirmationDialogVisible)
+        assertNull(session.promptedVersionCode)
+        assertEquals(emptyList(), visibility)
+    }
+
+    @Test
+    fun theReadmeSunsetGateReleasesTheSheetWhenTheFetchFails() {
+        // A failed or up-to-date Sunset check still calls onFirstCheckComplete with no prompt: fail open.
+        var sunsetSettled by mutableStateOf(false)
+        fake.setUpdateAvailable(42)
+        show(isSuppressed = { !sunsetSettled })
+        assertFalse(fake.isConfirmationDialogVisible)
+
+        sunsetSettled = true
         compose.waitForIdle()
         assertEquals(UpdateLaunchResult.STARTED, results.last())
         assertTrue(fake.isConfirmationDialogVisible)
