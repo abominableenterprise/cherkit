@@ -4,6 +4,99 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.4.0
+
+No breaking changes; every new parameter defaults to the old behavior. What's new:
+
+- **Review**, a new module for the store-review ("rate this app") prompt: the shared rules in `CherKitReview` /
+  `:review`, the iOS prompt `.reviewPrompt` in CherKitUI and the Android Play In-App Review in the new
+  `:review-compose`.
+- **WhatsNew Compose** (`:whatsnew-compose`), the Android "What's new" sheet and version history.
+- Hooks so the prompts never stack: `onPromptChange` on Sunset's prompts (both platforms; iOS also gets
+  `onVisibilityChange`) and `onVisibilityChange` / `suppressed` on What's New (iOS, and in WhatsNew Compose).
+
+### Review (`CherKitReview`, `:review`)
+
+- added: new module Review (JitPack artifact `review`): the store-review rules, shared by both platforms. It has no
+  runtime dependencies; the platform prompts live in CherKitUI (iOS) and Review Compose (Android).
+- added: `ReviewCoordinator`: due on the 5th `recordSuccess()` (configurable) or an `arm()`; at most once per app
+  version; held while the session is not eligible; `noteInterruption()` holds it for a 2-minute cooldown.
+- added: `setInterruptionVisible(_:source:)`: while any of your modals (a set of sources) is visible the review never
+  shows; hiding one starts the cooldown, so it never fires at once. Sunset's prompts hook in with
+  `ReviewInterruption.sunsetPrompt` / `.sunsetBlock` (see the module README), What's New with
+  `ReviewInterruption.whatsNew` (Swift) / `ReviewInterruption.WHATS_NEW` (Kotlin), both the string `"whatsNew"`.
+- added: `shouldPrompt(isIdle:)`, then `markPrompted()` right before launching the platform review; `disabled` and
+  `enabled: false` for debug and test builds.
+- added: stores `UserDefaultsReviewStore` (Swift), `AndroidReview.store` over SharedPreferences (Kotlin) and
+  `InMemoryReviewStore`, keys under `cherkit.review.*`.
+
+### Review Compose (`:review-compose`)
+
+Targets Android. Brings `review` and Play In-App Review (`com.google.android.play:review-ktx` 2.0.2); apps without
+Play Services can keep using `:review` alone.
+
+- added: `ReviewPromptEffect(coordinator, isIdle)`: on a resumed, idle screen it waits a settle delay (1.5 s by
+  default), then launches the Play review when `shouldPrompt()` holds, checking again while the screen stays idle
+  and starting over on every `ON_RESUME`.
+- added: `PlayReview.launch(activity, coordinator, requirePlayInstall = true)` calls `markPrompted()` only after
+  `requestReviewFlow()` succeeds, right before `launchReviewFlow()`; a failed request keeps the prompt due. Builds
+  the Play Store did not install (sideloaded, emulator installs, other stores) are skipped without consuming
+  anything; Play testing tracks install through `com.android.vending` and pass. Play errors never crash; the
+  `ReviewLaunchResult` says what happened. Play gives no signal when its quota shows nothing, so that version counts
+  as prompted.
+- added: `ReviewInterruptionEffect(coordinator, source, visible)` reports your own dialogs, sheets and banners; a
+  source that flickers never stays stuck, and every hide restarts the cooldown.
+
+### Sunset Compose (`:sunset-compose`)
+
+- added: `onPromptChange: (SunsetPromptKind?) -> Unit = {}` on both `SunsetPrompt` overloads reports which prompt is
+  showing: `SOFT` (the "Update available" dialog), `HARD` (the "Update required" block) or `null`. Use it to report
+  the hard block too, e.g. as `ReviewInterruption.SUNSET_BLOCK`, and to show Sunset before What's New.
+  `onVisibilityChange` is unchanged (soft dialog only) and a trailing lambda still binds to it; code compiled
+  against 0.3.0 still links.
+
+### WhatsNew
+
+- fixed: docs: the Android setup in `kotlin/whatsnew/README.md` no longer says to add the repo's `whatsnew/` folder
+  as an assets `srcDir`. That put the files at the root of `assets/`, so `AndroidWhatsNew.checker(context)` found no
+  notes. It now shows a Gradle `Sync` task into `build/generated/whatsnew-assets/whatsnew/`, with the parent folder
+  added as a plain-path assets `srcDir` and `preBuild` depending on the sync (works on AGP 9). If your app followed
+  the old advice, switch to this setup or copy the files to `src/main/assets/whatsnew/`.
+- fixed: the `WhatsNewStore` docs point to the shipped stores (`UserDefaultsWhatsNewStore`, `KeyValueWhatsNewStore`,
+  `AndroidWhatsNew.store(context)`) instead of saying they come later.
+
+### WhatsNew Compose (`:whatsnew-compose`)
+
+Targets Android (the JVM artifact carries just the strings). Brings `whatsnew`.
+
+- added: new module WhatsNew Compose (JitPack artifact `whatsnew-compose`), the Compose counterpart of CherKitUI's
+  WhatsNew views. `WhatsNewPrompt(checker = ...)` at the root calls `onLaunch` once per process, shows the "What's
+  new" bottom sheet when there are notes and calls `markSeen()` only when the user dismisses it (Continue, back or
+  swipe).
+- added: `suppressed = true` makes the sheet wait. Pass `suppressed = sunsetKind != null`, fed from `SunsetPrompt`'s
+  `onPromptChange`, so it never stacks with either Sunset prompt (see the module README for showing Sunset first).
+  `onVisibilityChange` reports when it appears and goes away, e.g. to a review coordinator.
+- added: `WhatsNewPrompt(entries, onDismiss)` shows entries you got yourself, like iOS's
+  `.whatsNew(entries:onDismiss:)`.
+- added: `WhatsNewHistoryScreen(entries)` lists every release for Settings with the "You're on this version" badge;
+  `WhatsNewStrings` has the same English defaults as iOS.
+
+### UI (SwiftUI, `CherKitUI`)
+
+- added: the iOS review prompt (CherKitUI now links `CherKitReview`). `.reviewPrompt(coordinator:isIdle:settleDelay:)`
+  on a main screen waits until the screen has been idle for a settle delay (1.5 s by default), then calls
+  `markPrompted()` right before StoreKit's `requestReview`. It runs only while the scene is active and starts over
+  when the app comes back. The version counts as prompted even if StoreKit's quota shows nothing. Pass
+  `ReviewCoordinator.disabled` in debug builds and test harnesses.
+- added: `.reviewInterruption(isPresented:source:coordinator:)` reports any of your sheets or alerts, so the review
+  never shows over them and waits a cooldown after them.
+- added: `.sunsetPrompt` (both forms) has two optional callbacks: `onVisibilityChange` (the soft alert) and
+  `onPromptChange` (`SunsetPromptKind.soft`, `.hard` or `nil`, like Android). Report both prompts with
+  `review.setSunsetPromptKind($0)`.
+- added: `.whatsNew` (both forms) has an optional `onVisibilityChange` (the sheet) and `suppressed`, which holds the
+  sheet back while it is `true`, e.g. `suppressed: sunsetKind != nil` from `.sunsetPrompt(onPromptChange:)`.
+  Report the sheet with `ReviewInterruption.whatsNew`.
+
 ## 0.3.0
 
 No breaking changes. One behavior change: a failed Sunset check is retried once and doesn't use up
