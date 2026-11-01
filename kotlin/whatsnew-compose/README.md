@@ -73,6 +73,9 @@ SunsetPrompt(sunsetDecision, onDecisionHandled = { sunsetDecision = null }, onPr
 WhatsNewPrompt(checker = whatsNew, suppressed = !sunsetChecked || sunsetKind != null)
 ```
 
+This form checks once; re-check on a return from the background yourself (see
+[Sunset Compose](../sunset-compose/README.md)) if you rely on that.
+
 To keep a store-review prompt from appearing over the sheet, report it as an interruption:
 
 ```kotlin

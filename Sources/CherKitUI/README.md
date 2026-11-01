@@ -231,5 +231,7 @@ ContentView()
     }
 ```
 
+This form checks once; re-check on a return from the background yourself if you rely on that.
+
 The soft alert alone, in one line:
 `.sunsetPrompt(checker: c, onVisibilityChange: { review.setInterruptionVisible($0, source: ReviewInterruption.sunsetPrompt) })`.
