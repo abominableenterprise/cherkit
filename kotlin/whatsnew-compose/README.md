@@ -50,9 +50,16 @@ Options, all with defaults:
 
 ### Order with Sunset and the review prompt
 
-Show Sunset first: pass `suppressed = sunsetVisible`, fed from `SunsetPrompt`'s `onVisibilityChange`, so the update
-dialog and the "What's new" sheet never stack. (A hard Sunset block is not reported there: it covers everything, and
-the sheet waiting behind it is harmless.)
+Pass `suppressed = sunsetVisible`, fed from `SunsetPrompt`'s `onVisibilityChange`, so the soft "Update available"
+dialog and the "What's new" sheet never stack: while the dialog shows, the sheet waits (or steps aside) and it
+comes back afterwards. This only covers the time the soft dialog is visible, with two limits:
+
+- `sunsetVisible` is `false` while Sunset's first check is still fetching, so the sheet can appear first; a soft
+  update decided after that takes the sheet away until the dialog is answered. To always show Sunset first, gate
+  `suppressed` on your own "first Sunset check finished" flag too (and release it if the check fails).
+- `SunsetPrompt`'s `onVisibilityChange` does not report the hard "Update required" block, so with only
+  `sunsetVisible` the sheet can open on top of it. Nobody gets past the block: dismissing the sheet leaves it in
+  place. If your Sunset version reports the hard block, suppress the sheet for it too.
 
 To keep a store-review prompt from appearing over the sheet, report it as an interruption:
 

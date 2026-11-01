@@ -166,5 +166,57 @@ class WhatsNewPromptUiTest {
         assertEquals(listOf(true, false, true, false), visibility)
     }
 
+    @Test
+    fun entriesOverloadShowsAListSuppliedFromTheDismissal() {
+        var entries by mutableStateOf(listOf(entry("2.0", "Widgets.")))
+        var dismissals = 0
+        compose.setContent {
+            WhatsNewPrompt(
+                entries,
+                onDismiss = {
+                    dismissals++
+                    if (dismissals == 1) entries = listOf(entry("2.1", "Export."))
+                },
+                onVisibilityChange = { visibility += it },
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText(strings.continueButton).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Version 2.1").assertIsDisplayed()
+        assertEquals(listOf(true, false, true), visibility)
+
+        compose.onNodeWithText(strings.continueButton).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText(strings.title).assertDoesNotExist()
+        assertEquals(2, dismissals)
+        assertEquals(listOf(true, false, true, false), visibility)
+    }
+
+    @Test
+    fun aNewVisibilityRecipientWhileShownGetsTheRegistration() {
+        val a = mutableListOf<Boolean>()
+        val b = mutableListOf<Boolean>()
+        val toA: (Boolean) -> Unit = { a += it }
+        val toB: (Boolean) -> Unit = { b += it }
+        var recipient by mutableStateOf<((Boolean) -> Unit)?>(null)
+        val entries = listOf(entry("2.0", "Widgets."))
+        compose.setContent { WhatsNewPrompt(entries, onDismiss = {}, onVisibilityChange = recipient) }
+        compose.waitForIdle()
+
+        recipient = toA
+        compose.waitForIdle()
+        assertEquals(listOf(true), a, "null to A: A learns the sheet is showing")
+        recipient = toB
+        compose.waitForIdle()
+        assertEquals(listOf(true, false), a, "A to B: A's true is balanced on A")
+        assertEquals(listOf(true), b)
+
+        compose.onNodeWithText(strings.continueButton).performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(true, false), b)
+        assertEquals(listOf(true, false), a)
+    }
+
     private val isHeading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 }

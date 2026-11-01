@@ -3,9 +3,9 @@ package com.abominableenterprise.cherkit.whatsnew.compose
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import com.abominableenterprise.cherkit.whatsnew.WhatsNewEntry
 
@@ -58,10 +58,11 @@ internal fun WhatsNewSheetHost(
     onVisibilityChange: ((Boolean) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
-    val currentOnVisibilityChange by rememberUpdatedState(onVisibilityChange)
-    DisposableEffect(visible) {
-        if (visible) currentOnVisibilityChange?.invoke(true)
-        onDispose { if (visible) currentOnVisibilityChange?.invoke(false) }
+    // Each `true` goes to the recipient that later gets the matching `false`: a new recipient while shown moves the
+    // registration, and new entries (even supplied from onDismiss) get a fresh sheet and a fresh true/false pair.
+    DisposableEffect(visible, entries, onVisibilityChange) {
+        if (visible) onVisibilityChange?.invoke(true)
+        onDispose { if (visible) onVisibilityChange?.invoke(false) }
     }
-    if (visible) WhatsNewSheet(entries, strings, onDismiss)
+    if (visible) key(entries) { WhatsNewSheet(entries, strings, onDismiss) }
 }
