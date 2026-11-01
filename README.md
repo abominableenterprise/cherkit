@@ -12,6 +12,7 @@ its own product, so an app imports only what it needs.
 | [Sunset](kotlin/sunset/README.md) | Soft or hard "please update" from a hosted min-version config | `CherKitSunset` | `:sunset` |
 | [Sunset Compose](kotlin/sunset-compose/README.md) | Jetpack Compose update dialog and blocking screen for Sunset (Android) | n/a | `:sunset-compose` |
 | [Review Compose](kotlin/review-compose/README.md) | Play In-App Review and Compose effects for Review (Android) | n/a | `:review-compose` |
+| [Update Compose](kotlin/update-compose/README.md) | Play In-App Updates (flexible flow), once per session and never over another prompt (Android) | n/a | `:update-compose` |
 | [WhatsNew](kotlin/whatsnew/README.md) | "What's new" notes and installed-version history | `CherKitWhatsNew` | `:whatsnew` |
 | [WhatsNew Compose](kotlin/whatsnew-compose/README.md) | Jetpack Compose "What's new" sheet and version history for WhatsNew (Android) | n/a | `:whatsnew-compose` |
 | [Review](kotlin/review/README.md) | Store-review prompt rules: when to ask, once per version, never over a modal (iOS prompt in `CherKitUI`; Android in Review Compose) | `CherKitReview` | `:review` |
@@ -69,6 +70,7 @@ dependencies {
     implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.5.0") // Android only; brings whatsnew
     implementation("com.github.abominableenterprise.cherkit:review:v0.5.0")
     implementation("com.github.abominableenterprise.cherkit:review-compose:v0.5.0")   // Android only; brings review
+    implementation("com.github.abominableenterprise.cherkit:update-compose:v0.6.0")   // Android only; available from 0.6.0
     implementation("com.github.abominableenterprise.cherkit:core:v0.5.0")             // already included by sunset and whatsnew
 }
 ```
