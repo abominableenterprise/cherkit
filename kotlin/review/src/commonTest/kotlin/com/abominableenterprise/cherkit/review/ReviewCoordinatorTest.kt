@@ -22,6 +22,14 @@ class ReviewCoordinatorTest {
     }
 
     @Test
+    fun wellKnownSourcesMatchSwift() {
+        // The same strings as Swift's ReviewInterruption, so both platforms log and test the same sources.
+        assertEquals("sunset.prompt", ReviewInterruption.SUNSET_PROMPT)
+        assertEquals("sunset.block", ReviewInterruption.SUNSET_BLOCK)
+        assertEquals("whatsNew", ReviewInterruption.WHATS_NEW)
+    }
+
+    @Test
     fun eligibilityIsReadOnEveryCall() {
         val review = ReviewCoordinator(InMemoryReviewStore(), "1.0")
         review.arm()
