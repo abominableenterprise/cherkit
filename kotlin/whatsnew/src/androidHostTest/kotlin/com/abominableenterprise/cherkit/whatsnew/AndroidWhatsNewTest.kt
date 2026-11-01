@@ -33,6 +33,41 @@ class AndroidWhatsNewTest {
     }
 
     @Test
+    fun historyMatchesTheCheckerAndWritesNothing() {
+        val values = mutableMapOf(
+            "cherkit.whatsnew.lastSeenVersion" to "1.0.0",
+            "cherkit.whatsnew.installHistory" to """["1.0.0","1.1.0"]""",
+        )
+        val writes = mutableListOf<String>()
+        val storage = object : KeyValueStorage {
+            override fun getString(key: String): String? = values[key]
+            override fun putString(key: String, value: String) {
+                writes += key
+                values[key] = value
+            }
+        }
+        val source = LoadedReleaseNotesSource {
+            listOf(
+                "1.0.0.json" to """{"version":"1.0.0","notes":{"en":["First release."]}}""",
+                "1.1.0.json" to """{"version":"1.1.0","date":"2026-11-02","notes":{"en":["CSV export."],"de":["CSV."]}}""",
+                "1.2.0.json" to """{"version":"1.2.0","notes":{"en":["Widgets."]}}""",
+            )
+        }
+        val store = KeyValueWhatsNewStore(storage)
+        val locales = listOf("de-DE", "en-US")
+
+        val history = AndroidWhatsNew.history(source, store, locales)
+        assertEquals(WhatsNewChecker(source, store).history(locales), history)
+        assertEquals(listOf("1.2.0", "1.1.0", "1.0.0"), history.map { it.version.toString() })
+        assertEquals(listOf("CSV."), history[1].bullets)
+        assertEquals(listOf(false, true, false), history.map { it.isInstalled })
+        // Read-only: no install-history append, nothing marked seen.
+        assertEquals(emptyList(), writes)
+        assertEquals("1.0.0", values["cherkit.whatsnew.lastSeenVersion"])
+        assertEquals("""["1.0.0","1.1.0"]""", values["cherkit.whatsnew.installHistory"])
+    }
+
+    @Test
     fun sharedPreferencesStorageRoundTripsAndTreatsOtherTypesAsAbsent() {
         val preferences = FakeSharedPreferences(mutableMapOf("cherkit.whatsnew.lastSeenVersion" to 42))
         val store = KeyValueWhatsNewStore(SharedPreferencesKeyValueStorage(preferences))

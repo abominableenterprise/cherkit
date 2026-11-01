@@ -17,6 +17,21 @@ public object AndroidWhatsNew {
     public fun checker(context: Context, onSkip: SkipHandler? = null): WhatsNewChecker =
         WhatsNewChecker(assetsSource(context.assets, onSkip = onSkip), store(context))
 
+    /**
+     * Every bundled release newest first, the same list as `checker(context).history(locales)`, for a Settings screen
+     * that has no checker of its own. Read-only: it never appends to the install history or marks anything seen.
+     * Invalid notes files are skipped; anything unreadable fails open (an empty list). It reads the assets, so call it
+     * off the main thread or remember the result.
+     *
+     * @param locales The user's locales, most preferred first; [preferredLocales] by default.
+     */
+    public fun history(context: Context, locales: List<String> = preferredLocales()): List<WhatsNewHistoryEntry> =
+        history(assetsSource(context.assets), store(context), locales)
+
+    /** [history] over any [source] and [store], so host tests can pass fakes. */
+    internal fun history(source: ReleaseNotesSource, store: WhatsNewStore, locales: List<String>): List<WhatsNewHistoryEntry> =
+        WhatsNewChecker(source, store).history(locales)
+
     /** Every `.json` file in `assets/<directory>/`; invalid files are skipped and reported to [onSkip]. */
     public fun assetsSource(
         assets: AssetManager,

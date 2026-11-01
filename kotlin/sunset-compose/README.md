@@ -83,6 +83,39 @@ SunsetPrompt(checker = checker, onPromptChange = { kind ->
 })
 ```
 
+### Know when the launch check is done
+
+`onPromptChange` says nothing while the launch check is still fetching, so `null` can mean "no prompt" or "not known
+yet". Pass `onFirstCheckComplete: (() -> Unit)?` (checker overload only) to learn when the launch check's first
+attempt has finished, whatever it found: up to date, a soft or hard update, or a failed fetch (which fails open). It
+is called at most once per process: recomposition, rebuilding the root, recreating the activity and later re-checks
+(on return from the background, or the quick retry after a failure) never call it again. `SunsetChecker.disabled()`
+calls it at once. Any `onPromptChange` and `onVisibilityChange` call for that first decision runs before it, so once
+it runs the prompt kind you hold is the launch's answer, not a stale `null`. The fetch has a timeout
+(`SunsetChecker.timeout`, 5 seconds by default), so it always comes and never holds the app back for long.
+
+To show Sunset before the "What's new" sheet ([whatsnew-compose](../whatsnew-compose/README.md)) on a cold start:
+
+```kotlin
+var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
+var sunsetSettled by rememberSaveable { mutableStateOf(false) }
+
+SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { sunsetSettled = true })
+WhatsNewPrompt(
+    checker = whatsNew,
+    suppressed = !sunsetSettled || sunsetKind != null,
+    onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) },
+)
+```
+
+Keep `sunsetSettled` in `rememberSaveable`, not `remember`: `onFirstCheckComplete` runs once per process, so after
+a rotation (the activity and its composition are recreated, the process is not) it is not called again, and a plain
+`remember` would start `false` and hold the sheet back for good. `sunsetKind` can stay in `remember`: the recreated
+`SunsetPrompt` reports the prompt still showing. If the process is killed in the background and restored, the saved
+`true` comes back before the new process's launch check finishes, so that one launch behaves as without the gate (the
+sheet may show first and step aside); it is never held back. Keep the root composable alive for the activity (not
+inside a navigation destination that leaves the composition), or hoist both values into your app's own state.
+
 Put `SunsetPrompt` inside your `MaterialTheme`: the dialogs use Material 3 and take the theme's colors and type.
 The hard block's **Update** button is a Material `Button`, so its label uses the theme's `onPrimary` on `primary`;
 there is no separate tint parameter (iOS's `tint:` exists because the block runs in its own window there).
@@ -109,12 +142,14 @@ Options, all with defaults (both overloads):
 - `onVisibilityChange: (Boolean) -> Unit`: whether the soft dialog is showing (see above).
 - `onPromptChange: (SunsetPromptKind?) -> Unit`: which prompt is showing, soft, hard or none (see above).
 - `minimumInterval: Duration` (checker overload only): the least time between re-checks, 1 hour by default.
+- `onFirstCheckComplete: (() -> Unit)?` (checker overload only): called once per process when the launch check has
+  finished (see above). `null` by default.
 
 ## API
 
 | Swift (CherKitUI) | Kotlin (`com.abominableenterprise.cherkit.sunset.compose`) |
 | --- | --- |
-| `.sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)` | `SunsetPrompt(checker, minimumInterval, memory, strings, appIcon, onPromptChange, onVisibilityChange)` |
+| `.sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:)` | `SunsetPrompt(checker, minimumInterval, memory, strings, appIcon, onPromptChange, onFirstCheckComplete, onVisibilityChange)` |
 | `.sunsetPrompt(decision:latestVersion:memory:strings:appIcon:)` | `SunsetPrompt(decision, onDecisionHandled, memory, strings, appIcon, onPromptChange, onVisibilityChange)` |
 | `SunsetCheckScheduler` (internal) | `SunsetCheckScheduler` (in `:sunset`, common code) |
 | `SunsetUpdateView(prompt:strings:appIcon:)` | `SunsetUpdateScreen(prompt, modifier, strings, appIcon)` |

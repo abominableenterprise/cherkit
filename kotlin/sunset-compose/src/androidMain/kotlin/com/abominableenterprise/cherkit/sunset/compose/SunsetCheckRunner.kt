@@ -40,6 +40,16 @@ internal class SunsetCheckRunner(
     /** The latest decision, `null` before the first check finishes. Answering the soft dialog sets it back to `null`. */
     var decision: SunsetDecision? by mutableStateOf(null)
 
+    /**
+     * Whether the launch check's first attempt has finished, with any outcome (up to date, soft, hard or failed open).
+     * Set right after [decision], in the same snapshot, so a composition that sees it also sees that decision.
+     */
+    var firstCheckFinished: Boolean by mutableStateOf(false)
+        private set
+
+    /** Whether `onFirstCheckComplete` has been called, so it runs at most once per runner (per process for [shared]). */
+    var firstCheckReported: Boolean = false
+
     /** When to check. */
     val scheduler: SunsetCheckScheduler = SunsetCheckScheduler(minimumInterval)
 
@@ -81,6 +91,8 @@ internal class SunsetCheckRunner(
             } catch (_: Exception) {
                 // The checker never throws; should a check still throw, keep the last decision (fail open).
             } finally {
+                // The first check to finish is the launch check: it starts first and checks never overlap.
+                firstCheckFinished = true
                 // Even after an exception or cancellation, so a later return from the background can check again.
                 if (scheduler.checkFinished(failed)) scheduleRetry(check)
             }

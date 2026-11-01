@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -15,9 +16,10 @@ import com.abominableenterprise.cherkit.whatsnew.WhatsNewHistoryEntry
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.test.assertTrue
 import org.robolectric.RobolectricTestRunner
 
-/** [WhatsNewHistoryScreen]: the installed badge, fix-only releases and the empty state. */
+/** [WhatsNewHistoryScreen]: the installed badge, fix-only releases, the empty state and the optional title. */
 @RunWith(RobolectricTestRunner::class)
 class WhatsNewHistoryScreenUiTest {
     @get:Rule
@@ -49,6 +51,26 @@ class WhatsNewHistoryScreenUiTest {
         compose.onNodeWithText(strings.emptyHistory).assertDoesNotExist()
         // The title belongs in the app's own top bar.
         compose.onNodeWithText(strings.historyTitle).assertDoesNotExist()
+    }
+
+    @Test
+    fun showTitleAddsTheTitleAsAHeadingAboveTheReleases() {
+        compose.setContent {
+            WhatsNewHistoryScreen(listOf(entry("2.0.0", null, listOf("A fresh new look."))), showTitle = true)
+        }
+        compose.onNodeWithText(strings.historyTitle).assert(isHeading)
+        val title = compose.onNodeWithText(strings.historyTitle).getUnclippedBoundsInRoot()
+        val version = compose.onNodeWithText("Version 2.0.0").getUnclippedBoundsInRoot()
+        assertTrue(title.bottom <= version.top, "the title sits above the first release")
+    }
+
+    @Test
+    fun showTitleUsesCustomStringsAndShowsAboveTheEmptyText() {
+        compose.setContent {
+            WhatsNewHistoryScreen(emptyList(), strings = WhatsNewStrings(historyTitle = "Versionen"), showTitle = true)
+        }
+        compose.onNodeWithText("Versionen").assert(isHeading)
+        compose.onNodeWithText(strings.emptyHistory).assertExists()
     }
 
     @Test
