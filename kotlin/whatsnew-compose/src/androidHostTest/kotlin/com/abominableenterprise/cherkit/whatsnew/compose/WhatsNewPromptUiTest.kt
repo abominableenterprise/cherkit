@@ -194,7 +194,52 @@ class WhatsNewPromptUiTest {
     }
 
     @Test
-    fun aNewVisibilityRecipientWhileShownGetsTheRegistration() {
+    fun aNewLambdaInstanceWhileShownSendsNothing() {
+        val calls = mutableListOf<Pair<Int, Boolean>>()
+        val instances = mutableSetOf<(Boolean) -> Unit>()
+        var generation by mutableStateOf(0)
+        val entries = listOf(entry("2.0", "Widgets."))
+        compose.setContent {
+            val g = generation
+            // Inline, capturing composition state: a new instance whenever `g` changes.
+            val onVisibilityChange: (Boolean) -> Unit = { calls += g to it }
+            instances += onVisibilityChange
+            WhatsNewPrompt(entries, onDismiss = {}, onVisibilityChange = onVisibilityChange)
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(0 to true), calls)
+
+        repeat(3) {
+            generation++
+            compose.waitForIdle()
+        }
+        assertEquals(4, instances.size, "each recomposition passed a new lambda instance")
+        assertEquals(listOf(0 to true), calls, "a new lambda instance is not a hide and show")
+
+        compose.onNodeWithText(strings.continueButton).performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(0 to true, 0 to false), calls, "one false, to the callback that got the true")
+    }
+
+    @Test
+    fun aCallbackRemovedWhileShownGetsItsFalse() {
+        val a = mutableListOf<Boolean>()
+        var recipient by mutableStateOf<((Boolean) -> Unit)?>({ a += it })
+        val entries = listOf(entry("2.0", "Widgets."))
+        compose.setContent { WhatsNewPrompt(entries, onDismiss = {}, onVisibilityChange = recipient) }
+        compose.waitForIdle()
+        assertEquals(listOf(true), a)
+
+        recipient = null
+        compose.waitForIdle()
+        assertEquals(listOf(true, false), a)
+        compose.onNodeWithText(strings.continueButton).performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(true, false), a)
+    }
+
+    @Test
+    fun theFalseGoesToTheCallbackThatGotTheTrue() {
         val a = mutableListOf<Boolean>()
         val b = mutableListOf<Boolean>()
         val toA: (Boolean) -> Unit = { a += it }
@@ -209,13 +254,13 @@ class WhatsNewPromptUiTest {
         assertEquals(listOf(true), a, "null to A: A learns the sheet is showing")
         recipient = toB
         compose.waitForIdle()
-        assertEquals(listOf(true, false), a, "A to B: A's true is balanced on A")
-        assertEquals(listOf(true), b)
+        assertEquals(listOf(true), a, "A to B while shown sends nothing")
+        assertEquals(emptyList(), b)
 
         compose.onNodeWithText(strings.continueButton).performClick()
         compose.waitForIdle()
-        assertEquals(listOf(true, false), b)
-        assertEquals(listOf(true, false), a)
+        assertEquals(listOf(true, false), a, "the hide reaches A, which got the show")
+        assertEquals(emptyList(), b)
     }
 
     private val isHeading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
