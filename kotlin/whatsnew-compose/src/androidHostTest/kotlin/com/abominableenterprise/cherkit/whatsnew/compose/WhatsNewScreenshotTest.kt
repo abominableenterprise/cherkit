@@ -53,6 +53,9 @@ class WhatsNewScreenshotTest {
     @Test
     fun historyWithTitleLight() = history(dark = false, "history-title-light", showTitle = true)
 
+    @Test
+    fun historyWithTitleDark() = history(dark = true, "history-title-dark", showTitle = true)
+
     private fun sheet(dark: Boolean, name: String) {
         compose.setContent {
             WhatsNewPreviewTheme(dark) {
