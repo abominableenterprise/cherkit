@@ -4,6 +4,57 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.7.0
+
+No breaking changes; both new parameters default to `null` (the old behavior), and Kotlin keeps the 0.6.0
+signatures as hidden overloads so existing binaries still link. No behavior change for apps that don't opt in.
+What's new (Android only):
+
+- **`WhatsNewPrompt(onLaunchCheckComplete = { hasNotes -> ... })`**: called once per process when the launch check
+  of the "What's new" notes is done, with whether there are notes to show, also while the sheet is `suppressed`
+  (see WhatsNew Compose).
+- **`SunsetPrompt(onCheckingChange = { checking -> ... })`**: reports `true` while any Sunset check runs (launch,
+  re-check on return from the background, quick retry) and `false` when it has finished (see Sunset Compose).
+- **Cold-start ordering for Play's update prompt**: the recipe now keeps a second process-wide flag,
+  `LaunchGate.whatsNewSettled`, and gates `PlayUpdatePrompt` with
+  `suppressed = !LaunchGate.sunsetSettled || sunsetKind != null || sunsetChecking || !LaunchGate.whatsNewSettled || whatsNewVisible`,
+  so Play's sheet opens only after Sunset and "What's new", and never while a re-check may still find a hard block
+  ([recipe](kotlin/whatsnew-compose/README.md#order-with-plays-in-app-update)).
+- **Restart to install**: `PlayUpdateState.completeUpdate()` restarts the app process at once; flush or confirm
+  pending local writes first (see Update Compose).
+
+### Sunset Compose (`:sunset-compose`)
+
+- added: `SunsetPrompt(checker = ...)` takes an optional `onCheckingChange: ((Boolean) -> Unit)? = null`. It reports
+  `true` when any check starts (the launch check, the re-check on return from the background, the quick retry after
+  a failed fetch) and `false` when it has finished, with any outcome. Any `onPromptChange` / `onVisibilityChange`
+  for that result runs before the `false`. `SunsetChecker.disabled()` never reports `true`. Add `sunsetChecking` to
+  the gate of Play's update sheet so it cannot open while a re-check may still find a hard block
+  ([README](kotlin/sunset-compose/README.md#know-when-a-check-is-running)). The 0.6.0 signature stays as a hidden
+  overload, so code compiled against it keeps working.
+
+### Update Compose (`:update-compose`)
+
+- changed: docs: `PlayUpdateState.completeUpdate()` ("Restart to install") restarts the app process at once. Apps
+  that queue local writes (e.g. an offline database or a sync queue) should flush or confirm them first, or disable
+  or delay the restart button until nothing is pending. The cold-start recipe now also gates Play's sheet on
+  Sunset's running checks and the "What's new" launch check:
+  `suppressed = !LaunchGate.sunsetSettled || sunsetKind != null || sunsetChecking || !LaunchGate.whatsNewSettled || whatsNewVisible`
+  ([Update Compose README](kotlin/update-compose/README.md#precedence-with-sunset)). No behavior change.
+
+### WhatsNew Compose (`:whatsnew-compose`)
+
+- added: `WhatsNewPrompt(checker = ...)` takes an optional
+  `onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)? = null`. It is called once per process, right after the
+  launch `onLaunch` has returned (same once-per-process guard), with whether there are notes to show (`false` when
+  nothing is new or `onLaunch` failed open). It still comes while `suppressed = true`: the check runs, only the
+  sheet waits. With notes and the sheet not suppressed, the sheet's `onVisibilityChange(true)` runs first, then
+  this, in the same frame. Recomposition and rotation never call it again. Use it like Sunset's
+  `onFirstCheckComplete`, e.g. to keep Play's update sheet back with
+  `suppressed = ... || !LaunchGate.whatsNewSettled || whatsNewVisible`
+  ([recipe](kotlin/whatsnew-compose/README.md#order-with-plays-in-app-update)). The 0.6.0 signature stays as a
+  hidden overload, so code compiled against it keeps working.
+
 ## 0.6.0
 
 No breaking changes; every new parameter defaults to the old behavior, and Kotlin keeps the old signatures as hidden
