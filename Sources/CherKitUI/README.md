@@ -180,9 +180,10 @@ HomeView()
   interruption cooldown) while the screen stays idle. Returning to the app or `isIdle` turning true starts over.
 - `markPrompted()` runs right before StoreKit's `requestReview`. **The version counts as prompted even if StoreKit's
   quota shows nothing**: StoreKit gives no signal either way. `requestReview` never throws, so failures stay quiet.
-- `ReviewCoordinator.disabled` (or `enabled: false`) does nothing. Pass it in debug builds and under every test
-  harness, not only XCTest: UI-test launch arguments, fixtures and previews too. `AnalyticsTestHost.isRunningTests`
-  (`CherKitAnalytics`) detects XCTest if you already link it:
+- `ReviewCoordinator.disabled` (or `enabled: false`) does nothing; each access returns a fresh one, so store it once
+  (like `review` above) and pass that around. Pass it in debug builds and under every test harness, not only XCTest:
+  UI-test launch arguments, fixtures and previews too. `AnalyticsTestHost.isRunningTests` (`CherKitAnalytics`) detects
+  XCTest if you already link it:
 
 ```swift
 let isTestHarness = AnalyticsTestHost.isRunningTests || ProcessInfo.processInfo.arguments.contains("-uiTesting")
