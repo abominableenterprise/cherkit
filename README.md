@@ -12,6 +12,7 @@ its own product, so an app imports only what it needs.
 | [Sunset](kotlin/sunset/README.md) | Soft or hard "please update" from a hosted min-version config | `CherKitSunset` | `:sunset` |
 | [Sunset Compose](kotlin/sunset-compose/README.md) | Jetpack Compose update dialog and blocking screen for Sunset (Android) | n/a | `:sunset-compose` |
 | [WhatsNew](kotlin/whatsnew/README.md) | "What's new" notes and installed-version history | `CherKitWhatsNew` | `:whatsnew` |
+| [Review](kotlin/review/README.md) | Store-review prompt rules: when to ask, once per version, never over a modal (core only, no UI yet) | `CherKitReview` | `:review` |
 | [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew | `CherKitUI` | n/a |
 
 Status: v0.3.0: Analytics (PostHog), Sunset and WhatsNew logic plus SwiftUI views; Android UI: Sunset Compose only.
@@ -24,7 +25,7 @@ Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
 
 Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
 "Up to Next Major Version" from 0.3.0), then link only the products you use:
-`CherKitAnalytics`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew) and
+`CherKitAnalytics`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
 ```swift
@@ -63,6 +64,7 @@ dependencies {
     implementation("com.github.abominableenterprise.cherkit:sunset:v0.3.0")
     implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.3.0") // Android only; brings sunset
     implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.3.0")
+    implementation("com.github.abominableenterprise.cherkit:review:v0.3.0")     // from the release that ships Review
     implementation("com.github.abominableenterprise.cherkit:core:v0.3.0") // already included by sunset and whatsnew
 }
 ```
@@ -82,7 +84,7 @@ conflicts. The build itself writes the right coordinates and refuses to publish 
 ```sh
 scripts/setup-linux.sh       # once per machine: Swift, JDK, Android SDK (idempotent, cached)
 scripts/test.sh              # size check + swift test + Gradle JVM and Android host tests
-scripts/test.sh sunset       # one module (analytics, sunset or whatsnew) on both platforms
+scripts/test.sh sunset       # one module (analytics, review, sunset or whatsnew) on both platforms
 ```
 
 On macOS with Xcode, Swift tests run with `swift test` and Kotlin tests with `./gradlew jvmTest`.

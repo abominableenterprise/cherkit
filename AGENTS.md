@@ -13,6 +13,8 @@ JitPack as `com.github.abominableenterprise.cherkit:<module>`; see the README's 
   off in debug builds.
 - **Sunset** (`CherKitSunset`, `:sunset`): version sunsetting from a hosted min-version config, soft or hard update screen.
 - **WhatsNew** (`CherKitWhatsNew`, `:whatsnew`): "What's new" notes plus the history of versions installed on the device.
+- **Review** (`CherKitReview`, `:review`): store-review prompt rules (when to ask, once per version, never over a
+  modal); platform adapters follow.
 - **CherKitUI**: SwiftUI views for Sunset and WhatsNew (Swift only).
 - **CherKitCore** / `:core`: tiny shared helpers (AppVersion); changes need their own small PR.
 
@@ -53,7 +55,7 @@ Run, on a Linux VM:
 
 ```sh
 scripts/setup-linux.sh          # idempotent; installs Swift, JDK, Android SDK; caches Gradle deps with task-cache
-scripts/test.sh <module>        # analytics | sunset | whatsnew: size check + that module's Swift and Kotlin tests
+scripts/test.sh <module>        # analytics | review | sunset | whatsnew: size check + that module's Swift and Kotlin tests
 scripts/test.sh                 # everything that runs on Linux; run it before opening a PR that touches shared files
 ```
 

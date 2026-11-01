@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run everything that runs on Linux:  scripts/test.sh
-# Run one module on both platforms:   scripts/test.sh sunset   (or analytics, whatsnew)
+# Run one module on both platforms:   scripts/test.sh sunset   (or analytics, review, whatsnew)
 # A Kotlin-only module (no Sources/CherKit<Module>, e.g. sunset-compose) runs only its Gradle tests.
 # Run setup first: scripts/setup-linux.sh. Swift and Gradle run in parallel; their logs
 # are printed when each finishes. With a module selected, a Swift or Gradle run that executed
