@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # macOS + iOS baseline. Run on a Mac with Xcode:
 #   scripts/test-mac.sh            # everything
-#   scripts/test-mac.sh sunset     # one module (or analytics, whatsnew), like scripts/test.sh
+#   scripts/test-mac.sh sunset     # one module (or analytics, review, whatsnew), like scripts/test.sh
 # Steps: size check (plus the scripts/tests/ tooling tests on full runs), host `swift build` +
 # `swift test`, an iOS Simulator build of every library scheme (CherKitUI included), the Swift
 # tests on an iPhone simulator, and the Kotlin jvmTest + Android host tests. The simulator tests
