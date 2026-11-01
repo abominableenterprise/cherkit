@@ -4,6 +4,74 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.5.0
+
+No breaking changes; every new parameter defaults to the old behavior. One behavior change: Swift's
+`ReviewCoordinator.disabled` is now a fresh instance on each access (see Review). What's new:
+
+- **Sunset first on a cold start**: `onFirstCheckComplete` on Sunset's checker prompt on both platforms
+  (`.sunsetPrompt(checker:)` in CherKitUI, `SunsetPrompt(checker = ...)` in Sunset Compose) says when the launch
+  check has answered, so What's New can wait for it with `suppressed = !sunsetSettled || sunsetKind != null`.
+- **WhatsNew Compose**: `WhatsNewHistoryScreen(showTitle = true)` shows its own heading, and `onVisibilityChange` no
+  longer restarts the review cooldown when you pass a new lambda on recomposition.
+- **WhatsNew**: `AndroidWhatsNew.history(context)` for a Settings screen without a checker of its own.
+- **Review**: Swift's `ReviewCoordinator.disabled` is a fresh instance per access, and the docs show how to base
+  `isEligible` on state created later.
+
+### Review (`CherKitReview`, `:review`)
+
+- changed: Swift: `ReviewCoordinator.disabled` now returns a fresh, independent disabled coordinator on each access
+  instead of one shared instance, so setting `isEligible` (or any other state) on it no longer leaks to other
+  callers. The call site is unchanged (`isUITest ? .disabled : ReviewCoordinator()`); keep the coordinator you got
+  for the app's lifetime (a `let` or `@State`) rather than reading `.disabled` again, and don't compare coordinators
+  with `=== .disabled` (check `isDisabled` instead). This matches Kotlin's `ReviewCoordinator.disabled()`.
+- changed: docs: how to base eligibility on state created after the coordinator (e.g. a ViewModel): pass a closure
+  that reads it lazily (`isEligible = { eligibilityHolder.value }`) or assign `review.isEligible = { ... }` later
+  (Kotlin and Swift). It is read on every check, so keep it cheap and main-thread safe. No behavior change.
+
+### Sunset Compose (`:sunset-compose`)
+
+- added: `SunsetPrompt(checker = ...)` takes an optional `onFirstCheckComplete: (() -> Unit)? = null`. It is called
+  once per process when the launch check's first attempt has finished, whatever it found (up to date, soft, hard or
+  a failed fetch, which fails open), and at once for `SunsetChecker.disabled()`. Any `onPromptChange` /
+  `onVisibilityChange` call for that first decision runs before it. Later re-checks, recomposition and rotation never
+  call it again. Use it to hold back the "What's new" sheet on a cold start until Sunset has answered:
+  `suppressed = !sunsetSettled || sunsetKind != null`, with `sunsetSettled` in `rememberSaveable` (recipe in the
+  [Sunset Compose README](kotlin/sunset-compose/README.md)). Code compiled against 0.4.0 still links.
+
+### WhatsNew
+
+- added: `AndroidWhatsNew.history(context, locales = AndroidWhatsNew.preferredLocales())` returns the same list as
+  `AndroidWhatsNew.checker(context).history(locales)`, so a Settings screen needs no checker of its own. Read-only:
+  it never appends to the install history or marks notes seen.
+
+### WhatsNew Compose (`:whatsnew-compose`)
+
+- added: `WhatsNewHistoryScreen` takes an optional `showTitle: Boolean = false`. With `true` it shows
+  `strings.historyTitle` as a heading (for TalkBack too) at the top of the scrolling list, for screens without a
+  title of their own. Still no top bar: navigation stays with the app. The default keeps today's layout; code
+  compiled against 0.4.0 still links.
+- fixed: `WhatsNewPrompt`'s `onVisibilityChange` no longer gets a false `false` then `true` when the caller passes a
+  new lambda instance on recomposition while the sheet is showing (e.g. an inline
+  `{ review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) }`), which restarted the review cooldown. The
+  `false` still goes to the callback that got the `true`.
+
+### UI (SwiftUI, `CherKitUI`)
+
+- added: `.sunsetPrompt(checker:)` takes an optional `onFirstCheckComplete: (() -> Void)?`. It runs once per process
+  when the launch check's first attempt resolves, whatever the outcome (up to date, soft, hard, or a failed fetch
+  that fails open after the checker's timeout), and always after `onPromptChange` / `onVisibilityChange` reported
+  that first decision. `SunsetChecker.disabled` calls it on the first appear; re-checks on a return from the
+  background and the quick retry after a failed check never call it again. Hold What's New until Sunset has decided
+  with `.whatsNew(checker: whatsNew, suppressed: !sunsetSettled || sunsetKind != nil)` (recipe in the
+  [CherKitUI README](Sources/CherKitUI/README.md)).
+
+### Tooling (contributors only)
+
+- changed: nothing changes for apps: after `scripts/setup-linux.sh`, a bare `./gradlew <task>` in a fresh shell
+  finds the JDK by itself (it sources `${CHERKIT_TOOLS:-~/.cherkit-tools}/env.sh` when `JAVA_HOME` is unset).
+  Without that file (macOS, JitPack, IDEs) `./gradlew` behaves as before.
+
 ## 0.4.0
 
 No breaking changes; every new parameter defaults to the old behavior. What's new:
