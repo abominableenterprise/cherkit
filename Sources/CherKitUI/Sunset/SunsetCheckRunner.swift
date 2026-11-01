@@ -4,7 +4,7 @@ import Combine
 import Foundation
 import SwiftUI
 
-/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)``
+/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``
 /// when ``SunsetCheckScheduler`` says so, and holds the latest decision for the prompts.
 ///
 /// The modifier uses one ``shared`` runner for the process, so the launch check runs once per process and the

@@ -33,10 +33,14 @@ let package = Package(
         ),
         .target(name: "CherKitSunset", dependencies: ["CherKitCore"], exclude: ["README.md"]),
         .target(name: "CherKitWhatsNew", dependencies: ["CherKitCore"], exclude: ["README.md"]),
-        // CherKitReview: store-review prompt rules only; the StoreKit/SwiftUI adapter comes separately.
+        // CherKitReview: store-review prompt rules only; the StoreKit/SwiftUI adapter lives in CherKitUI.
         .target(name: "CherKitReview", exclude: ["README.md"]),
         // SwiftUI views. Sources are wrapped in `#if canImport(SwiftUI)` so Linux builds stay green.
-        .target(name: "CherKitUI", dependencies: ["CherKitSunset", "CherKitWhatsNew"], exclude: ["README.md"]),
+        .target(
+            name: "CherKitUI",
+            dependencies: ["CherKitSunset", "CherKitWhatsNew", "CherKitReview"],
+            exclude: ["README.md"]
+        ),
         // Test-only helper that loads the shared JSON contract in fixtures/. Not a product.
         .target(name: "CherKitTestSupport", path: "Tests/CherKitTestSupport"),
         .testTarget(name: "CherKitCoreTests", dependencies: ["CherKitCore", "CherKitTestSupport"]),
@@ -47,7 +51,7 @@ let package = Package(
         // The logic behind the CherKitUI views. Its files are wrapped in `#if canImport(SwiftUI)`, so empty on Linux.
         .testTarget(
             name: "CherKitUITests",
-            dependencies: ["CherKitUI", "CherKitCore", "CherKitSunset", "CherKitWhatsNew"]
+            dependencies: ["CherKitUI", "CherKitCore", "CherKitSunset", "CherKitWhatsNew", "CherKitReview"]
         ),
     ]
 )

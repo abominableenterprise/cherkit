@@ -5,6 +5,8 @@ import Combine
 /// The state behind the `.whatsNew` modifiers, kept free of view code so its rules are unit-testable:
 /// present only non-empty entries, and run the dismiss action once, only after the sheet was dismissed.
 /// For a checker, ``launchCheck(_:)`` runs `onLaunch` at most once, and `markSeen` is the dismiss action.
+/// While ``isSuppressed`` (e.g. a Sunset prompt is up) the sheet waits, or is taken away without counting as a
+/// dismissal, and comes back once it is no longer suppressed.
 @MainActor
 final class WhatsNewPresenter: ObservableObject {
     /// Drives `.sheet(isPresented:)`; SwiftUI sets it back to `false` when the sheet goes away.
@@ -12,7 +14,14 @@ final class WhatsNewPresenter: ObservableObject {
     /// The releases the sheet shows.
     @Published private(set) var entries: [WhatsNewEntry] = []
 
+    /// Whether the sheet is held back; see ``setSuppressed(_:)``.
+    private(set) var isSuppressed = false
+
     private var onDismiss: (() -> Void)?
+    /// Entries were presented and the user has not dismissed them yet.
+    private var isPending = false
+    /// The sheet was taken away for ``isSuppressed`` and SwiftUI has not reported that dismissal yet.
+    private var isHidingForSuppression = false
     private var hasRunLaunchCheck = false
     private var lastOffered: [WhatsNewEntry]?
 
@@ -22,7 +31,22 @@ final class WhatsNewPresenter: ObservableObject {
         guard !entries.isEmpty else { return }
         self.entries = entries
         if self.onDismiss == nil { self.onDismiss = onDismiss }
-        isPresented = true
+        isPending = true
+        if !isSuppressed && !isHidingForSuppression { isPresented = true }
+    }
+
+    /// Holds the sheet back while `suppressed`: it is not presented, or is taken away if up (the dismiss action does
+    /// not run). Pending entries are presented again once this turns `false`.
+    func setSuppressed(_ suppressed: Bool) {
+        guard suppressed != isSuppressed else { return }
+        isSuppressed = suppressed
+        if suppressed {
+            guard isPresented else { return }
+            isHidingForSuppression = true
+            isPresented = false
+        } else if isPending && !isHidingForSuppression {
+            isPresented = true
+        }
     }
 
     /// ``present(_:onDismiss:)`` for app-supplied entries, skipping a list equal to the last one offered, so a view
@@ -41,6 +65,13 @@ final class WhatsNewPresenter: ObservableObject {
     /// Called from the sheet's `onDismiss`: runs the pending dismiss action once.
     func sheetDismissed() {
         isPresented = false
+        if isHidingForSuppression {
+            // Taken away by `setSuppressed(true)`, not by the user: keep the entries and the action.
+            isHidingForSuppression = false
+            if !isSuppressed && isPending { isPresented = true }
+            return
+        }
+        isPending = false
         let action = onDismiss
         onDismiss = nil
         action?()

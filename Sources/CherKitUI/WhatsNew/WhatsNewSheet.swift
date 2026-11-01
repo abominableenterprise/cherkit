@@ -6,7 +6,7 @@ import SwiftUI
 /// date and bullets, and a "Continue" button that dismisses it. One release shows as a single block; several get one
 /// section each. Everything is local: no network, no loading state.
 ///
-/// Usually presented by ``SwiftUI/View/whatsNew(checker:installedVersion:locale:strings:)``; present it yourself with
+/// Usually presented by ``SwiftUI/View/whatsNew(checker:installedVersion:locale:strings:suppressed:onVisibilityChange:)``; present it yourself with
 /// `.sheet` if you need to. "Continue" calls `onContinue` when given, else the environment's `dismiss`.
 @available(iOS 16, macOS 13, *)
 public struct WhatsNewSheet: View {
