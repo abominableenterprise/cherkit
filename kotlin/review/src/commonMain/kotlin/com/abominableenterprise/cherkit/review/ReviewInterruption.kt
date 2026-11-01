@@ -8,6 +8,9 @@ public object ReviewInterruption {
     /** Sunset's soft "Update available" dialog (sunset-compose `SunsetPrompt(onVisibilityChange = ...)`). */
     public const val SUNSET_PROMPT: String = "sunset.prompt"
 
-    /** Sunset's hard "Update required" block. */
+    /** Sunset's hard "Update required" block (sunset-compose `SunsetPrompt(onPromptChange = ...)` reports it). */
     public const val SUNSET_BLOCK: String = "sunset.block"
+
+    /** The "What's new" sheet or screen. The same string as Swift's `ReviewInterruption.whatsNew`. */
+    public const val WHATS_NEW: String = "whatsNew"
 }

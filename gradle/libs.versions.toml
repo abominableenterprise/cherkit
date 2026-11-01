@@ -14,6 +14,8 @@ compose-material3 = "1.4.0"
 robolectric = "4.16.1"
 junit = "4.13.2"
 espresso = "3.5.0"
+# Play In-App Review for :review-compose (Android only).
+play-review = "2.0.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -30,6 +32,7 @@ compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", ve
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "play-review" }
 # Catalog entry only; the analytics module adds it in its own PR.
 posthog-android = { module = "com.posthog:posthog-android", version.ref = "posthog-android" }
 

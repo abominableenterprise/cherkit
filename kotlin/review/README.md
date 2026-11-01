@@ -2,7 +2,7 @@
 
 The store-review ("rate this app") rules: when to ask, never too often, never over a modal. This module is the
 **contract and core rules only**: no platform review API, no UI. The SwiftUI adapter (`AppStore.requestReview`) and the
-Android adapter (Play In-App Review plus a Compose effect) build on it.
+Android adapter ([review-compose](../review-compose/README.md): Play In-App Review plus Compose effects) build on it.
 
 Swift: `Sources/CherKitReview` ([Swift usage](../../Sources/CherKitReview/README.md)), Foundation only. Kotlin:
 `kotlin/review` (no runtime dependencies). Shared cases: `fixtures/review/coordinator.json`. Test with
@@ -18,7 +18,7 @@ val review = if (BuildConfig.DEBUG) ReviewCoordinator.disabled()
 review.recordSuccess()                                              // e.g. after an entry is saved
 review.noteInterruption()                                           // after a paywall, error or failed write
 review.setInterruptionVisible(true, source = "paywall")             // while one of your modals is up (false when gone)
-// Adapter (later): on a settled screen, if (review.shouldPrompt(isIdle) && review.markPrompted()) launchReviewFlow()
+ReviewPromptEffect(review, isIdle = !isEditing)                     // review-compose: settles, then launches Play
 ```
 
 `AndroidReview.coordinator` is disabled by default in debuggable builds. Swift: `ReviewCoordinator(isEligible:)`
@@ -55,13 +55,23 @@ review.setInterruptionVisible(true, source = "paywall")             // while one
 
 `:review` does not depend on `:sunset` (and `CherKitReview` not on `CherKitSunset`/`CherKitUI`); the automatic bridge
 belongs in the platform adapters. Until then, hook it up in one line per prompt, with the well-known sources
-`ReviewInterruption.SUNSET_PROMPT` / `.sunsetPrompt` (soft dialog) and `SUNSET_BLOCK` / `.sunsetBlock` (hard block):
+`ReviewInterruption.SUNSET_PROMPT` / `.sunsetPrompt` (soft dialog) and `SUNSET_BLOCK` / `.sunsetBlock` (hard block).
+Kotlin also has `ReviewInterruption.WHATS_NEW` (`"whatsNew"`, the same string as Swift's `.whatsNew`) for the
+"What's new" sheet.
+
+On Android, sunset-compose's `onPromptChange` reports which prompt is showing (`SunsetPromptKind.SOFT`, `HARD` or
+`null`), so both sources hook up in one place (both `SunsetPrompt` overloads take it):
 
 ```kotlin
-SunsetPrompt(checker, onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.SUNSET_PROMPT) })
-// Decision-based UI: you hold the decision, so report the hard block from it:
-review.setInterruptionVisible(decision is SunsetDecision.HardUpdate, ReviewInterruption.SUNSET_BLOCK)
+SunsetPrompt(checker = checker, onPromptChange = { kind ->
+    review.setInterruptionVisible(kind == SunsetPromptKind.SOFT, ReviewInterruption.SUNSET_PROMPT)
+    review.setInterruptionVisible(kind == SunsetPromptKind.HARD, ReviewInterruption.SUNSET_BLOCK)
+})
 ```
+
+`onVisibilityChange` still reports the soft dialog only, so
+`SunsetPrompt(checker = c, onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.SUNSET_PROMPT) })`
+keeps working but misses the hard block; use `onPromptChange` for it.
 
 ```swift
 // Decision-based `.sunsetPrompt(decision:)`: report the hard block from the decision you hold.
