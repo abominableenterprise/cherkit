@@ -18,6 +18,12 @@ public struct SunsetStrings: Equatable, Sendable {
     public var updateHint: String
     /// The soft prompt's dismiss button. Tapping it hides the prompt for that version.
     public var notNowButton: String
+    /// Title of the soft TestFlight prompt (a ``SunsetUpdateKind/testBuild`` prompt).
+    public var testBuildTitle: String
+    /// TestFlight prompt text when the config's `testFlight` block has no custom message.
+    public var testBuildMessage: String
+    /// VoiceOver hint for ``updateButton`` on the TestFlight prompt.
+    public var testBuildUpdateHint: String
 
     /// Creates the strings, with English defaults for anything you leave out.
     public init(
@@ -27,7 +33,10 @@ public struct SunsetStrings: Equatable, Sendable {
         hardMessage: String = "This version is no longer supported. Please update to keep using the app.",
         updateButton: String = "Update",
         updateHint: String = "Opens the store to update the app.",
-        notNowButton: String = "Not now"
+        notNowButton: String = "Not now",
+        testBuildTitle: String = "A new test build is available",
+        testBuildMessage: String = "Install it from TestFlight to try the latest changes.",
+        testBuildUpdateHint: String = "Opens TestFlight to install the new build."
     ) {
         self.softTitle = softTitle
         self.softMessage = softMessage
@@ -36,11 +45,26 @@ public struct SunsetStrings: Equatable, Sendable {
         self.updateButton = updateButton
         self.updateHint = updateHint
         self.notNowButton = notNowButton
+        self.testBuildTitle = testBuildTitle
+        self.testBuildMessage = testBuildMessage
+        self.testBuildUpdateHint = testBuildUpdateHint
     }
 
-    /// The text for the soft prompt: the config's custom message, or ``softMessage`` when it has none.
+    /// The soft prompt's title: ``testBuildTitle`` for a ``SunsetUpdateKind/testBuild`` prompt, else ``softTitle``.
+    public func softTitle(for prompt: SunsetPrompt?) -> String {
+        prompt?.kind == .testBuild ? testBuildTitle : softTitle
+    }
+
+    /// The text for the soft prompt: the config's custom message, or, when it has none, ``testBuildMessage`` for a
+    /// ``SunsetUpdateKind/testBuild`` prompt and ``softMessage`` for a release prompt.
     public func softText(for prompt: SunsetPrompt) -> String {
-        Self.custom(prompt.message) ?? softMessage
+        Self.custom(prompt.message) ?? (prompt.kind == .testBuild ? testBuildMessage : softMessage)
+    }
+
+    /// The VoiceOver hint for the soft prompt's ``updateButton``: ``testBuildUpdateHint`` for a
+    /// ``SunsetUpdateKind/testBuild`` prompt, else ``updateHint``.
+    public func softUpdateHint(for prompt: SunsetPrompt) -> String {
+        prompt.kind == .testBuild ? testBuildUpdateHint : updateHint
     }
 
     /// The text for the hard block: the config's custom message, or ``hardMessage`` when it has none.

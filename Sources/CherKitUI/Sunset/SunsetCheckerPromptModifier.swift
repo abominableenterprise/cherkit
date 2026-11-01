@@ -2,7 +2,7 @@
 import CherKitSunset
 import SwiftUI
 
-/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``:
+/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:channel:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``:
 /// runs the checks through a ``SunsetCheckRunner`` and shows its decision with ``SunsetPromptModifier``.
 @available(iOS 16, macOS 13, *)
 struct SunsetCheckerPromptModifier: ViewModifier {
@@ -46,7 +46,8 @@ struct SunsetCheckerPromptModifier: ViewModifier {
             onVisibilityChange: onVisibilityChange,
             onPromptChange: onPromptChange,
             firstCheckComplete: runner.firstCheckComplete,
-            onFirstCheckComplete: firstCheckCompleteOnce
+            onFirstCheckComplete: firstCheckCompleteOnce,
+            onSoftPromptAnswered: { [runner] in runner.softPromptAnswered() }
         )
     }
 
@@ -79,13 +80,20 @@ extension View {
     ///   return from the background re-checks whatever the interval.
     ///
     /// A re-check replaces the decision: a hard block goes away once the config no longer requires the update, and
-    /// a soft prompt answered with "Not now" stays hidden for that `latestVersion`. ``SunsetChecker/disabled`` never
-    /// shows anything.
+    /// a soft prompt answered with "Not now" stays hidden for that `latestVersion`. Once the user has answered a soft
+    /// prompt, no other soft prompt shows until the next launch (at most one per session); hard blocks still do.
+    /// ``SunsetChecker/disabled`` never shows anything.
+    ///
+    /// For TestFlight test-build prompts, pass the install channel: `channel: .current()` (``SunsetChannel/other``
+    /// in debug builds, which a library cannot detect). The installed build is read from `CFBundleVersion`.
     ///
     /// - Parameters:
     ///   - checker: The checker, e.g. `SunsetChecker(url:)`, or ``SunsetChecker/disabled`` in UI tests.
     ///   - installedVersion: The installed version; `nil` (the default) uses `CFBundleShortVersionString`.
     ///   - locale: The preferred languages for the config's messages.
+    ///   - channel: How this build was installed. ``SunsetChannel/store`` (the default) keeps the behaviour from before
+    ///     channels; pass ``SunsetChannel/current(bundle:)`` to get TestFlight test-build prompts, and
+    ///     ``SunsetChannel/other`` in debug builds.
     ///   - minimumInterval: The least time, in seconds, between the start of one check and a re-check on return from
     ///     the background. One hour by default; `0` re-checks on every return.
     ///   - memory: Where "Not now" is stored.
@@ -97,7 +105,8 @@ extension View {
     ///     white, whichever contrasts more with `tint` in the current light or dark mode. Ignored without a `tint`.
     ///   - onVisibilityChange: Called with `true` when the soft "Update available" alert appears and `false` when it
     ///     goes away. Not called for the hard block, so checks can keep running behind it; use `onPromptChange`.
-    ///   - onPromptChange: Called with the prompt showing (`.soft`, `.hard` or `nil`) whenever that changes, e.g.
+    ///   - onPromptChange: Called with the prompt showing (`.soft`, `.hard` or `nil`; a test-build prompt is `.soft`)
+    ///     whenever that changes, e.g.
     ///     `{ review.setSunsetPromptKind($0) }` so a review never shows over either.
     ///   - onFirstCheckComplete: Called once per process when the launch check's first attempt has resolved, with
     ///     any outcome: up to date, a soft prompt, a hard block, or a failed fetch (which fails open after the
@@ -109,6 +118,7 @@ extension View {
         checker: SunsetChecker,
         installedVersion: String? = nil,
         locale: [String] = Locale.preferredLanguages,
+        channel: SunsetChannel = .store,
         minimumInterval: TimeInterval = 60 * 60,
         memory: SunsetSoftPromptMemory = SunsetSoftPromptMemory(),
         strings: SunsetStrings = SunsetStrings(),
@@ -123,7 +133,9 @@ extension View {
             request: SunsetCheckRunner.Request(
                 checker: checker,
                 installedVersion: installedVersion ?? installedAppVersion(),
-                locale: locale
+                locale: locale,
+                channel: channel,
+                installedBuild: SunsetChecker.installedBuild()
             ),
             minimumInterval: minimumInterval,
             memory: memory,

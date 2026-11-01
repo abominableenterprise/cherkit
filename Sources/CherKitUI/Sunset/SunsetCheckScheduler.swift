@@ -2,7 +2,7 @@
 import Foundation
 import SwiftUI
 
-/// Decides when ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``
+/// Decides when ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:channel:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``
 /// runs a check. Pure (the caller passes the time), so its rules are unit-tested on their own:
 ///
 /// - Launch: the first ``shouldCheckAtLaunch(now:)`` checks; later calls never do.
