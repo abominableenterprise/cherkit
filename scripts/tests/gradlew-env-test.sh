@@ -22,7 +22,8 @@ check "gradlew has the env.sh hook" yes \
 # The real JDK: JAVA_HOME (scripts/test.sh has sourced env.sh), else the java on PATH, else the setup's env.sh.
 JDK="${JAVA_HOME:-}"
 if [ -z "$JDK" ] && command -v java >/dev/null; then
-  JDK="$(java -XshowSettings:properties -version 2>&1 | sed -n 's/^ *java\.home = //p' | head -n 1)"
+  # `|| true`: macOS's /usr/bin/java stub exits nonzero without a JDK; that must reach the skip below, not abort.
+  JDK="$({ java -XshowSettings:properties -version 2>&1 || true; } | sed -n 's/^ *java\.home = //p' | head -n 1)"
 fi
 TOOLS_ENV="${CHERKIT_TOOLS:-$HOME/.cherkit-tools}/env.sh"
 if [ -z "$JDK" ] && [ -f "$TOOLS_ENV" ]; then
@@ -43,12 +44,11 @@ cp -R "$ROOT/gradle/wrapper" "$WORK/repo/gradle/wrapper"
 # env.sh exports the real JDK and records that it was sourced.
 printf 'export JAVA_HOME=%q\ntouch %q\n' "$JDK" "$WORK/sourced" >"$WORK/tools/env.sh"
 
-# PATH without any directory holding a java executable.
-NOJAVA_PATH=""
-IFS=: read -r -a dirs <<<"$PATH"
-for d in "${dirs[@]}"; do
-  [ -n "$d" ] && [ ! -x "$d/java" ] && NOJAVA_PATH="${NOJAVA_PATH:+$NOJAVA_PATH:}$d"
-done
+# An isolated PATH with only the tools gradlew and the fake env.sh use, and no java (system dirs like macOS's
+# /usr/bin hold a java stub next to these tools, so they can't just be dropped from PATH).
+mkdir -p "$WORK/bin"
+for t in uname xargs sed tr touch ls; do ln -s "$(command -v "$t")" "$WORK/bin/$t"; done
+NOJAVA_PATH="$WORK/bin"
 
 # gradlew_version <dir to run from> <JAVA_HOME or empty> <CHERKIT_TOOLS>: runs `gradlew --version` there and sets
 # RC (its exit code), SOURCED (sourced / not-sourced: whether env.sh ran) and OUT (its output).
