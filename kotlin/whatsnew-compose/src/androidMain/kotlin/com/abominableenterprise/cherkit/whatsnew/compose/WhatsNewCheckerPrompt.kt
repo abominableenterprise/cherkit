@@ -27,7 +27,9 @@ import com.abominableenterprise.cherkit.whatsnew.WhatsNewChecker
  * @param locales The user's locales, most preferred first.
  * @param strings The text; English defaults.
  * @param suppressed While `true`, the sheet waits (or is taken away again, without counting as a dismissal), e.g.
- *   `suppressed = sunsetVisible` so Sunset's soft dialog goes first. It shows once this turns `false`.
+ *   `suppressed = sunsetVisible` so it never stacks with Sunset's soft dialog. It shows once this turns `false`.
+ *   `sunsetVisible` is `false` while Sunset's first check fetches, so to always show Sunset first, also keep this
+ *   `true` until that check finishes (or fails).
  * @param onVisibilityChange Called with `true` when the sheet appears and `false` when it goes away, e.g.
  *   `{ review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) }`.
  */
