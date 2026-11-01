@@ -1,7 +1,7 @@
 import Foundation
 
 extension SunsetChecker {
-    /// A checker that is switched off: ``check(installedVersion:osVersion:locale:)`` always answers
+    /// A checker that is switched off: ``check(installedVersion:osVersion:locale:channel:installedBuild:)`` always answers
     /// ``SunsetDecision/upToDate`` without fetching anything or reading or writing any cache.
     ///
     /// Use it wherever the app should never be prompted, e.g. UI tests, simulators and emulators:

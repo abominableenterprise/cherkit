@@ -7,8 +7,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * The one call apps make at launch: fetch the hosted config, fall back to the last good one, and decide.
@@ -29,7 +31,22 @@ public class SunsetChecker(
     public val timeout: Duration = DEFAULT_TIMEOUT,
     /** Which block of the config applies to this app. */
     public val platform: SunsetPlatform = SunsetPlatform.ANDROID,
+    /**
+     * The App Store lookup, or `null` (the default) when only the config can offer an update. Asked, with the same
+     * [timeout] and alongside the config fetch, only on the [SunsetChannel.STORE] channel. Not cached: a failed lookup
+     * just means no lookup prompt.
+     */
+    public val lookup: SunsetLookupSource? = null,
 ) {
+    /** The 0.1.0 constructor, kept so code compiled against it still links. Source calls resolve to the one above. */
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public constructor(
+        source: SunsetConfigSource,
+        cache: SunsetConfigCache,
+        timeout: Duration = DEFAULT_TIMEOUT,
+        platform: SunsetPlatform = SunsetPlatform.ANDROID,
+    ) : this(source, cache, timeout, platform, null)
+
     /**
      * `true` only for [disabled]: [check] answers [SunsetDecision.UpToDate] at once. Read-only, so app tests can
      * assert they wired the switched-off checker, e.g. `assertTrue(testEnvironment.sunsetChecker.isDisabled)`.
@@ -42,9 +59,21 @@ public class SunsetChecker(
      * @param installedVersion The installed app version, e.g. `versionName`.
      * @param osVersion The device OS version: the Android API level (`"34"`) or the iOS version.
      * @param locale The user's preferred language tags in order, e.g. `["de-DE", "en-US"]`.
+     * @param channel How this build was installed (default [SunsetChannel.STORE], the behaviour before channels).
+     * @param installedBuild The installed build number (iOS `CFBundleVersion`), for TestFlight test-build prompts.
      */
+    public suspend fun check(
+        installedVersion: String,
+        osVersion: String,
+        locale: List<String>,
+        channel: SunsetChannel = SunsetChannel.STORE,
+        installedBuild: String? = null,
+    ): SunsetDecision = checkReportingFailure(installedVersion, osVersion, locale, channel, installedBuild).decision
+
+    /** The 0.1.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
     public suspend fun check(installedVersion: String, osVersion: String, locale: List<String>): SunsetDecision =
-        checkReportingFailure(installedVersion, osVersion, locale).decision
+        check(installedVersion, osVersion, locale, SunsetChannel.STORE)
 
     /**
      * [check] plus whether it failed: [SunsetCheckOutcome.failed] is `true` when there was no usable config at all
@@ -55,30 +84,56 @@ public class SunsetChecker(
      * @param installedVersion The installed app version, e.g. `versionName`.
      * @param osVersion The device OS version: the Android API level (`"34"`) or the iOS version.
      * @param locale The user's preferred language tags in order, e.g. `["de-DE", "en-US"]`.
+     * @param channel How this build was installed (default [SunsetChannel.STORE], the behaviour before channels).
+     * @param installedBuild The installed build number (iOS `CFBundleVersion`), for TestFlight test-build prompts.
+     * @param now The device clock, compared with the TestFlight block's `notBefore`.
      */
     public suspend fun checkReportingFailure(
         installedVersion: String,
         osVersion: String,
         locale: List<String>,
+        channel: SunsetChannel = SunsetChannel.STORE,
+        installedBuild: String? = null,
+        now: Instant = Clock.System.now(),
     ): SunsetCheckOutcome {
         if (isDisabled) return SunsetCheckOutcome(SunsetDecision.UpToDate, failed = false)
-        val fetched = fetchWithDeadline()
+        val lookupSource = lookup?.takeIf { channel == SunsetChannel.STORE }
+        val looked = lookupSource?.let { CoroutineScope(Dispatchers.Default).async { withDeadline { it.fetch(timeout) } } }
+        val fetched: String?
+        val lookupBody: String?
+        try {
+            fetched = withDeadline { source.fetch(timeout) }
+            lookupBody = looked?.let { failOpen { it.await() } }
+        } finally {
+            looked?.cancel()
+        }
         val choice = SunsetConfigChoice.choose(fetched, failOpen { cache.load() })
         if (choice.source == SunsetConfigChoice.Source.FETCHED && fetched != null) failOpen { cache.save(fetched) }
-        val decision = SunsetDecider.decide(choice.config, platform, installedVersion, osVersion, locale)
+        val lookupResult = lookupBody?.let(SunsetLookupResult::parse)
+        val decision = SunsetDecider.decide(
+            choice.config, platform, installedVersion, osVersion, locale, channel, installedBuild, lookupResult, now,
+        )
         return SunsetCheckOutcome(decision, failed = choice.source == SunsetConfigChoice.Source.MISSING)
     }
 
+    /** The 0.1.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public suspend fun checkReportingFailure(
+        installedVersion: String,
+        osVersion: String,
+        locale: List<String>,
+    ): SunsetCheckOutcome = checkReportingFailure(installedVersion, osVersion, locale, SunsetChannel.STORE)
+
     /**
-     * The source's body, or `null` after [timeout]. The fetch runs detached, so a source that blocks or ignores
+     * [fetch]'s body, or `null` after [timeout]. The fetch runs detached, so a source that blocks or ignores
      * cancellation is abandoned at the deadline instead of holding up the launch.
      */
-    private suspend fun fetchWithDeadline(): String? {
-        val fetch = CoroutineScope(Dispatchers.Default).async { source.fetch(timeout) }
+    private suspend fun withDeadline(fetch: suspend () -> String?): String? {
+        val job = CoroutineScope(Dispatchers.Default).async { fetch() }
         return try {
-            failOpen { withTimeoutOrNull(timeout) { fetch.await() } }
+            failOpen { withTimeoutOrNull(timeout) { job.await() } }
         } finally {
-            fetch.cancel()
+            job.cancel()
         }
     }
 

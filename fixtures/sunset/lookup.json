@@ -1,0 +1,24 @@
+{
+  "description": "App Store lookup parsing (https://itunes.apple.com/lookup?bundleId=<id>&country=<cc>). `body` is a JSON value served back as the response text, or `text` is raw text. `result` is null when the response is unusable (no lookup prompt: fail open), else the parsed `version` and `minimumOsVersion` (as normalized by AppVersion) and `trackViewUrl` (null when missing or not a plain https link under the storeURL rules).",
+  "cases": [
+    { "name": "good response", "body": { "resultCount": 1, "results": [ { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": "https://apps.apple.com/us/app/example/id123456789?uo=4", "bundleId": "com.example.app" } ] }, "result": { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": "https://apps.apple.com/us/app/example/id123456789?uo=4" } },
+    { "name": "only the first result counts", "body": { "resultCount": 2, "results": [ { "version": "2.0", "minimumOsVersion": "15" }, { "version": "9.0", "minimumOsVersion": "18" } ] }, "result": { "version": "2.0", "minimumOsVersion": "15", "trackViewUrl": null } },
+    { "name": "non-https trackViewUrl is dropped", "body": { "resultCount": 1, "results": [ { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": "http://apps.apple.com/us/app/id1" } ] }, "result": { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": null } },
+    { "name": "custom-scheme trackViewUrl is dropped", "body": { "resultCount": 1, "results": [ { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": "itms-apps://apps.apple.com/app/id1" } ] }, "result": { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": null } },
+    { "name": "trackViewUrl that is not a string is dropped", "body": { "resultCount": 1, "results": [ { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": 5 } ] }, "result": { "version": "2.3.0", "minimumOsVersion": "16.0", "trackViewUrl": null } },
+    { "name": "empty results", "body": { "resultCount": 0, "results": [] }, "result": null },
+    { "name": "resultCount 0 with a stray result", "body": { "resultCount": 0, "results": [ { "version": "2.0", "minimumOsVersion": "15" } ] }, "result": null },
+    { "name": "resultCount missing", "body": { "results": [ { "version": "2.0", "minimumOsVersion": "15" } ] }, "result": null },
+    { "name": "resultCount as a string", "body": { "resultCount": "1", "results": [ { "version": "2.0", "minimumOsVersion": "15" } ] }, "result": null },
+    { "name": "results not an array", "body": { "resultCount": 1, "results": { "version": "2.0" } }, "result": null },
+    { "name": "result not an object", "body": { "resultCount": 1, "results": [ "2.0" ] }, "result": null },
+    { "name": "version missing", "body": { "resultCount": 1, "results": [ { "minimumOsVersion": "15" } ] }, "result": null },
+    { "name": "version not a version", "body": { "resultCount": 1, "results": [ { "version": "latest", "minimumOsVersion": "15" } ] }, "result": null },
+    { "name": "version as a number", "body": { "resultCount": 1, "results": [ { "version": 2, "minimumOsVersion": "15" } ] }, "result": null },
+    { "name": "minimumOsVersion missing", "body": { "resultCount": 1, "results": [ { "version": "2.0" } ] }, "result": null },
+    { "name": "root is an array", "body": [ { "version": "2.0" } ], "result": null },
+    { "name": "malformed JSON", "text": "{\"resultCount\": 1, \"results\": [{\"version\": \"2.", "result": null },
+    { "name": "HTML error page", "text": "<html><body>Service unavailable</body></html>", "result": null },
+    { "name": "empty body", "text": "", "result": null }
+  ]
+}

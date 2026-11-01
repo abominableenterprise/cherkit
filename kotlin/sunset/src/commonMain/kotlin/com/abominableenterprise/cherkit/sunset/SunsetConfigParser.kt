@@ -42,8 +42,26 @@ internal object SunsetConfigParser {
             latestMinimumOS = minimumOS.value,
             storeUrl = url.content,
             messages = messages(value["message"]),
+            testFlight = testFlight(value["testFlight"]),
         )
     }
+
+    /**
+     * The `testFlight` object, or `null` when it is absent or its `latestBuild` is not a valid build number string.
+     * A bad `url` or `notBefore` only drops that field; a bad block never invalidates the platform block.
+     */
+    private fun testFlight(value: JsonElement?): SunsetTestFlightConfig? {
+        if (value !is JsonObject) return null
+        val build = string(value["latestBuild"])?.let(SunsetBuildNumber::parse) ?: return null
+        return SunsetTestFlightConfig(
+            latestBuild = build,
+            url = string(value["url"])?.takeIf(SunsetTestFlightUrl::isValid),
+            notBefore = string(value["notBefore"])?.let(SunsetTimestamp::parse),
+            messages = messages(value["message"]),
+        )
+    }
+
+    private fun string(value: JsonElement?): String? = (value as? JsonPrimitive)?.takeIf { it.isString }?.content
 
     /** A present-or-absent version; `null` from [version] itself means invalid. */
     private class OptionalVersion(val value: AppVersion?)

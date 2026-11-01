@@ -29,31 +29,50 @@ public struct SunsetChecker: Sendable {
     public let timeout: TimeInterval
     /// Which block of the config applies to this app.
     public let platform: SunsetPlatform
-    /// `true` only for ``disabled``: ``check(installedVersion:osVersion:locale:)`` answers `upToDate` at once, so app
+    /// `true` only for ``disabled``: ``check(installedVersion:osVersion:locale:channel:installedBuild:)`` answers `upToDate` at once, so app
     /// tests can assert they got the switched-off checker.
     public let isDisabled: Bool
+    /// The App Store lookup, or `nil` (the default) when only the config can offer an update. Asked, with the same
+    /// `timeout` and alongside the config fetch, only on the ``SunsetChannel/store`` channel. Not cached: a failed
+    /// lookup just means no lookup prompt.
+    public let lookup: SunsetLookupSource?
 
-    /// A checker over any `source` and `cache`.
+    /// A checker over any `source` and `cache`; pass a `lookup` (e.g. ``URLSessionSunsetLookupSource``) to also offer
+    /// the version live in the App Store.
     public init(
         source: SunsetConfigSource,
         cache: SunsetConfigCache = UserDefaultsSunsetConfigCache(),
         timeout: TimeInterval = defaultTimeout,
-        platform: SunsetPlatform = .ios
+        platform: SunsetPlatform = .ios,
+        lookup: SunsetLookupSource? = nil
     ) {
-        self.init(source: source, cache: cache, timeout: timeout, platform: platform, isDisabled: false)
+        self.init(source: source, cache: cache, timeout: timeout, platform: platform, isDisabled: false, lookup: lookup)
     }
 
-    init(source: SunsetConfigSource, cache: SunsetConfigCache, timeout: TimeInterval, platform: SunsetPlatform, isDisabled: Bool) {
+    init(
+        source: SunsetConfigSource,
+        cache: SunsetConfigCache,
+        timeout: TimeInterval,
+        platform: SunsetPlatform,
+        isDisabled: Bool,
+        lookup: SunsetLookupSource? = nil
+    ) {
         self.source = source
         self.cache = cache
         self.timeout = timeout
         self.platform = platform
         self.isDisabled = isDisabled
+        self.lookup = lookup
     }
 
     /// A checker that fetches `url` with `URLSession` and caches in `UserDefaults.standard`.
-    public init(url: URL, cache: SunsetConfigCache = UserDefaultsSunsetConfigCache(), timeout: TimeInterval = defaultTimeout) {
-        self.init(source: URLSessionSunsetConfigSource(url: url), cache: cache, timeout: timeout)
+    public init(
+        url: URL,
+        cache: SunsetConfigCache = UserDefaultsSunsetConfigCache(),
+        timeout: TimeInterval = defaultTimeout,
+        lookup: SunsetLookupSource? = nil
+    ) {
+        self.init(source: URLSessionSunsetConfigSource(url: url), cache: cache, timeout: timeout, lookup: lookup)
     }
 
     /// Decides for this launch. Never throws; every failure ends in the cached config or ``SunsetDecision/upToDate``.
@@ -62,21 +81,41 @@ public struct SunsetChecker: Sendable {
     ///   - installedVersion: The installed app version, e.g. `CFBundleShortVersionString`.
     ///   - osVersion: The device OS version, e.g. `"17.4.1"` (on Android, the API level).
     ///   - locale: The user's preferred language tags in order, e.g. `Locale.preferredLanguages`.
-    public func check(installedVersion: String, osVersion: String, locale: [String]) async -> SunsetDecision {
-        await checkReportingFailure(installedVersion: installedVersion, osVersion: osVersion, locale: locale).decision
+    ///   - channel: How this build was installed (default ``SunsetChannel/store``, the behaviour before channels).
+    ///   - installedBuild: The installed build number (`CFBundleVersion`), for TestFlight test-build prompts.
+    public func check(
+        installedVersion: String,
+        osVersion: String,
+        locale: [String],
+        channel: SunsetChannel = .store,
+        installedBuild: String? = nil
+    ) async -> SunsetDecision {
+        await checkReportingFailure(
+            installedVersion: installedVersion,
+            osVersion: osVersion,
+            locale: locale,
+            channel: channel,
+            installedBuild: installedBuild
+        ).decision
     }
 
-    /// ``check(installedVersion:osVersion:locale:)`` plus whether it failed: `failed` is `true` when there was no
+    /// ``check(installedVersion:osVersion:locale:channel:installedBuild:)`` plus whether it failed: `failed` is `true` when there was no
     /// usable config at all (the fetch failed, timed out or did not parse, and nothing usable was cached), so the
     /// fail-open `upToDate` is not a real answer. CherKitUI uses it to retry; ``disabled`` never fails.
     package func checkReportingFailure(
         installedVersion: String,
         osVersion: String,
-        locale: [String]
+        locale: [String],
+        channel: SunsetChannel = .store,
+        installedBuild: String? = nil,
+        now: Date = Date()
     ) async -> (decision: SunsetDecision, failed: Bool) {
         if isDisabled { return (.upToDate, false) }
         let source = self.source
         let timeout = self.timeout
+        let lookupSource = channel == .store ? lookup : nil
+        async let looked = lookupSource == nil
+            ? nil : SunsetTimeout.run(seconds: timeout) { await lookupSource?.fetch(timeout: timeout) }
         let fetched = await SunsetTimeout.run(seconds: timeout) { await source.fetch(timeout: timeout) }
         let choice = SunsetConfigChoice.choose(fetched: fetched, cached: await cache.load())
         if choice.source == .fetched, let fetched { await cache.save(fetched) }
@@ -85,15 +124,34 @@ public struct SunsetChecker: Sendable {
             platform: platform,
             appVersion: installedVersion,
             osVersion: osVersion,
-            languages: locale
+            languages: locale,
+            channel: channel,
+            installedBuild: installedBuild,
+            lookup: await looked.flatMap(SunsetLookupResult.parse),
+            now: now
         )
         return (decision, choice.source == .missing)
     }
 
-    /// ``check(installedVersion:osVersion:locale:)`` for the running app: its `CFBundleShortVersionString`, the
-    /// `ProcessInfo` OS version and `Locale.preferredLanguages`.
-    public func check(bundle: Bundle = .main, locale: [String] = Locale.preferredLanguages) async -> SunsetDecision {
-        await check(installedVersion: Self.installedVersion(bundle: bundle), osVersion: Self.osVersion(), locale: locale)
+    /// ``check(installedVersion:osVersion:locale:channel:installedBuild:)`` for the running app: its
+    /// `CFBundleShortVersionString` and `CFBundleVersion`, the `ProcessInfo` OS version and `Locale.preferredLanguages`.
+    public func check(
+        bundle: Bundle = .main,
+        locale: [String] = Locale.preferredLanguages,
+        channel: SunsetChannel = .store
+    ) async -> SunsetDecision {
+        await check(
+            installedVersion: Self.installedVersion(bundle: bundle),
+            osVersion: Self.osVersion(),
+            locale: locale,
+            channel: channel,
+            installedBuild: Self.installedBuild(bundle: bundle)
+        )
+    }
+
+    /// `bundle`'s `CFBundleVersion` (the build number), or `nil` when absent.
+    public static func installedBuild(bundle: Bundle = .main) -> String? {
+        bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
     }
 
     /// `bundle`'s `CFBundleShortVersionString`, or `""` (which fails open) when absent.
