@@ -12,6 +12,9 @@ private enum SunsetPreviewData {
             + "This version can no longer talk to the new sync service. Updating takes a minute, and everything "
             + "you have saved stays right where it is. Thanks for sticking with us!"
     )
+    static let testBuild = SunsetPrompt(
+        storeURL: SunsetTestFlightConfig.defaultURL, message: nil, kind: .testBuild, latestBuild: SunsetBuildNumber("42")
+    )
     static let icon = Image(systemName: "app.badge.fill")
 
     /// A throwaway suite so previews never touch the app's real "Not now" memory.
@@ -41,6 +44,11 @@ private struct SunsetPromptPreviewHost: View {
 @available(iOS 17, macOS 14, *)
 #Preview("Soft prompt") {
     SunsetPromptPreviewHost(decision: .softUpdate(SunsetPreviewData.prompt))
+}
+
+@available(iOS 17, macOS 14, *)
+#Preview("TestFlight test build") {
+    SunsetPromptPreviewHost(decision: .softUpdate(SunsetPreviewData.testBuild))
 }
 
 @available(iOS 17, macOS 14, *)

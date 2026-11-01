@@ -120,7 +120,8 @@ jq --arg build "$BUILD_NUMBER" --arg at "$(date -u -d '+30 minutes' +%Y-%m-%dT%H
 | `SunsetTestFlightConfig(latestBuild:url:notBefore:messages:)`, `defaultURL`; `SunsetPlatformConfig.testFlight` | `SunsetTestFlightConfig(latestBuild, url, notBefore, messages)`, `DEFAULT_URL`; `SunsetPlatformConfig.testFlight` |
 | `SunsetLookupResult.parse(Data) -> SunsetLookupResult?` (`version`, `minimumOSVersion`, `trackViewURL`) | `SunsetLookupResult.parse(String): SunsetLookupResult?` (`version`, `minimumOsVersion`, `trackViewUrl`) |
 | `protocol SunsetLookupSource` (`fetch(timeout:) async -> Data?`) | `fun interface SunsetLookupSource` (`suspend fetch(timeout): String?`) |
-| `URLSessionSunsetLookupSource(url:session:)`, `init?(bundleID:country:session:)` | (none: Android does not use the lookup) |
+| `URLSessionSunsetLookupSource(url:session:)`, `init?(bundleID:country:session:)`, `init?(bundle:locale:session:)`, `country(for:)` | (none: Android does not use the lookup) |
+| `SunsetChannel.current(bundle:)`, `current(receiptURL:isSimulator:)` (iOS: TestFlight from `sandboxReceipt`, simulator `other`) | |
 | `SunsetTestBuildPromptRule.shouldShow(_:rememberedBuild:)`, `buildToRemember(after:on:)`, `defaultMemoryKey` | `SunsetTestBuildPromptRule.shouldShow(decision, rememberedBuild)`, `buildToRemember(action, prompt)`, `DEFAULT_MEMORY_KEY` |
 | `SunsetPromptAction.notNow / .update` | `SunsetPromptAction.NOT_NOW / UPDATE` |
 | `SunsetMessages.resolve(_:languages:)` | `SunsetMessages.resolve(messages, languages)` |

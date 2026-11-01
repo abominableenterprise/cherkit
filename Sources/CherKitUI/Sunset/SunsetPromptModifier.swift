@@ -3,7 +3,7 @@ import CherKitSunset
 import SwiftUI
 
 /// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``
-/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``.
+/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:channel:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``.
 @available(iOS 16, macOS 13, *)
 struct SunsetPromptModifier: ViewModifier {
     @Binding var decision: SunsetDecision?
@@ -27,6 +27,9 @@ struct SunsetPromptModifier: ViewModifier {
     /// Called once `firstCheckComplete` turns `true`, right after the prompt callbacks heard that decision. The
     /// `checker:` form guards it to once per process.
     var onFirstCheckComplete: (() -> Void)? = nil
+    /// Called after the user answers the soft alert. The `checker:` form uses it to show at most one soft prompt per
+    /// session.
+    var onSoftPromptAnswered: (() -> Void)? = nil
 
     @Environment(\.openURL) private var openURL
 
@@ -38,7 +41,21 @@ struct SunsetPromptModifier: ViewModifier {
 
     /// What "Not now" does for `prompt`.
     func rememberNotNow(for prompt: SunsetPrompt) {
-        memory.rememberNotNow(for: version(for: prompt))
+        answer(.notNow, on: prompt)
+    }
+
+    /// Records the user's answer to `prompt` (see ``SunsetSoftPromptMemory/remember(_:on:version:)``): a test-build
+    /// prompt remembers its build for "Update" and "Not now", a release prompt its version for "Not now".
+    func answer(_ action: SunsetPromptAction, on prompt: SunsetPrompt) {
+        memory.remember(action, on: prompt, version: version(for: prompt))
+        onSoftPromptAnswered?()
+    }
+
+    /// What "Update" does for `prompt`: remembers the answer, then opens ``SunsetPrompt/storeURL`` (the store page,
+    /// or TestFlight for a test-build prompt) with `open`.
+    func update(_ prompt: SunsetPrompt, open: (URL) -> Void) {
+        answer(.update, on: prompt)
+        open(prompt.storeURL)
     }
 
     /// Whether the soft alert is up for the current decision.
@@ -72,9 +89,9 @@ struct SunsetPromptModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert(strings.softTitle, isPresented: softPresented, presenting: softPrompt) { prompt in
-                Button(strings.updateButton) { openURL(prompt.storeURL) }
-                    .accessibilityHint(strings.updateHint)
+            .alert(strings.softTitle(for: softPrompt), isPresented: softPresented, presenting: softPrompt) { prompt in
+                Button(strings.updateButton) { update(prompt) { openURL($0) } }
+                    .accessibilityHint(strings.softUpdateHint(for: prompt))
                 Button(strings.notNowButton, role: .cancel) { rememberNotNow(for: prompt) }
             } message: { prompt in
                 Text(strings.softText(for: prompt))
@@ -146,8 +163,10 @@ extension View {
     ///
     /// - ``SunsetDecision/softUpdate(_:)``: a dismissible alert with "Update" and "Not now". "Not now" is remembered
     ///   for the config's latest version, so the alert does not come back for that version (see
-    ///   ``SunsetSoftPromptRule``).
-    ///   Either answer sets `decision` to `nil`.
+    ///   ``SunsetSoftPromptRule``). A TestFlight prompt (``SunsetUpdateKind/testBuild``) is titled
+    ///   ``SunsetStrings/testBuildTitle`` ("A new test build is available"), its "Update" opens the TestFlight URL,
+    ///   and both answers are remembered for its build, so each build prompts at most once (see
+    ///   ``SunsetTestBuildPromptRule``). Either answer sets `decision` to `nil`.
     /// - ``SunsetDecision/hardUpdate(_:)``: ``SunsetUpdateView`` over everything, with no way to dismiss it
     ///   (on iOS a window above the app's windows, so it also covers sheets the app is presenting; on macOS an
     ///   overlay).
@@ -155,7 +174,7 @@ extension View {
     ///
     /// This modifier only displays a decision; it never fetches. Get one from the Sunset checker (or
     /// ``SunsetDecider``) and assign it to `decision`, or let
-    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)`` run the checks.
+    /// ``sunsetPrompt(checker:installedVersion:locale:channel:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)`` run the checks.
     ///
     /// - Parameters:
     ///   - decision: The decision to show, `nil` while unknown.
@@ -163,8 +182,8 @@ extension View {
     ///     prompt's ``SunsetPrompt/latestVersion`` (the config's `latestVersion`), so a newer one shows the prompt
     ///     again. When both are `nil`, the installed app version is used, so "Not now" lasts until the app is
     ///     updated.
-    ///   - memory: Where "Not now" is stored. Defaults to `UserDefaults.standard` under
-    ///     ``SunsetSoftPromptMemory/defaultKey``.
+    ///   - memory: Where the answers are stored. Defaults to `UserDefaults.standard` under
+    ///     ``SunsetSoftPromptMemory/defaultKey`` and, for test builds, ``SunsetTestBuildPromptRule/defaultMemoryKey``.
     ///   - strings: The text; English defaults.
     ///   - appIcon: Optional icon for the hard block.
     ///   - tint: The hard block's button and accent color, e.g. your accent color. On iOS the block runs in its own
@@ -176,7 +195,7 @@ extension View {
     ///     goes away (answered, cleared, or this view goes away). Not called for the hard block; use
     ///     `onPromptChange` for both.
     ///   - onPromptChange: Called with the prompt showing (`.soft`, `.hard` or `nil`) whenever that changes, never for
-    ///     the initial `nil`, and with `nil` when this view goes away while one was showing. Report both to a review
+    ///     the initial `nil` (a TestFlight test-build prompt is `.soft` too), and with `nil` when this view goes away while one was showing. Report both to a review
     ///     coordinator with `{ review.setSunsetPromptKind($0) }`.
     public func sunsetPrompt(
         decision: Binding<SunsetDecision?>,

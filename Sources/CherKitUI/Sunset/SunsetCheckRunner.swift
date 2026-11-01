@@ -4,7 +4,7 @@ import Combine
 import Foundation
 import SwiftUI
 
-/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``
+/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:channel:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``
 /// when ``SunsetCheckScheduler`` says so, and holds the latest decision for the prompts.
 ///
 /// The modifier uses one ``shared`` runner for the process, so the launch check runs once per process and the
@@ -25,6 +25,9 @@ final class SunsetCheckRunner: ObservableObject {
     @Published private(set) var firstCheckComplete = false
     /// Whether an `onFirstCheckComplete` callback has run (``reportFirstCheckComplete(_:)``).
     private(set) var hasReportedFirstCheckComplete = false
+    /// Whether the user has answered a soft prompt in this process (``softPromptAnswered()``). From then on, later
+    /// checks show no soft prompt until the next launch: at most one soft prompt per session. Hard blocks still show.
+    private(set) var hasAnsweredSoftPrompt = false
     /// When to check.
     private(set) var scheduler: SunsetCheckScheduler
     /// The running check, if any.
@@ -71,6 +74,11 @@ final class SunsetCheckRunner: ObservableObject {
         callback()
     }
 
+    /// The user answered the soft prompt ("Update" or "Not now"): no other soft prompt in this process.
+    func softPromptAnswered() {
+        hasAnsweredSoftPrompt = true
+    }
+
     private func run(_ request: Request) {
         retryTask?.cancel()
         retryTask = nil
@@ -84,7 +92,9 @@ final class SunsetCheckRunner: ObservableObject {
             let result = await request.checker.checkReportingFailure(
                 installedVersion: request.installedVersion,
                 osVersion: SunsetChecker.osVersion(),
-                locale: request.locale
+                locale: request.locale,
+                channel: request.channel,
+                installedBuild: request.installedBuild
             )
             guard let self else { return }
             self.finish(decision: result.decision)
@@ -94,9 +104,14 @@ final class SunsetCheckRunner: ObservableObject {
         }
     }
 
-    /// Shows `decision`, then marks the first check complete if this was it.
+    /// Shows `decision` (a soft one only while none was answered this session), then marks the first check complete
+    /// if this was it.
     private func finish(decision: SunsetDecision) {
-        self.decision = decision
+        if case .softUpdate = decision, hasAnsweredSoftPrompt {
+            self.decision = .upToDate
+        } else {
+            self.decision = decision
+        }
         if !firstCheckComplete { firstCheckComplete = true }
     }
 
@@ -116,6 +131,10 @@ final class SunsetCheckRunner: ObservableObject {
         let checker: SunsetChecker
         let installedVersion: String
         let locale: [String]
+        /// How the app was installed; ``SunsetChannel/store`` unless the app passes one.
+        var channel: SunsetChannel = .store
+        /// The installed build number (`CFBundleVersion`), for TestFlight test-build prompts.
+        var installedBuild: String? = nil
     }
 }
 #endif

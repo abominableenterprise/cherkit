@@ -102,6 +102,56 @@ Options, all with defaults:
 screens or at the largest Dynamic Type sizes. `SunsetSoftPromptRule.shouldShow(_:version:dismissedVersion:)` is the
 pure "show the soft prompt?" rule the modifier uses.
 
+### iOS: App Store and TestFlight updates
+
+Beyond the config's `latestVersion`, the soft prompt can offer the version live in the App Store and, for testers,
+a newer TestFlight build (rules: [Update sources](https://github.com/abominableenterprise/cherkit/blob/main/kotlin/sunset/README.md#update-sources)).
+Both are opt in; without them nothing changes.
+
+```swift
+#if DEBUG
+let channel = SunsetChannel.other            // a library cannot tell a debug build from TestFlight
+#else
+let channel = SunsetChannel.current()        // .testFlight, .store, or .other in the simulator
+#endif
+
+let sunset = SunsetChecker(
+    url: URL(string: "https://example.github.io/myapp/sunset.json")!,
+    lookup: URLSessionSunsetLookupSource()   // App Store lookup: this bundle id, the user's region
+)
+
+ContentView()
+    .sunsetPrompt(checker: sunset, channel: channel, onPromptChange: { review.setSunsetPromptKind($0) })
+```
+
+- **App Store installs** (`.store`): with a `lookup`, a newer App Store version (that the device's OS can install)
+  shows the usual "Update available" alert, linking the config's `storeURL`, else the App Store page. "Not now" is
+  remembered for that version. A failed lookup just means no lookup prompt.
+- **TestFlight installs** (`.testFlight`): when the config's `ios.testFlight.latestBuild` is higher than the installed
+  `CFBundleVersion`, the alert says "A new test build is available" and **Update** opens TestFlight
+  (`testFlight.url`, default `itms-beta://`). Each build prompts **at most once**: "Update" and "Not now" both
+  remember it (`SunsetTestBuildPromptRule`, under `SunsetTestBuildPromptRule.defaultMemoryKey`, separate from the
+  release "Not now"); a later build prompts again. Your release pipeline writes the block: see
+  [the jq recipe](https://github.com/abominableenterprise/cherkit/blob/main/kotlin/sunset/README.md#release-pipeline-publish-the-testflight-build).
+- **Debug builds, the simulator, sideloads** (`.other`): only the config's own versions apply, as before. Use
+  `SunsetChecker.disabled` to switch Sunset off entirely.
+- `SunsetChannel.current()` reads the App Store receipt: a file named `sandboxReceipt` means TestFlight, the
+  simulator is always `.other`, anything else `.store`. An Xcode, ad hoc or enterprise install also has a
+  `sandboxReceipt`, so pass `.other` for those builds yourself, as above.
+- `URLSessionSunsetLookupSource(bundle:locale:)` uses `Bundle.main`'s identifier and `Locale.current`'s region (e.g.
+  `"us"`) and is `nil` without them. If you know the App Store storefront (StoreKit `Storefront.current`), use
+  `URLSessionSunsetLookupSource(bundleID:country:)` with its country instead.
+- Both kinds report `.soft` to `onPromptChange` and `onVisibilityChange`, so Review and What's New stay out of the
+  way exactly as for the release prompt. The hard block (config `minimumVersion`) is unchanged and always wins.
+- **At most one soft prompt per session** (`checker:` form): once the user answers a soft prompt, later re-checks
+  in that process show no other soft prompt; a hard block still shows.
+- Text: `SunsetStrings(testBuildTitle:testBuildMessage:testBuildUpdateHint:)` localizes the test-build alert like the
+  others; a `testFlight.message` in the config replaces the body text. `memory: SunsetSoftPromptMemory(testBuildKey:)`
+  moves the remembered build, and `reset()` forgets both answers.
+- With the `decision:` form, pass the channel to the check yourself:
+  `sunsetDecision = await sunset.check(channel: channel)` (`CFBundleVersion` is read for you). The modifier applies
+  the same per-build memory; the once-per-session rule is yours to keep.
+
 ## WhatsNew
 
 The views only display what `WhatsNewChecker` (`CherKitWhatsNew`) returns; everything is bundled, so there is no
