@@ -73,8 +73,21 @@ Outside Android (e.g. a consumer app's shared Kotlin code) pass any loader:
 - **iOS (Xcode):** keep the files in `whatsnew/` at the repo root and add that folder to the app target as a folder
   reference (blue folder, "Create folder references"), so it ships as `<App>.app/whatsnew/<version>.json`. Check it is
   listed under the target's Build Phases > Copy Bundle Resources.
-- **Android:** put the files in `src/main/assets/whatsnew/<version>.json` (or point the assets source set at the
-  repo's `whatsnew/` folder) so they ship as `assets/whatsnew/`.
+- **Android:** the files must ship as `assets/whatsnew/<version>.json`. Either copy them to
+  `src/main/assets/whatsnew/<version>.json`, or keep the one repo-root `whatsnew/` folder shared with iOS and sync it
+  in the app module's `build.gradle.kts`. Do not add `whatsnew/` itself as an assets `srcDir`: its files would land at
+  the root of `assets/`, and `AndroidWhatsNew.checker(context)` / `assetsSource(assets)` would find nothing. Add the
+  generated *parent* folder as a plain path and make `preBuild` depend on the sync (AGP 9 rejects wiring the task's
+  output provider into `sourceSets`):
+
+  ```kotlin
+  val syncWhatsNew by tasks.registering(Sync::class) {
+      from(rootProject.file("whatsnew")) { include("*.json") }
+      into(layout.buildDirectory.dir("generated/whatsnew-assets/whatsnew"))
+  }
+  android { sourceSets["main"].assets.srcDir("build/generated/whatsnew-assets") }
+  tasks.named("preBuild") { dependsOn(syncWhatsNew) }
+  ```
 
 Each app's bot writes the notes file for every release per the shared whatsnew-notes rules: user-facing changes only,
 1 to 4 short bullets, and `"show": false` when nothing qualifies.
