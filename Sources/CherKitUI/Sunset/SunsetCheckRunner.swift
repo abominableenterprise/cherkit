@@ -4,7 +4,7 @@ import Combine
 import Foundation
 import SwiftUI
 
-/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``
+/// Runs the checks for ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``
 /// when ``SunsetCheckScheduler`` says so, and holds the latest decision for the prompts.
 ///
 /// The modifier uses one ``shared`` runner for the process, so the launch check runs once per process and the
@@ -19,6 +19,12 @@ final class SunsetCheckRunner: ObservableObject {
 
     /// The latest decision, `nil` before the first check finishes. The soft alert sets it back to `nil` when answered.
     @Published var decision: SunsetDecision?
+    /// Whether the launch check's first attempt has resolved, with any outcome (a failed fetch fails open). Set in the
+    /// same main-actor turn as that attempt's ``decision``, after it, so the prompt callbacks hear the decision first.
+    /// Re-checks and the quick retry never change it back.
+    @Published private(set) var firstCheckComplete = false
+    /// Whether an `onFirstCheckComplete` callback has run (``reportFirstCheckComplete(_:)``).
+    private(set) var hasReportedFirstCheckComplete = false
     /// When to check.
     private(set) var scheduler: SunsetCheckScheduler
     /// The running check, if any.
@@ -57,9 +63,23 @@ final class SunsetCheckRunner: ObservableObject {
         if scheduler.shouldCheck(onScenePhase: phase, now: now()) { run(request) }
     }
 
+    /// Runs `callback` (the modifier's `onFirstCheckComplete`) unless one already ran: at most once per runner, so
+    /// once per process for ``shared``, even when the root view is rebuilt.
+    func reportFirstCheckComplete(_ callback: (() -> Void)?) {
+        guard let callback, !hasReportedFirstCheckComplete else { return }
+        hasReportedFirstCheckComplete = true
+        callback()
+    }
+
     private func run(_ request: Request) {
         retryTask?.cancel()
         retryTask = nil
+        if request.checker.isDisabled {
+            // Answers at once, so the first check completes on the first appear rather than a turn later.
+            finish(decision: .upToDate)
+            scheduler.checkFinished(failed: false)
+            return
+        }
         task = Task { [weak self] in
             let result = await request.checker.checkReportingFailure(
                 installedVersion: request.installedVersion,
@@ -67,11 +87,17 @@ final class SunsetCheckRunner: ObservableObject {
                 locale: request.locale
             )
             guard let self else { return }
-            self.decision = result.decision
+            self.finish(decision: result.decision)
             let retry = self.scheduler.checkFinished(failed: result.failed)
             self.task = nil
             if retry { self.scheduleRetry(request) }
         }
+    }
+
+    /// Shows `decision`, then marks the first check complete if this was it.
+    private func finish(decision: SunsetDecision) {
+        self.decision = decision
+        if !firstCheckComplete { firstCheckComplete = true }
     }
 
     /// The one quick retry after a failed check, unless another check started meanwhile.

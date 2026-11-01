@@ -3,7 +3,7 @@ import CherKitSunset
 import SwiftUI
 
 /// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``
-/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``.
+/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``.
 @available(iOS 16, macOS 13, *)
 struct SunsetPromptModifier: ViewModifier {
     @Binding var decision: SunsetDecision?
@@ -22,6 +22,11 @@ struct SunsetPromptModifier: ViewModifier {
     var onVisibilityChange: ((Bool) -> Void)? = nil
     /// Hears which prompt is showing whenever that changes.
     var onPromptChange: ((SunsetPromptKind?) -> Void)? = nil
+    /// Whether the `checker:` form's launch check has resolved; always `false` for the `decision:` form.
+    var firstCheckComplete = false
+    /// Called once `firstCheckComplete` turns `true`, right after the prompt callbacks heard that decision. The
+    /// `checker:` form guards it to once per process.
+    var onFirstCheckComplete: (() -> Void)? = nil
 
     @Environment(\.openURL) private var openURL
 
@@ -53,6 +58,18 @@ struct SunsetPromptModifier: ViewModifier {
         if (old == .soft) != (new == .soft) { onVisibilityChange?(new == .soft) }
     }
 
+    /// What the callbacks report for the current decision.
+    var promptState: SunsetPromptState {
+        SunsetPromptState(kind: promptKind, settled: firstCheckComplete)
+    }
+
+    /// Passes a change of ``promptState`` to the callbacks: a kind change first (``report(from:to:)``), then
+    /// `onFirstCheckComplete` when the launch check has just resolved, so it never runs before that decision's kind.
+    func report(from old: SunsetPromptState, to new: SunsetPromptState) {
+        if old.kind != new.kind { report(from: old.kind, to: new.kind) }
+        if new.settled, !old.settled { onFirstCheckComplete?() }
+    }
+
     func body(content: Content) -> some View {
         content
             .alert(strings.softTitle, isPresented: softPresented, presenting: softPrompt) { prompt in
@@ -65,7 +82,9 @@ struct SunsetPromptModifier: ViewModifier {
             .modifier(SunsetHardBlockPresenter(
                 prompt: hardPrompt, strings: strings, appIcon: appIcon, tint: tint, tintLabel: tintLabel
             ))
-            .modifier(VisibilityChangeReporter(value: promptKind, hidden: nil, report: report(from:to:)))
+            .modifier(VisibilityChangeReporter(
+                value: promptState, hidden: SunsetPromptState(), report: report(from:to:)
+            ))
     }
 
     private var softPrompt: SunsetPrompt? {
@@ -136,7 +155,7 @@ extension View {
     ///
     /// This modifier only displays a decision; it never fetches. Get one from the Sunset checker (or
     /// ``SunsetDecider``) and assign it to `decision`, or let
-    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)`` run the checks.
+    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)`` run the checks.
     ///
     /// - Parameters:
     ///   - decision: The decision to show, `nil` while unknown.
