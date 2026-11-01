@@ -60,6 +60,22 @@ final class ReviewStoreTests: XCTestCase {
         XCTAssertTrue(ReviewCoordinator(store: InMemoryReviewStore(), appVersion: "1.0", enabled: false).isDisabled)
     }
 
+    func testEachDisabledAccessIsAFreshIndependentCoordinator() {
+        let first = ReviewCoordinator.disabled
+        let second = ReviewCoordinator.disabled
+        XCTAssertFalse(first === second)
+        XCTAssertTrue(first.isDisabled)
+        XCTAssertTrue(second.isDisabled)
+
+        first.isEligible = { false }
+        first.setInterruptionVisible(true, source: ReviewInterruption.sunsetBlock)
+        XCTAssertFalse(first.isEligible())
+        XCTAssertTrue(second.isEligible())
+        XCTAssertTrue(ReviewCoordinator.disabled.isEligible())
+        XCTAssertTrue(second.visibleInterruptions.isEmpty)
+        XCTAssertEqual(second.cooldownRemaining, 0)
+    }
+
     func testEligibilityIsReadOnEveryCall() {
         let review = ReviewCoordinator(store: InMemoryReviewStore(), appVersion: "1.0")
         review.arm()

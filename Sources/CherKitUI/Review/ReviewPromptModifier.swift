@@ -66,7 +66,8 @@ extension View {
     /// - ``ReviewCoordinator/disabled`` (or `enabled: false`) does nothing: pass it in debug builds and test hosts.
     ///
     /// - Parameters:
-    ///   - coordinator: The app's coordinator, kept for the app's lifetime; ``ReviewCoordinator/disabled`` in tests.
+    ///   - coordinator: The app's coordinator, kept for the app's lifetime; ``ReviewCoordinator/disabled`` in tests
+    ///     (each access returns a fresh one, so store it once rather than reading `.disabled` here).
     ///   - isIdle: `false` while the screen is busy (editing, a running task); the review then waits.
     ///   - settleDelay: Seconds the screen must stay idle first; 1.5 by default, at least 0.1.
     public func reviewPrompt(
