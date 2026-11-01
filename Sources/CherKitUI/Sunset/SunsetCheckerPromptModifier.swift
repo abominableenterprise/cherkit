@@ -2,7 +2,7 @@
 import CherKitSunset
 import SwiftUI
 
-/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``:
+/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:onFirstCheckComplete:)``:
 /// runs the checks through a ``SunsetCheckRunner`` and shows its decision with ``SunsetPromptModifier``.
 @available(iOS 16, macOS 13, *)
 struct SunsetCheckerPromptModifier: ViewModifier {
@@ -15,24 +15,14 @@ struct SunsetCheckerPromptModifier: ViewModifier {
     let tintLabel: Color?
     var onVisibilityChange: ((Bool) -> Void)? = nil
     var onPromptChange: ((SunsetPromptKind?) -> Void)? = nil
+    var onFirstCheckComplete: (() -> Void)? = nil
     @ObservedObject var runner: SunsetCheckRunner
 
     @Environment(\.scenePhase) private var scenePhase
 
     func body(content: Content) -> some View {
         content
-            .modifier(SunsetPromptModifier(
-                decision: $runner.decision,
-                latestVersion: nil,
-                installedVersion: request.installedVersion,
-                memory: memory,
-                strings: strings,
-                appIcon: appIcon,
-                tint: tint,
-                tintLabel: tintLabel,
-                onVisibilityChange: onVisibilityChange,
-                onPromptChange: onPromptChange
-            ))
+            .modifier(promptModifier)
             .onAppear {
                 runner.setMinimumInterval(minimumInterval)
                 runner.launched(request)
@@ -40,6 +30,31 @@ struct SunsetCheckerPromptModifier: ViewModifier {
             .onChange(of: scenePhase) { phase in
                 runner.scenePhaseChanged(to: phase, request)
             }
+    }
+
+    /// Shows the runner's decision and reports it, with the launch check's completion, to the callbacks.
+    var promptModifier: SunsetPromptModifier {
+        SunsetPromptModifier(
+            decision: $runner.decision,
+            latestVersion: nil,
+            installedVersion: request.installedVersion,
+            memory: memory,
+            strings: strings,
+            appIcon: appIcon,
+            tint: tint,
+            tintLabel: tintLabel,
+            onVisibilityChange: onVisibilityChange,
+            onPromptChange: onPromptChange,
+            firstCheckComplete: runner.firstCheckComplete,
+            onFirstCheckComplete: firstCheckCompleteOnce
+        )
+    }
+
+    /// `onFirstCheckComplete`, guarded by the runner so it runs once per process even if the view is rebuilt.
+    private var firstCheckCompleteOnce: (() -> Void)? {
+        guard let onFirstCheckComplete else { return nil }
+        let runner = runner
+        return { runner.reportFirstCheckComplete(onFirstCheckComplete) }
     }
 }
 
@@ -84,6 +99,12 @@ extension View {
     ///     goes away. Not called for the hard block, so checks can keep running behind it; use `onPromptChange`.
     ///   - onPromptChange: Called with the prompt showing (`.soft`, `.hard` or `nil`) whenever that changes, e.g.
     ///     `{ review.setSunsetPromptKind($0) }` so a review never shows over either.
+    ///   - onFirstCheckComplete: Called once per process when the launch check's first attempt has resolved, with
+    ///     any outcome: up to date, a soft prompt, a hard block, or a failed fetch (which fails open after the
+    ///     checker's timeout). `onPromptChange` and `onVisibilityChange` hear that first decision before it runs, so
+    ///     a prompt kind is never stale when it does. ``SunsetChecker/disabled`` completes on the first appear.
+    ///     Re-checks and the quick retry after a failure never call it again. Use it to hold What's New until Sunset
+    ///     has decided: `.whatsNew(checker:suppressed: !sunsetSettled || sunsetKind != nil)`.
     public func sunsetPrompt(
         checker: SunsetChecker,
         installedVersion: String? = nil,
@@ -95,7 +116,8 @@ extension View {
         tint: Color? = nil,
         tintLabel: Color? = nil,
         onVisibilityChange: ((Bool) -> Void)? = nil,
-        onPromptChange: ((SunsetPromptKind?) -> Void)? = nil
+        onPromptChange: ((SunsetPromptKind?) -> Void)? = nil,
+        onFirstCheckComplete: (() -> Void)? = nil
     ) -> some View {
         modifier(SunsetCheckerPromptModifier(
             request: SunsetCheckRunner.Request(
@@ -111,6 +133,7 @@ extension View {
             tintLabel: tintLabel,
             onVisibilityChange: onVisibilityChange,
             onPromptChange: onPromptChange,
+            onFirstCheckComplete: onFirstCheckComplete,
             runner: .shared
         ))
     }

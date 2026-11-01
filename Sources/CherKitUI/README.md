@@ -91,6 +91,12 @@ Options, all with defaults:
 - `onPromptChange: ((SunsetPromptKind?) -> Void)?`: which prompt is showing, `.soft`, `.hard` or `nil`, whenever that
   changes (never for the initial `nil`). Like Android's `SunsetPrompt(onPromptChange:)`. Use it to report both prompts
   to Review (see [Review](#review)).
+- `onFirstCheckComplete: (() -> Void)?` (`checker:` form only): called once per process when the launch check's first
+  attempt has resolved, whatever the outcome (up to date, soft, hard, or a failed fetch that fails open). The
+  `onPromptChange` / `onVisibilityChange` calls for that first decision always run before it, so the kind you stored
+  is never stale. `SunsetChecker.disabled` calls it on the first appear; re-checks on a return from the background and
+  the quick retry after a failed check never call it again. Use it to show Sunset before What's New (see
+  [Review](#review)).
 
 `SunsetUpdateView(prompt:strings:appIcon:tint:tintLabel:)` can also be used on its own. It scrolls, so it does not clip on small
 screens or at the largest Dynamic Type sizes. `SunsetSoftPromptRule.shouldShow(_:version:dismissedVersion:)` is the
@@ -128,7 +134,7 @@ struct ExampleApp: App {
 - `suppressed: Bool`: while `true` the sheet waits, or is taken away again without counting as a dismissal (so
   `markSeen()` does not run); it shows once this turns `false`. Pass `suppressed: sunsetKind != nil`, fed from
   `.sunsetPrompt(onPromptChange:)`, so neither Sunset prompt (soft alert or hard block) stacks with the sheet; keep
-  it `true` until the first Sunset check finishes to always show Sunset first (see [Review](#review)).
+  it `true` until `.sunsetPrompt(onFirstCheckComplete:)` fires to always show Sunset first (see [Review](#review)).
 - `onVisibilityChange: ((Bool) -> Void)?`: `true` when the sheet is presented, `false` when it goes away, e.g. to
   report it to Review as `ReviewInterruption.whatsNew`.
 
@@ -140,6 +146,10 @@ ContentView().whatsNew(entries: entries) { whatsNew.markSeen() }
 ```
 
 It takes the same `suppressed:` and `onVisibilityChange:` parameters.
+
+`WhatsNewEntry.version` is an `AppVersion` from `CherKitCore`. With Swift's `MemberImportVisibility` upcoming feature
+on, add `import CherKitCore` to use its members such as `entry.version.description`, or use
+`String(describing: entry.version)`.
 
 The full history, for Settings (it sets its own navigation title; push it inside your `NavigationStack`):
 
@@ -196,26 +206,35 @@ Report your own sheets, alerts and banners, so the review never shows over them 
 .reviewInterruption(isPresented: showPaywall, source: "paywall", coordinator: review)
 ```
 
-Sunset and What's New hook in through their callbacks. Show Sunset first: hold What's New while either Sunset prompt
-is up.
+Sunset and What's New hook in through their callbacks. Show Sunset first on a cold start: hold What's New until
+Sunset's launch check has decided, then while either Sunset prompt is up.
 
 ```swift
-@State private var sunsetKind: SunsetPromptKind?
+@State private var sunsetKind: SunsetPromptKind? = nil
+@State private var sunsetSettled = false
 
 ContentView()
-    .sunsetPrompt(checker: sunset, onPromptChange: { kind in
-        sunsetKind = kind
-        review.setSunsetPromptKind(kind)   // .soft → ReviewInterruption.sunsetPrompt, .hard → .sunsetBlock
-    })
-    .whatsNew(checker: whatsNew, suppressed: sunsetKind != nil, onVisibilityChange: {
+    .sunsetPrompt(
+        checker: sunset,
+        onPromptChange: {
+            sunsetKind = $0
+            review.setSunsetPromptKind($0)   // .soft → ReviewInterruption.sunsetPrompt, .hard → .sunsetBlock
+        },
+        onFirstCheckComplete: { sunsetSettled = true }
+    )
+    .whatsNew(checker: whatsNew, suppressed: !sunsetSettled || sunsetKind != nil, onVisibilityChange: {
         review.setInterruptionVisible($0, source: ReviewInterruption.whatsNew)
     })
     .reviewPrompt(coordinator: review)
 ```
 
-`onPromptChange` says nothing while Sunset's first check is still fetching, so the sheet can appear first and step
-aside when a prompt comes. To always show Sunset first, keep `suppressed` true until that first check finishes: run
-the check yourself with the `decision:` form (it fails open, so it always finishes).
+While the first fetch runs, `onPromptChange` says nothing, so `suppressed: sunsetKind != nil` alone would let the sheet
+appear first and step aside when a prompt comes. `onFirstCheckComplete` runs after `onPromptChange` has reported that
+first decision, so `sunsetKind` is already set when `sunsetSettled` turns true. The Sunset fetch has a timeout (5 s by
+default, `SunsetChecker(url:timeout:)`) and fails open, so What's New is never held back forever; with
+`SunsetChecker.disabled` it is not held at all.
+
+With the `decision:` form you run the check yourself, so set the flag after it:
 
 ```swift
 @State private var sunsetDecision: SunsetDecision?
