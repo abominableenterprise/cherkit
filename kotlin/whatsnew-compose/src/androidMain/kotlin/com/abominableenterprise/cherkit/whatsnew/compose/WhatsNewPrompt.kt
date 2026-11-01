@@ -22,7 +22,8 @@ import com.abominableenterprise.cherkit.whatsnew.WhatsNewEntry
  * @param suppressed While `true`, the sheet is not shown (or is taken away, without counting as a dismissal), e.g.
  *   while a Sunset prompt is visible. It shows once this turns `false` again.
  * @param onVisibilityChange Called with `true` when the sheet appears and `false` when it goes away, e.g. to report it
- *   to a review coordinator as an interruption.
+ *   to a review coordinator as an interruption. An inline lambda is fine: a new instance on recomposition sends
+ *   nothing, and the `false` goes to the callback that got the `true`.
  */
 @Composable
 public fun WhatsNewPrompt(
@@ -49,6 +50,14 @@ public fun WhatsNewPrompt(
 /**
  * Shows [WhatsNewSheet] while [visible] and reports it to [onVisibilityChange]: `true` when it appears, `false` when it
  * goes away (dismissed, hidden again, or this composable leaves the composition).
+ *
+ * Each `false` goes to the same callback that got the matching `true`: the effect captures the callback when the sheet
+ * appears and hides on that one. A new lambda instance alone (e.g. `{ review.setInterruptionVisible(it, ...) }`
+ * written inline, recreated on every recomposition) is not a change, so it sends nothing: no false hide-then-show that
+ * would restart a review cooldown. Only a switch between no callback and a callback re-registers: `null` to a callback
+ * while shown sends it `true`; a callback to `null` sends the old one its `false`. Composition cannot tell a new
+ * instance from a different recipient, so a caller that really moves the report elsewhere while the sheet is up
+ * wraps this in `key(recipient)`.
  */
 @Composable
 internal fun WhatsNewSheetHost(
@@ -58,11 +67,13 @@ internal fun WhatsNewSheetHost(
     onVisibilityChange: ((Boolean) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
-    // Each `true` goes to the recipient that later gets the matching `false`: a new recipient while shown moves the
-    // registration, and new entries (even supplied from onDismiss) get a fresh sheet and a fresh true/false pair.
-    DisposableEffect(visible, entries, onVisibilityChange) {
-        if (visible) onVisibilityChange?.invoke(true)
-        onDispose { if (visible) onVisibilityChange?.invoke(false) }
+    // Keyed on whether there is a callback, not on its identity. The effect body comes from the composition that
+    // (re)started it, so `recipient` is the callback that gets `true` and later the matching `false`. New entries
+    // (even supplied from onDismiss) get a fresh sheet and a fresh true/false pair.
+    DisposableEffect(visible, entries, onVisibilityChange != null) {
+        val recipient = if (visible) onVisibilityChange else null
+        recipient?.invoke(true)
+        onDispose { recipient?.invoke(false) }
     }
     if (visible) key(entries) { WhatsNewSheet(entries, strings, onDismiss) }
 }

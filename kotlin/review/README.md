@@ -25,6 +25,17 @@ ReviewPromptEffect(review, isIdle = !isEditing)                     // review-co
 `AndroidReview.coordinator` is disabled by default in debuggable builds. Swift: `ReviewCoordinator(isEligible:)`
 (state in `UserDefaults.standard`) or `.disabled`; pass `enabled: false` for debug builds and test hosts.
 
+### Eligibility that depends on later state
+
+`isEligible` is a closure, not a value, and `ReviewCoordinator.isEligible` is a public `var`, so eligibility can come
+from state that does not exist yet when you build the coordinator (e.g. a ViewModel). Either:
+
+- pass a closure that reads the state lazily: `AndroidReview.coordinator(context, isEligible = { eligibilityHolder.value })`;
+- or assign it later, once the state exists: `review.isEligible = { viewModel.isReviewEligible }`.
+
+It is read on every check (`recordSuccess()`, `arm()`, `shouldPrompt()`, ...), so keep it cheap (no I/O) and safe
+to call on the main thread. Swift: `ReviewCoordinator.isEligible` is a public `var` too.
+
 ## Rules
 
 - **Due** at whichever comes first: the Nth `recordSuccess()` (N = `successThreshold`, default 5, at least 1) or an

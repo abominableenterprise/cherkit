@@ -20,6 +20,8 @@ the same way `sunset-compose` sits on top of `sunset`. Its `jvm` artifact carrie
 
 ```kotlin
 val review = remember { AndroidReview.coordinator(context.applicationContext) } // off in debuggable builds
+// Eligibility from state created later (e.g. a ViewModel): read lazily on every check, cheap and main-thread safe.
+review.isEligible = { viewModel.isReviewEligible }
 
 // On your main screens, not over a modal:
 ReviewPromptEffect(review, isIdle = !isEditing)

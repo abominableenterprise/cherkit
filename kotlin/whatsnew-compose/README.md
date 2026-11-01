@@ -46,7 +46,9 @@ Options, all with defaults:
   override any of it.
 - `suppressed: Boolean`: while `true` the sheet waits; it shows once this turns `false`. A sheet already showing is
   taken away while suppressed (not a dismissal: nothing is marked seen) and comes back afterwards.
-- `onVisibilityChange: ((Boolean) -> Unit)?`: `true` when the sheet appears, `false` when it goes away.
+- `onVisibilityChange: ((Boolean) -> Unit)?`: `true` when the sheet appears, `false` when it goes away. An inline
+  lambda is fine: a new instance on recomposition sends nothing, and the `false` goes to the callback that got the
+  `true`.
 
 ### Order with Sunset and the review prompt
 
