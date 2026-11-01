@@ -1,5 +1,5 @@
-/// Where WhatsNew keeps its per-device state. UserDefaults and SharedPreferences adapters come in a later PR;
-/// tests and apps can use any implementation. Calls happen on the caller's thread and must be fast (local storage).
+/// Where WhatsNew keeps its per-device state. ``UserDefaultsWhatsNewStore`` stores it in `UserDefaults`; tests and
+/// apps can use any implementation. Calls happen on the caller's thread and must be fast (local storage).
 public protocol WhatsNewStore: Sendable {
     /// The version whose notes the user last saw, or `nil` on first launch.
     func lastSeenVersion() -> String?
