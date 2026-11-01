@@ -6,7 +6,7 @@ block and the same "Not now" memory. Android only (the `jvm` artifact carries ju
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.5.0") // brings :sunset
+    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.6.0") // brings :sunset
 }
 ```
 
@@ -97,24 +97,30 @@ it runs the prompt kind you hold is the launch's answer, not a stale `null`. The
 To show Sunset before the "What's new" sheet ([whatsnew-compose](../whatsnew-compose/README.md)) on a cold start:
 
 ```kotlin
-var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
-var sunsetSettled by rememberSaveable { mutableStateOf(false) }
+// Top level, per process like onFirstCheckComplete: survives rotation, starts over after process death.
+object LaunchGate { var sunsetSettled by mutableStateOf(false) }
 
-SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { sunsetSettled = true })
+// In the root composable:
+var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
+
+SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { LaunchGate.sunsetSettled = true })
 WhatsNewPrompt(
     checker = whatsNew,
-    suppressed = !sunsetSettled || sunsetKind != null,
+    suppressed = !LaunchGate.sunsetSettled || sunsetKind != null,
     onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) },
 )
 ```
 
-Keep `sunsetSettled` in `rememberSaveable`, not `remember`: `onFirstCheckComplete` runs once per process, so after
-a rotation (the activity and its composition are recreated, the process is not) it is not called again, and a plain
-`remember` would start `false` and hold the sheet back for good. `sunsetKind` can stay in `remember`: the recreated
-`SunsetPrompt` reports the prompt still showing. If the process is killed in the background and restored, the saved
-`true` comes back before the new process's launch check finishes, so that one launch behaves as without the gate (the
-sheet may show first and step aside); it is never held back. Keep the root composable alive for the activity (not
-inside a navigation destination that leaves the composition), or hoist both values into your app's own state.
+Keep `sunsetSettled` in process-scoped state (an `object` like `LaunchGate`, or your app's own singleton), the same
+scope as `onFirstCheckComplete`, which runs once per process. Not `remember`: after a rotation (the activity and its
+composition are recreated, the process is not) the callback is not called again, so a plain `remember` would start
+`false` and hold the sheet back for good. Not `rememberSaveable` either: if the process is killed in the background
+and restored, a saved `true` would come back before the new process's launch check has answered, so the sheet (or
+Play's update sheet, see [update-compose](../update-compose/README.md)) could open ahead of a hard block. A
+process-wide flag starts `false` in the new process and turns `true` when its own launch check finishes.
+`sunsetKind` can stay in `remember`: the recreated `SunsetPrompt` reports the prompt still showing. Keep the root
+composable alive for the activity (not inside a navigation destination that leaves the composition), or hoist
+`sunsetKind` into your app's own state.
 
 Put `SunsetPrompt` inside your `MaterialTheme`: the dialogs use Material 3 and take the theme's colors and type.
 The hard block's **Update** button is a Material `Button`, so its label uses the theme's `onPrimary` on `primary`;

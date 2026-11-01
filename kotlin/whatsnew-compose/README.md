@@ -6,7 +6,7 @@ behavior and English text. Android only (the `jvm` artifact carries just the str
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.5.0") // brings :whatsnew
+    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.6.0") // brings :whatsnew
 }
 ```
 
@@ -64,28 +64,33 @@ hard or a failed fetch), and after the `onPromptChange` call for that decision, 
 This is the recommended root setup:
 
 ```kotlin
-var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
-var sunsetSettled by rememberSaveable { mutableStateOf(false) }
+// Top level, per process like onFirstCheckComplete: survives rotation, starts over after process death.
+object LaunchGate { var sunsetSettled by mutableStateOf(false) }
 
-SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { sunsetSettled = true })
+// In the root composable:
+var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
+
+SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { LaunchGate.sunsetSettled = true })
 WhatsNewPrompt(
     checker = whatsNew,
-    suppressed = !sunsetSettled || sunsetKind != null,
+    suppressed = !LaunchGate.sunsetSettled || sunsetKind != null,
     onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) },
 )
 ```
 
 The Sunset fetch has a timeout (`SunsetChecker.timeout`, 5 seconds by default) and a failed or timed-out fetch still
 completes the check, so the sheet is never held back for good. `SunsetChecker.disabled()` (UI tests) completes it at
-once. Keep `sunsetSettled` in `rememberSaveable`: `onFirstCheckComplete` is not called again after a rotation, so a
-plain `remember` would hold the sheet back. See [Sunset Compose](../sunset-compose/README.md) for the details.
+once. Keep `sunsetSettled` in process-scoped state (an `object` like `LaunchGate`, or your app's own singleton):
+`onFirstCheckComplete` runs once per process, so a plain `remember` would hold the sheet back after a rotation, and
+`rememberSaveable` would restore a stale `true` after process death, before the new launch check has answered. See
+[Sunset Compose](../sunset-compose/README.md#know-when-the-launch-check-is-done) for the details.
 
 To keep a store-review prompt from appearing over the sheet, report it as an interruption:
 
 ```kotlin
 WhatsNewPrompt(
     checker = whatsNew,
-    suppressed = !sunsetSettled || sunsetKind != null,
+    suppressed = !LaunchGate.sunsetSettled || sunsetKind != null,
     onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) },
 )
 ```
