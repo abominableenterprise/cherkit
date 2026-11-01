@@ -1,0 +1,406 @@
+{
+  "description": "ReviewCoordinator rules. Each case builds a coordinator over a fresh in-memory store (seeded with `stored` when given), app version `version`, `enabled` (default true), `successThreshold` (default 5), `cooldownSeconds` (default 120), an eligibility flag that starts true and a test clock that starts at 0 and moves only on `advance`. Steps run in order. `recordSuccess` (`times`, default 1), `arm`, `noteInterruption`, `interruption` (setInterruptionVisible(`visible`, source: `source`)), `eligible` (sets the flag to `value`), `advance` (`seconds`), `relaunch` (a new coordinator over the same store and settings, with `version` when given; interruptions are in memory and start empty), `check` (asserts each given field: `shouldPrompt` for shouldPrompt(isIdle: `isIdle`, default true), `isDue`, `cooldownRemaining` in seconds), `markPrompted` (asserts its result `result`) and `expectStored` (asserts the store holds `successCount`, `isDue` and `lastPromptedVersion`).",
+  "cases": [
+    {
+      "name": "the 5th success makes the prompt due, not the 4th",
+      "version": "1.0",
+      "steps": [
+        { "do": "recordSuccess", "times": 4 },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "expectStored", "successCount": 4, "isDue": false, "lastPromptedVersion": null },
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": true, "isDue": true },
+        { "do": "expectStored", "successCount": 5, "isDue": true, "lastPromptedVersion": null }
+      ]
+    },
+    {
+      "name": "a custom threshold",
+      "version": "1.0",
+      "successThreshold": 2,
+      "steps": [
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "a threshold below 1 counts as 1",
+      "version": "1.0",
+      "successThreshold": 0,
+      "steps": [
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "arm makes the prompt due at once",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "check", "shouldPrompt": true, "isDue": true },
+        { "do": "expectStored", "successCount": 0, "isDue": true, "lastPromptedVersion": null }
+      ]
+    },
+    {
+      "name": "the success count persists across launches",
+      "version": "1.0",
+      "steps": [
+        { "do": "recordSuccess", "times": 3 },
+        { "do": "relaunch" },
+        { "do": "recordSuccess", "times": 2 },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "the success count carries over a version update until the first prompt",
+      "version": "1.0",
+      "steps": [
+        { "do": "recordSuccess", "times": 3 },
+        { "do": "relaunch", "version": "1.1" },
+        { "do": "recordSuccess", "times": 2 },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "a due prompt persists across launches",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "relaunch" },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "a stored due prompt is read at launch",
+      "version": "1.0",
+      "stored": { "successCount": 0, "isDue": true, "lastPromptedVersion": null },
+      "steps": [{ "do": "check", "shouldPrompt": true, "isDue": true }]
+    },
+    {
+      "name": "markPrompted consumes the version and resets the count and the due flag",
+      "version": "1.0",
+      "steps": [
+        { "do": "recordSuccess", "times": 5 },
+        { "do": "markPrompted", "result": true },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "expectStored", "successCount": 0, "isDue": false, "lastPromptedVersion": "1.0" }
+      ]
+    },
+    {
+      "name": "markPrompted twice consumes only once",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "markPrompted", "result": true },
+        { "do": "markPrompted", "result": false }
+      ]
+    },
+    {
+      "name": "markPrompted without a due prompt does nothing",
+      "version": "1.0",
+      "steps": [
+        { "do": "recordSuccess", "times": 2 },
+        { "do": "markPrompted", "result": false },
+        { "do": "expectStored", "successCount": 2, "isDue": false, "lastPromptedVersion": null }
+      ]
+    },
+    {
+      "name": "once per version: successes and arm after the prompt are ignored in that version",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "markPrompted", "result": true },
+        { "do": "recordSuccess", "times": 6 },
+        { "do": "arm" },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "expectStored", "successCount": 0, "isDue": false, "lastPromptedVersion": "1.0" },
+        { "do": "relaunch" },
+        { "do": "check", "shouldPrompt": false, "isDue": false }
+      ]
+    },
+    {
+      "name": "a new version does not prompt until it is re-armed",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "markPrompted", "result": true },
+        { "do": "relaunch", "version": "1.1" },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "arm" },
+        { "do": "check", "shouldPrompt": true, "isDue": true },
+        { "do": "markPrompted", "result": true },
+        { "do": "expectStored", "successCount": 0, "isDue": false, "lastPromptedVersion": "1.1" }
+      ]
+    },
+    {
+      "name": "a new version is re-armed by N fresh successes",
+      "version": "1.0",
+      "steps": [
+        { "do": "recordSuccess", "times": 5 },
+        { "do": "markPrompted", "result": true },
+        { "do": "relaunch", "version": "1.1" },
+        { "do": "recordSuccess", "times": 4 },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "a due prompt that never showed is held across a version update",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "eligible", "value": false },
+        { "do": "check", "shouldPrompt": false, "isDue": true },
+        { "do": "relaunch", "version": "1.1" },
+        { "do": "eligible", "value": true },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "a stored due flag for the version that already prompted is not due",
+      "version": "1.0",
+      "stored": { "successCount": 5, "isDue": true, "lastPromptedVersion": "1.0" },
+      "steps": [
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "markPrompted", "result": false },
+        { "do": "relaunch", "version": "1.1" },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "successes in an ineligible session do not count",
+      "version": "1.0",
+      "steps": [
+        { "do": "eligible", "value": false },
+        { "do": "recordSuccess", "times": 5 },
+        { "do": "expectStored", "successCount": 0, "isDue": false, "lastPromptedVersion": null },
+        { "do": "eligible", "value": true },
+        { "do": "recordSuccess", "times": 4 },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "arm in an ineligible session is ignored",
+      "version": "1.0",
+      "steps": [
+        { "do": "eligible", "value": false },
+        { "do": "arm" },
+        { "do": "eligible", "value": true },
+        { "do": "check", "shouldPrompt": false, "isDue": false }
+      ]
+    },
+    {
+      "name": "an ineligible session holds a due prompt without dropping it",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "eligible", "value": false },
+        { "do": "check", "shouldPrompt": false, "isDue": true },
+        { "do": "markPrompted", "result": false },
+        { "do": "expectStored", "successCount": 0, "isDue": true, "lastPromptedVersion": null },
+        { "do": "eligible", "value": true },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    },
+    {
+      "name": "not idle holds the prompt",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "check", "isIdle": false, "shouldPrompt": false, "isDue": true },
+        { "do": "check", "isIdle": true, "shouldPrompt": true }
+      ]
+    },
+    {
+      "name": "an interruption holds a due prompt for the cooldown",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "noteInterruption" },
+        { "do": "check", "shouldPrompt": false, "isDue": true, "cooldownRemaining": 120 },
+        { "do": "markPrompted", "result": false },
+        { "do": "advance", "seconds": 119 },
+        { "do": "check", "shouldPrompt": false, "cooldownRemaining": 1 },
+        { "do": "advance", "seconds": 1 },
+        { "do": "check", "shouldPrompt": true, "isDue": true, "cooldownRemaining": 0 }
+      ]
+    },
+    {
+      "name": "the cooldown runs from the last interruption",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "noteInterruption" },
+        { "do": "advance", "seconds": 100 },
+        { "do": "noteInterruption" },
+        { "do": "advance", "seconds": 100 },
+        { "do": "check", "shouldPrompt": false, "cooldownRemaining": 20 },
+        { "do": "advance", "seconds": 20 },
+        { "do": "check", "shouldPrompt": true }
+      ]
+    },
+    {
+      "name": "an interruption before the prompt is due still holds it",
+      "version": "1.0",
+      "steps": [
+        { "do": "noteInterruption" },
+        { "do": "advance", "seconds": 60 },
+        { "do": "arm" },
+        { "do": "check", "shouldPrompt": false, "isDue": true, "cooldownRemaining": 60 }
+      ]
+    },
+    {
+      "name": "a custom cooldown",
+      "version": "1.0",
+      "cooldownSeconds": 30,
+      "steps": [
+        { "do": "arm" },
+        { "do": "noteInterruption" },
+        { "do": "advance", "seconds": 29 },
+        { "do": "check", "shouldPrompt": false, "cooldownRemaining": 1 },
+        { "do": "advance", "seconds": 1 },
+        { "do": "check", "shouldPrompt": true }
+      ]
+    },
+    {
+      "name": "a zero cooldown does not hold the prompt",
+      "version": "1.0",
+      "cooldownSeconds": 0,
+      "steps": [
+        { "do": "arm" },
+        { "do": "noteInterruption" },
+        { "do": "check", "shouldPrompt": true, "cooldownRemaining": 0 }
+      ]
+    },
+    {
+      "name": "interruptions are in memory: a relaunch ends the cooldown",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "noteInterruption" },
+        { "do": "relaunch" },
+        { "do": "check", "shouldPrompt": true, "cooldownRemaining": 0 }
+      ]
+    },
+    {
+      "name": "a visible interruption blocks the prompt for as long as it is visible",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "interruption", "source": "paywall", "visible": true },
+        { "do": "check", "shouldPrompt": false, "isDue": true },
+        { "do": "advance", "seconds": 3600 },
+        { "do": "check", "shouldPrompt": false, "isDue": true, "cooldownRemaining": 0 },
+        { "do": "markPrompted", "result": false },
+        { "do": "expectStored", "successCount": 0, "isDue": true, "lastPromptedVersion": null }
+      ]
+    },
+    {
+      "name": "two overlapping sources: the prompt waits until both are gone",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "interruption", "source": "paywall", "visible": true },
+        { "do": "interruption", "source": "sunset", "visible": true },
+        { "do": "advance", "seconds": 300 },
+        { "do": "interruption", "source": "paywall", "visible": false },
+        { "do": "advance", "seconds": 300 },
+        { "do": "check", "shouldPrompt": false, "isDue": true, "cooldownRemaining": 0 },
+        { "do": "interruption", "source": "sunset", "visible": false },
+        { "do": "check", "shouldPrompt": false, "cooldownRemaining": 120 },
+        { "do": "advance", "seconds": 120 },
+        { "do": "check", "shouldPrompt": true }
+      ]
+    },
+    {
+      "name": "clearing an interruption does not prompt at once: eligible again after the cooldown from the clear",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "interruption", "source": "error", "visible": true },
+        { "do": "advance", "seconds": 600 },
+        { "do": "interruption", "source": "error", "visible": false },
+        { "do": "check", "shouldPrompt": false, "isDue": true, "cooldownRemaining": 120 },
+        { "do": "advance", "seconds": 120 },
+        { "do": "check", "shouldPrompt": true, "isDue": true },
+        { "do": "markPrompted", "result": true }
+      ]
+    },
+    {
+      "name": "the Sunset hard block (source sunset) blocks the prompt while it is up",
+      "version": "1.0",
+      "steps": [
+        { "do": "interruption", "source": "sunset", "visible": true },
+        { "do": "recordSuccess", "times": 5 },
+        { "do": "check", "shouldPrompt": false, "isDue": true },
+        { "do": "advance", "seconds": 86400 },
+        { "do": "check", "shouldPrompt": false, "isDue": true },
+        { "do": "markPrompted", "result": false },
+        { "do": "expectStored", "successCount": 5, "isDue": true, "lastPromptedVersion": null }
+      ]
+    },
+    {
+      "name": "the same source shown twice is cleared by one hide",
+      "version": "1.0",
+      "cooldownSeconds": 0,
+      "steps": [
+        { "do": "arm" },
+        { "do": "interruption", "source": "paywall", "visible": true },
+        { "do": "interruption", "source": "paywall", "visible": true },
+        { "do": "interruption", "source": "paywall", "visible": false },
+        { "do": "check", "shouldPrompt": true }
+      ]
+    },
+    {
+      "name": "hiding a source that is not visible changes nothing",
+      "version": "1.0",
+      "steps": [
+        { "do": "arm" },
+        { "do": "interruption", "source": "paywall", "visible": false },
+        { "do": "check", "shouldPrompt": true, "cooldownRemaining": 0 }
+      ]
+    },
+    {
+      "name": "a disabled coordinator never counts, arms or prompts and never touches the store",
+      "version": "1.0",
+      "enabled": false,
+      "stored": { "successCount": 4, "isDue": true, "lastPromptedVersion": null },
+      "steps": [
+        { "do": "check", "shouldPrompt": false, "isDue": false, "cooldownRemaining": 0 },
+        { "do": "recordSuccess", "times": 5 },
+        { "do": "arm" },
+        { "do": "noteInterruption" },
+        { "do": "check", "shouldPrompt": false, "isDue": false, "cooldownRemaining": 0 },
+        { "do": "markPrompted", "result": false },
+        { "do": "expectStored", "successCount": 4, "isDue": true, "lastPromptedVersion": null }
+      ]
+    },
+    {
+      "name": "a huge stored count arms without overflowing",
+      "version": "1.0",
+      "stored": { "successCount": 2147483647, "isDue": false, "lastPromptedVersion": null },
+      "steps": [
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": true, "isDue": true },
+        { "do": "expectStored", "successCount": 2147483647, "isDue": true, "lastPromptedVersion": null }
+      ]
+    },
+    {
+      "name": "a negative stored count counts as 0",
+      "version": "1.0",
+      "stored": { "successCount": -3, "isDue": false, "lastPromptedVersion": null },
+      "steps": [
+        { "do": "recordSuccess", "times": 4 },
+        { "do": "check", "shouldPrompt": false, "isDue": false },
+        { "do": "recordSuccess" },
+        { "do": "check", "shouldPrompt": true, "isDue": true }
+      ]
+    }
+  ]
+}
