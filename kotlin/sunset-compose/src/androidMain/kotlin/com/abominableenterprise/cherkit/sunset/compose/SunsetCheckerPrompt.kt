@@ -59,7 +59,9 @@ import kotlin.time.Duration
  *   the background, or the quick retry after a failure) never call it again. [onPromptChange] and
  *   [onVisibilityChange] for that first decision run before it, so when it runs the prompt kind you got is final for
  *   the launch: e.g. hold back the "What's new" sheet until then (see the README). The fetch has a timeout
- *   ([SunsetChecker.timeout], 5 seconds by default), so it always comes.
+ *   ([SunsetChecker.timeout], 5 seconds by default), so it always comes. Keep the flag it sets per process too
+ *   (`object LaunchGate { var sunsetSettled by mutableStateOf(false) }`), not in `remember` (lost on rotation, and
+ *   this is not called again) or `rememberSaveable` (a stale `true` after process death, before the new check).
  */
 @Composable
 public fun SunsetPrompt(

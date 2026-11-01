@@ -1,7 +1,7 @@
 # CherKit Update Compose
 
 The Android "update available" adapter: Google Play In-App Updates (the **FLEXIBLE** flow: Play's sheet, a background
-download, then "Restart to install") plus a Jetpack Compose effect. Available from 0.6.0.
+download, then "Restart to install") plus a Jetpack Compose effect.
 
 ```kotlin
 dependencies {

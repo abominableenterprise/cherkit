@@ -4,6 +4,88 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.6.0
+
+No breaking changes; every new parameter defaults to the old behavior, and Kotlin keeps the old signatures as hidden
+deprecated overloads so existing binaries still link. One behavior change: on iOS, `.sunsetPrompt(checker:)` now
+shows at most one soft prompt per session (see UI). What's new:
+
+- **"Update available" prompts**: besides the hosted config's `latestVersion`, a soft update prompt can now come
+  from:
+  - iOS: the App Store lookup (opt in with `URLSessionSunsetLookupSource`, release builds only);
+  - iOS: a "new test build" prompt for TestFlight installs, driven by the new `ios.testFlight` block in the hosted
+    config, which your release pipeline writes;
+  - Android: Google Play In-App Updates (the flexible flow) in the new `:update-compose` module.
+- **The hard block is unchanged and always wins**: it still comes only from the config's `minimumVersion`, and the
+  new prompts never open over it.
+- **Soft prompts at most once per session**: on iOS, once the user answers a soft prompt, re-checks in the same
+  process show no other one; Play's sheet starts at most once per process. Each TestFlight build prompts at most
+  once.
+- **Docs**: the cold-start recipes now keep `sunsetSettled` in a process-wide object (`LaunchGate`) instead of
+  `rememberSaveable` (see Sunset Compose).
+
+### Sunset (`CherKitSunset`, `:sunset`)
+
+- added: update sources. Besides the config's `latestVersion`, a soft prompt can now come from the App Store lookup
+  (iOS release builds, opt in with `SunsetChecker(..., lookup:)` and `URLSessionSunsetLookupSource`) and from a new
+  optional `ios.testFlight` config block (`latestBuild`, `url`, `notBefore`, `message`) for TestFlight installs. The
+  lookup offers the higher of the two versions, respects the store's `minimumOsVersion`, and links the config's
+  `storeURL` (else the lookup's `trackViewUrl`). Hard blocks still come from the config's `minimumVersion` only.
+  Rules and the release pipeline recipe for the TestFlight block: [Sunset README](kotlin/sunset/README.md#update-sources).
+- added: new inputs with defaults that keep today's behavior: `channel` (`SunsetChannel.store` / `.testFlight` /
+  `.other`; Kotlin `STORE` / `TEST_FLIGHT` / `OTHER`) and `installedBuild` on `SunsetChecker.check` and
+  `SunsetDecider.decide`.
+- added: `SunsetPrompt` gains `kind` (`SunsetUpdateKind.update` / `.testBuild`) and `latestBuild`;
+  `SunsetTestBuildPromptRule` shows a test-build prompt at most once per build ("Not now" and "Update" both remember
+  it, under its own key).
+- added: new types `SunsetBuildNumber`, `SunsetTestFlightConfig`, `SunsetLookupResult`, `SunsetLookupSource`,
+  `SunsetPromptAction`. Kotlin keeps the old `SunsetPrompt`, `SunsetPlatformConfig`, `SunsetChecker` and
+  `SunsetDecider` signatures as hidden deprecated overloads, so existing binaries still link.
+- added: iOS: `SunsetChannel.current()` detects the install channel (`.testFlight` from the `sandboxReceipt` App
+  Store receipt, `.other` in the simulator, `.store` otherwise). A library cannot detect debug builds: pass `.other`
+  there.
+- added: iOS: `URLSessionSunsetLookupSource(bundle:locale:)` opts in to the App Store lookup in one line (the app's
+  bundle id and the user's region, `country(for:)`). See the
+  [CherKitSunset README](Sources/CherKitSunset/README.md#ios-app-store-lookup-and-testflight-builds).
+
+### Sunset Compose (`:sunset-compose`)
+
+- changed: docs: the cold-start recipe for `onFirstCheckComplete` now keeps `sunsetSettled` in a process-wide object,
+  `object LaunchGate { var sunsetSettled by mutableStateOf(false) }`, instead of `rememberSaveable` (as recommended
+  in 0.5.0). After the process is killed in the background and restored, `rememberSaveable` brings back a stale
+  `true` before the new process's launch check has answered, so a sheet could open ahead of a hard block. Move the
+  flag into an `object` (or your app's own singleton) and gate with `!LaunchGate.sunsetSettled || sunsetKind != null`.
+  The same change is in the WhatsNew Compose README and the `SunsetPrompt` / `WhatsNewPrompt` KDoc
+  ([recipe](kotlin/sunset-compose/README.md#know-when-the-launch-check-is-done)). No behavior change.
+
+### Update Compose (new, `:update-compose`)
+
+- added: new Android module `com.github.abominableenterprise.cherkit:update-compose`: Google Play In-App Updates
+  (FLEXIBLE flow) with `PlayUpdatePrompt(...)`. It runs only on Play installs (Play testing tracks included;
+  sideloads get nothing) and is off in debug builds. It starts at most once per session, waits while `suppressed` is
+  true (pass it while the Sunset prompt, What's New or another prompt shows, and until Sunset's launch check has
+  answered), and remembers "Not now" per `availableVersionCode`.
+- added: a downloaded update sets `rememberPlayUpdateState().isDownloaded` (also after a later resume) and calls
+  `onDownloaded`; `completeUpdate()` installs it ("Restart to install").
+- added: `onVisibilityChange` reports Play's sheet, e.g. to
+  `ReviewCoordinator.setInterruptionVisible(it, UpdateInterruption.SOURCE)` (`"update"`). Opt in: apps that don't
+  add the module are unchanged. Setup and precedence with Sunset: [Update Compose README](kotlin/update-compose/README.md).
+
+### UI (SwiftUI, `CherKitUI`)
+
+- added: `.sunsetPrompt(checker:channel:)` passes the channel and `CFBundleVersion` to the check. A TestFlight
+  test-build prompt is a soft alert titled "A new test build is available" whose **Update** opens TestFlight; each
+  build prompts at most once ("Update" and "Not now" both remember it, under
+  `SunsetTestBuildPromptRule.defaultMemoryKey`). Both the `checker:` and `decision:` forms apply it, and
+  `onPromptChange` reports it as `.soft`. Recipe in the [CherKitUI README](Sources/CherKitUI/README.md#ios-app-store-and-testflight-updates).
+- added: new `SunsetStrings` texts `testBuildTitle`, `testBuildMessage`, `testBuildUpdateHint` (with
+  `softTitle(for:)`, `softUpdateHint(for:)`); `SunsetSoftPromptMemory` gains `testBuildKey`, `rememberedTestBuild`
+  and `remember(_:on:version:)`, and `reset()` now also forgets the remembered test build.
+- changed: `.sunsetPrompt(checker:)` shows at most one soft prompt per session. Once the user answers a soft prompt
+  ("Update" or "Not now"), re-checks on later returns from the background show no other soft prompt until the app is
+  launched again. A hard block still shows. Before, an "Update" tap on a release prompt that was not followed by an
+  update could show the prompt again on the next re-check in the same process.
+
 ## 0.5.0
 
 No breaking changes; every new parameter defaults to the old behavior. One behavior change: Swift's

@@ -29,7 +29,8 @@ import com.abominableenterprise.cherkit.whatsnew.WhatsNewChecker
  * @param suppressed While `true`, the sheet waits (or is taken away again, without counting as a dismissal), e.g.
  *   `suppressed = sunsetKind != null`, fed from `SunsetPrompt`'s `onPromptChange`, so it never stacks with Sunset's
  *   soft dialog or hard block. It shows once this turns `false`. `sunsetKind` is `null` while Sunset's first check
- *   fetches, so to always show Sunset first, also keep this `true` until that check finishes.
+ *   fetches, so to always show Sunset first, also keep this `true` until that check finishes, with a process-wide
+ *   flag set from `onFirstCheckComplete` (not `rememberSaveable`, which restores a stale `true` after process death).
  * @param onVisibilityChange Called with `true` when the sheet appears and `false` when it goes away, e.g.
  *   `{ review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) }`.
  */
