@@ -1,0 +1,16 @@
+{
+  "description": "TestFlight test-build prompt memory (SunsetTestBuildPromptRule on both platforms). A launch's `decision` is upToDate, softUpdate or hardUpdate with a prompt of `kind` update or testBuild and `latestBuild` (null: none). `shouldShow` is true only for a soft testBuild prompt whose latestBuild differs, as a build number, from `rememberedBuild` (null or unparsable: none). After `action` (notNow or update; null: no action) on that prompt, `rememberedAfter` is the build stored under the test-build key (null: nothing stored, keep the old value). Both actions store the build, so the same build never prompts twice.",
+  "cases": [
+    { "name": "never remembered: show", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "124", "rememberedBuild": null, "shouldShow": true, "action": null, "rememberedAfter": null },
+    { "name": "Not now remembers the build", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "124", "rememberedBuild": null, "shouldShow": true, "action": "notNow", "rememberedAfter": "124" },
+    { "name": "Update remembers the build too", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "124", "rememberedBuild": null, "shouldShow": true, "action": "update", "rememberedAfter": "124" },
+    { "name": "update tap suppresses the same build next launch", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "124", "rememberedBuild": "124", "shouldShow": false, "action": null, "rememberedAfter": null },
+    { "name": "the same build spelled with a trailing zero is the same build", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "124", "rememberedBuild": "124.0", "shouldShow": false, "action": null, "rememberedAfter": null },
+    { "name": "a higher build prompts again", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "125", "rememberedBuild": "124", "shouldShow": true, "action": "update", "rememberedAfter": "125" },
+    { "name": "dotted builds", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "1.2.10", "rememberedBuild": "1.2.9", "shouldShow": true, "action": "notNow", "rememberedAfter": "1.2.10" },
+    { "name": "unparsable remembered build counts as none", "decision": "softUpdate", "kind": "testBuild", "latestBuild": "124", "rememberedBuild": "abc", "shouldShow": true, "action": null, "rememberedAfter": null },
+    { "name": "a release prompt is not a test-build prompt", "decision": "softUpdate", "kind": "update", "latestBuild": null, "rememberedBuild": null, "shouldShow": false, "action": "update", "rememberedAfter": null },
+    { "name": "hard block is never a test-build prompt", "decision": "hardUpdate", "kind": "update", "latestBuild": null, "rememberedBuild": null, "shouldShow": false, "action": null, "rememberedAfter": null },
+    { "name": "up to date", "decision": "upToDate", "kind": null, "latestBuild": null, "rememberedBuild": null, "shouldShow": false, "action": null, "rememberedAfter": null }
+  ]
+}

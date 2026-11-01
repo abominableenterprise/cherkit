@@ -18,7 +18,13 @@ One public JSON file per app (e.g. on a CDN). Unknown fields are ignored; any `s
     "latestVersion": "1.4.0",
     "latestMinimumOS": "17.0",
     "storeURL": "https://apps.apple.com/app/id123456789",
-    "message": { "en": "Please update.", "de": "Bitte aktualisieren." }
+    "message": { "en": "Please update.", "de": "Bitte aktualisieren." },
+    "testFlight": {
+      "latestBuild": "124",
+      "url": "itms-beta://beta.itunes.apple.com/v1/app/123456789",
+      "notBefore": "2026-11-01T12:30:00Z",
+      "message": { "en": "A new test build is ready." }
+    }
   },
   "android": {
     "minimumVersion": "1.2.0",
@@ -39,20 +45,89 @@ One public JSON file per app (e.g. on a CDN). Unknown fields are ignored; any `s
   then `en`, then none (the UI shows its default text).
 - A platform block with a bad field (version that is not a valid `AppVersion` string, missing/invalid `storeURL`) is
   ignored as a whole: that platform never prompts.
+- `testFlight` (iOS only, optional): the newest TestFlight build, for TestFlight installs (see
+  [Update sources](#update-sources)).
+  - `latestBuild`: required string, a build number (`"124"` or dot-separated like `"1.2.10"`, each part 1 to 9
+    digits). TestFlight installs whose `CFBundleVersion` is lower get a soft test-build prompt.
+  - `url`: optional. `itms-beta://...` or `https://...` (any host, e.g. `https://testflight.apple.com/join/<code>`);
+    any other scheme or a malformed value counts as absent. Absent: the app opens plain `itms-beta://` (the TestFlight
+    app). For existing testers, `itms-beta://beta.itunes.apple.com/v1/app/<appleId>` (the app's TestFlight page) is
+    the recommended value; the library passes it on unchanged.
+  - `notBefore`: optional UTC time `YYYY-MM-DDTHH:MM:SSZ` (optional `.fraction`); no prompt while the device clock is
+    before it. A malformed value is ignored (no delay).
+  - `message`: optional, same language rules as above.
+  - A bad `testFlight` object (missing or invalid `latestBuild`, not an object) is ignored on its own; the rest of the
+    `ios` block still applies.
+
+## Update sources
+
+A soft "newer build available" prompt can come from three sources. A hard block always comes from the config's
+`minimumVersion` alone, on every channel, and always wins.
+
+| Source | Applies to | Enabled |
+| --- | --- | --- |
+| Config `latestVersion` | every channel | always |
+| App Store lookup (`https://itunes.apple.com/lookup?bundleId=<id>&country=<cc>`) | `store` channel (iOS release builds) | opt in: pass a `lookup` source to `SunsetChecker` |
+| Config `ios.testFlight` | `testFlight` channel | whenever the app reports `testFlight` and the block exists |
+
+The app passes its install channel (`store`, the default, `testFlight` or `other`) and its build number to `check`;
+the iOS adapter detects them. Rules (contract: `fixtures/sunset/update-sources.json`, `lookup.json` and
+`test-build-prompt.json`):
+
+- **Lookup**: the offered version is the higher of the config's `latestVersion` and the lookup's `version`. The
+  lookup's `minimumOsVersion` gates its version like `latestMinimumOS` does the config's: a device below it gets no
+  prompt from the lookup. The prompt links the config's `storeURL`, else the lookup's `trackViewUrl` (plain `https`
+  only). A malformed, empty (`resultCount` 0) or failed lookup is ignored. The lookup never hard-blocks and is never
+  used on the `testFlight` or `other` channels.
+- **TestFlight**: on the `testFlight` channel, an installed build lower than `testFlight.latestBuild` gets a soft
+  prompt with `kind` test build and `latestBuild` set, ahead of the config's soft release prompt. Equal or higher, an
+  unknown or unparsable installed build, or a `notBefore` still in the future: no test-build prompt. Not gated by OS.
+- **Prompt memory**: release prompts keep their "Not now" per version. A test-build prompt shows **at most once per
+  offered build**: both "Not now" and "Update" record that build (`SunsetTestBuildPromptRule`, suggested key
+  `cherkit.sunset.testBuildRememberedBuild`, separate from the release key), and a different `latestBuild` prompts
+  again.
+
+### Release pipeline: publish the TestFlight build
+
+After each TestFlight upload, write the new build number into the hosted config and publish it:
+
+```sh
+jq --arg build "$BUILD_NUMBER" '.ios.testFlight.latestBuild = $build' sunset.json > sunset.json.tmp && mv sunset.json.tmp sunset.json
+```
+
+Publish only once the build is installable, or testers get a prompt for a build TestFlight does not offer yet. Best:
+wait until App Store Connect reports the build's `processingState` as `VALID` (App Store Connect API, `GET /v1/builds`
+filtered by app and version), then publish. If the pipeline cannot wait, also set `notBefore` to a time after
+processing usually ends:
+
+```sh
+jq --arg build "$BUILD_NUMBER" --arg at "$(date -u -d '+30 minutes' +%Y-%m-%dT%H:%M:%SZ)" '.ios.testFlight.latestBuild = $build | .ios.testFlight.notBefore = $at' sunset.json > sunset.json.tmp && mv sunset.json.tmp sunset.json
+```
+
+(`date -d` is GNU date; on macOS use `date -u -v+30M +%Y-%m-%dT%H:%M:%SZ`.)
 
 ## API (same names on both platforms)
 
 | Swift | Kotlin |
 | --- | --- |
 | `SunsetConfig.parse(Data) -> SunsetConfig?` | `SunsetConfig.parse(String): SunsetConfig?` |
-| `SunsetDecider.decide(config:platform:appVersion:osVersion:languages:)` | `SunsetDecider.decide(config, platform, appVersion, osVersion, languages)` |
+| `SunsetDecider.decide(config:platform:appVersion:osVersion:languages:channel:installedBuild:lookup:now:)` | `SunsetDecider.decide(config, platform, appVersion, osVersion, languages, channel, installedBuild, lookup, now)` |
 | `SunsetDecision.upToDate / .softUpdate(p) / .hardUpdate(p)` | `SunsetDecision.UpToDate / SoftUpdate(p) / HardUpdate(p)` |
-| `SunsetPrompt(storeURL: URL, message: String?, latestVersion: AppVersion?)` | `SunsetPrompt(storeUrl: String, message: String?, latestVersion: AppVersion?)` |
+| `SunsetPrompt(storeURL: URL, message: String?, latestVersion: AppVersion?, kind:, latestBuild:)` | `SunsetPrompt(storeUrl: String, message: String?, latestVersion: AppVersion?, kind, latestBuild)` |
+| `SunsetChannel.store / .testFlight / .other` | `SunsetChannel.STORE / TEST_FLIGHT / OTHER` |
+| `SunsetUpdateKind.update / .testBuild` | `SunsetUpdateKind.UPDATE / TEST_BUILD` |
+| `SunsetBuildNumber(String)` (failable), `components` | `SunsetBuildNumber.parse(String): SunsetBuildNumber?`, `components` |
+| `SunsetTestFlightConfig(latestBuild:url:notBefore:messages:)`, `defaultURL`; `SunsetPlatformConfig.testFlight` | `SunsetTestFlightConfig(latestBuild, url, notBefore, messages)`, `DEFAULT_URL`; `SunsetPlatformConfig.testFlight` |
+| `SunsetLookupResult.parse(Data) -> SunsetLookupResult?` (`version`, `minimumOSVersion`, `trackViewURL`) | `SunsetLookupResult.parse(String): SunsetLookupResult?` (`version`, `minimumOsVersion`, `trackViewUrl`) |
+| `protocol SunsetLookupSource` (`fetch(timeout:) async -> Data?`) | `fun interface SunsetLookupSource` (`suspend fetch(timeout): String?`) |
+| `URLSessionSunsetLookupSource(url:session:)`, `init?(bundleID:country:session:)` | (none: Android does not use the lookup) |
+| `SunsetTestBuildPromptRule.shouldShow(_:rememberedBuild:)`, `buildToRemember(after:on:)`, `defaultMemoryKey` | `SunsetTestBuildPromptRule.shouldShow(decision, rememberedBuild)`, `buildToRemember(action, prompt)`, `DEFAULT_MEMORY_KEY` |
+| `SunsetPromptAction.notNow / .update` | `SunsetPromptAction.NOT_NOW / UPDATE` |
 | `SunsetMessages.resolve(_:languages:)` | `SunsetMessages.resolve(messages, languages)` |
 | `SunsetConfigChoice.choose(fetched:cached:)` | `SunsetConfigChoice.choose(fetched, cached)` |
 | `protocol SunsetConfigSource` (`fetch(timeout:) async -> Data?`) | `fun interface SunsetConfigSource` (`suspend fetch(timeout): String?`) |
 | `protocol SunsetConfigCache` (`load`, `save`) | `interface SunsetConfigCache` (`load`, `save`) |
-| `SunsetChecker(source:cache:timeout:platform:)`, `check(installedVersion:osVersion:locale:) async` | `SunsetChecker(source, cache, timeout, platform)`, `suspend check(installedVersion, osVersion, locale)` |
+| `SunsetChecker(source:cache:timeout:platform:lookup:)`, `check(installedVersion:osVersion:locale:channel:installedBuild:) async` | `SunsetChecker(source, cache, timeout, platform, lookup)`, `suspend check(installedVersion, osVersion, locale, channel, installedBuild)` |
 | `SunsetChecker.disabled`, `isDisabled` | `SunsetChecker.disabled()`, `isDisabled` |
 | `checkReportingFailure(...)` (`package`, for CherKitUI) | `suspend checkReportingFailure(...): SunsetCheckOutcome(decision, failed)` |
 | `URLSessionSunsetConfigSource(url:session:)` | `FetchSunsetConfigSource(fetch: SunsetFetch)` |

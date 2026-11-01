@@ -14,6 +14,8 @@ public struct SunsetPlatformConfig: Equatable, Sendable {
     public let storeURL: URL
     /// Custom prompt text by language tag (`"en"`, `"de"`, `"pt-BR"`); resolve it with ``SunsetMessages/resolve(_:languages:)``.
     public let messages: [String: String]
+    /// The optional `testFlight` object (iOS): the newest TestFlight build. `nil` when absent or invalid.
+    public let testFlight: SunsetTestFlightConfig?
 
     /// Creates a block. ``SunsetConfig/parse(_:)`` validates hosted values; this initializer does not.
     public init(
@@ -21,12 +23,14 @@ public struct SunsetPlatformConfig: Equatable, Sendable {
         latestVersion: AppVersion? = nil,
         latestMinimumOS: AppVersion? = nil,
         storeURL: URL,
-        messages: [String: String] = [:]
+        messages: [String: String] = [:],
+        testFlight: SunsetTestFlightConfig? = nil
     ) {
         self.minimumVersion = minimumVersion
         self.latestVersion = latestVersion
         self.latestMinimumOS = latestMinimumOS
         self.storeURL = storeURL
         self.messages = messages
+        self.testFlight = testFlight
     }
 }

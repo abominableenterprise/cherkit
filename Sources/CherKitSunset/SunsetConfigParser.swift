@@ -24,8 +24,23 @@ enum SunsetConfigParser {
             latestVersion: latest,
             latestMinimumOS: minimumOS,
             storeURL: storeURL,
-            messages: messages(fields["message"])
+            messages: messages(fields["message"]),
+            testFlight: testFlight(fields["testFlight"])
         )
+    }
+
+    /// The `testFlight` object, or `nil` when it is absent or its `latestBuild` is not a valid build number string.
+    /// A bad `url` or `notBefore` only drops that field; a bad block never invalidates the platform block.
+    private static func testFlight(_ value: JSONValue?) -> SunsetTestFlightConfig? {
+        guard case .object(let fields)? = value,
+              case .string(let buildText)? = fields["latestBuild"],
+              let build = SunsetBuildNumber(buildText)
+        else { return nil }
+        var url: URL?
+        if case .string(let text)? = fields["url"] { url = SunsetTestFlightURL.validate(text) }
+        var notBefore: Date?
+        if case .string(let text)? = fields["notBefore"] { notBefore = SunsetTimestamp.parse(text) }
+        return SunsetTestFlightConfig(latestBuild: build, url: url, notBefore: notBefore, messages: messages(fields["message"]))
     }
 
     private enum OptionalVersion {
