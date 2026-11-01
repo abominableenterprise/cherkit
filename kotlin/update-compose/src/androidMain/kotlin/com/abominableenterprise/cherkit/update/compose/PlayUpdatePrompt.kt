@@ -21,25 +21,39 @@ import com.google.android.play.core.install.model.InstallStatus
  * Put it once in your root composable:
  *
  * ```kotlin
- * // Top level, per process like onFirstCheckComplete (not rememberSaveable: stale after process death).
- * object LaunchGate { var sunsetSettled by mutableStateOf(false) }
+ * // Top level, per process like the launch callbacks (not rememberSaveable: stale after process death).
+ * object LaunchGate {
+ *     var sunsetSettled by mutableStateOf(false)
+ *     var whatsNewSettled by mutableStateOf(false)
+ * }
  *
  * // In the root composable:
  * val update = rememberPlayUpdateState()
  * var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
+ * var sunsetChecking by remember { mutableStateOf(false) }
+ * var whatsNewVisible by remember { mutableStateOf(false) }
  * SunsetPrompt(
  *     checker = sunset,
  *     onPromptChange = { sunsetKind = it },
  *     onFirstCheckComplete = { LaunchGate.sunsetSettled = true },
+ *     onCheckingChange = { sunsetChecking = it },
+ * )
+ * WhatsNewPrompt(
+ *     checker = whatsNew,
+ *     suppressed = !LaunchGate.sunsetSettled || sunsetKind != null,
+ *     onLaunchCheckComplete = { LaunchGate.whatsNewSettled = true },
+ *     onVisibilityChange = { whatsNewVisible = it },
  * )
  * PlayUpdatePrompt(
  *     update,
- *     // Not `sunsetKind != null` alone: it is null while Sunset's launch fetch runs, and a late hard block
- *     // cannot close Play's sheet. See the README's "Precedence with Sunset".
- *     suppressed = !LaunchGate.sunsetSettled || sunsetKind != null || showWhatsNew,
+ *     // Not `sunsetKind != null` alone: it is null while a Sunset check runs, and a late hard block cannot
+ *     // close Play's sheet. See the README's "Precedence with Sunset".
+ *     suppressed = !LaunchGate.sunsetSettled || sunsetKind != null || sunsetChecking ||
+ *         !LaunchGate.whatsNewSettled || whatsNewVisible,
  *     onVisibilityChange = { review.setInterruptionVisible(it, UpdateInterruption.SOURCE) },
  * )
- * if (update.isDownloaded) { /* "Restart to install" -> update.completeUpdate() */ }
+ * // "Restart to install" -> update.completeUpdate(), once pending local writes are flushed (it restarts at once).
+ * if (update.isDownloaded) { /* ... */ }
  * ```
  *
  * - Runs on every `ON_RESUME` and every time [suppressed] changes, while the lifecycle is `RESUMED`.

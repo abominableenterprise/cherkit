@@ -2,6 +2,7 @@ package com.abominableenterprise.cherkit.sunset.compose
 
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
@@ -46,6 +47,27 @@ internal class SunsetCheckRunner(
      */
     var firstCheckFinished: Boolean by mutableStateOf(false)
         private set
+
+    /**
+     * How many checks have started (launch, re-checks and retries). Counts rather than a flag, so a check that starts
+     * and finishes between two frames is still seen. A check is running while it is above [checksFinished].
+     */
+    var checksStarted: Int = 0
+        private set
+
+    /**
+     * How many checks have finished, with any outcome. Set after [decision] on the same thread, so a composition that
+     * reads the new count also reads that check's decision.
+     */
+    var checksFinished: Int by mutableIntStateOf(0)
+        private set
+
+    /**
+     * Called (on the main thread) right after a check started and [checksStarted] went up, before it runs: from the
+     * first composition's effect, the Lifecycle callback or the retry. `onCheckingChange` reports `true` from here, so
+     * state it sets is written before the next frame.
+     */
+    val checkStartedListeners: MutableList<() -> Unit> = mutableListOf()
 
     /** Whether `onFirstCheckComplete` has been called, so it runs at most once per runner (per process for [shared]). */
     var firstCheckReported: Boolean = false
@@ -93,11 +115,14 @@ internal class SunsetCheckRunner(
             } finally {
                 // The first check to finish is the launch check: it starts first and checks never overlap.
                 firstCheckFinished = true
+                checksFinished++
                 // Even after an exception or cancellation, so a later return from the background can check again.
                 if (scheduler.checkFinished(failed)) scheduleRetry(check)
             }
         }
         job = started
+        checksStarted++
+        for (listener in checkStartedListeners.toList()) listener()
         started.start()
     }
 
