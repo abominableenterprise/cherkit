@@ -2,7 +2,7 @@
 import CherKitSunset
 import SwiftUI
 
-/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)``:
+/// Backs ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``:
 /// runs the checks through a ``SunsetCheckRunner`` and shows its decision with ``SunsetPromptModifier``.
 @available(iOS 16, macOS 13, *)
 struct SunsetCheckerPromptModifier: ViewModifier {
@@ -13,6 +13,8 @@ struct SunsetCheckerPromptModifier: ViewModifier {
     let appIcon: Image?
     let tint: Color?
     let tintLabel: Color?
+    var onVisibilityChange: ((Bool) -> Void)? = nil
+    var onPromptChange: ((SunsetPromptKind?) -> Void)? = nil
     @ObservedObject var runner: SunsetCheckRunner
 
     @Environment(\.scenePhase) private var scenePhase
@@ -27,7 +29,9 @@ struct SunsetCheckerPromptModifier: ViewModifier {
                 strings: strings,
                 appIcon: appIcon,
                 tint: tint,
-                tintLabel: tintLabel
+                tintLabel: tintLabel,
+                onVisibilityChange: onVisibilityChange,
+                onPromptChange: onPromptChange
             ))
             .onAppear {
                 runner.setMinimumInterval(minimumInterval)
@@ -41,7 +45,7 @@ struct SunsetCheckerPromptModifier: ViewModifier {
 
 @available(iOS 16, macOS 13, *)
 extension View {
-    /// Checks for an update and shows the Sunset prompt (see ``sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:)``
+    /// Checks for an update and shows the Sunset prompt (see ``sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``
     /// for what each decision shows). Attach it once, to your root view:
     ///
     /// ```swift
@@ -76,6 +80,10 @@ extension View {
     ///     app's tint. `nil` keeps the system tint. The soft alert always uses the app's tint.
     ///   - tintLabel: The hard block's button label color on the `tint` fill. `nil` (the default) picks black or
     ///     white, whichever contrasts more with `tint` in the current light or dark mode. Ignored without a `tint`.
+    ///   - onVisibilityChange: Called with `true` when the soft "Update available" alert appears and `false` when it
+    ///     goes away. Not called for the hard block, so checks can keep running behind it; use `onPromptChange`.
+    ///   - onPromptChange: Called with the prompt showing (`.soft`, `.hard` or `nil`) whenever that changes, e.g.
+    ///     `{ review.setSunsetPromptKind($0) }` so a review never shows over either.
     public func sunsetPrompt(
         checker: SunsetChecker,
         installedVersion: String? = nil,
@@ -85,7 +93,9 @@ extension View {
         strings: SunsetStrings = SunsetStrings(),
         appIcon: Image? = nil,
         tint: Color? = nil,
-        tintLabel: Color? = nil
+        tintLabel: Color? = nil,
+        onVisibilityChange: ((Bool) -> Void)? = nil,
+        onPromptChange: ((SunsetPromptKind?) -> Void)? = nil
     ) -> some View {
         modifier(SunsetCheckerPromptModifier(
             request: SunsetCheckRunner.Request(
@@ -99,6 +109,8 @@ extension View {
             appIcon: appIcon,
             tint: tint,
             tintLabel: tintLabel,
+            onVisibilityChange: onVisibilityChange,
+            onPromptChange: onPromptChange,
             runner: .shared
         ))
     }

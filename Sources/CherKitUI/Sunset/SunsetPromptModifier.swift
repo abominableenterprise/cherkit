@@ -2,8 +2,8 @@
 import CherKitSunset
 import SwiftUI
 
-/// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:)``
-/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)``.
+/// Presents the Sunset prompts for a decision. Use it through ``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``
+/// or ``SwiftUI/View/sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``.
 @available(iOS 16, macOS 13, *)
 struct SunsetPromptModifier: ViewModifier {
     @Binding var decision: SunsetDecision?
@@ -18,6 +18,10 @@ struct SunsetPromptModifier: ViewModifier {
     var tint: Color?
     /// The hard block's button label color on `tint`; `nil` picks black or white by contrast.
     var tintLabel: Color?
+    /// Hears `true` / `false` when the soft alert appears / goes away.
+    var onVisibilityChange: ((Bool) -> Void)? = nil
+    /// Hears which prompt is showing whenever that changes.
+    var onPromptChange: ((SunsetPromptKind?) -> Void)? = nil
 
     @Environment(\.openURL) private var openURL
 
@@ -37,6 +41,18 @@ struct SunsetPromptModifier: ViewModifier {
         memory.shouldShowSoftPrompt(for: decision, version: version(for: softPrompt))
     }
 
+    /// The prompt showing for the current decision, as the callbacks report it.
+    var promptKind: SunsetPromptKind? {
+        SunsetPromptKind.showing(for: decision, showsSoftPrompt: showsSoftPrompt)
+    }
+
+    /// Passes a change of ``promptKind`` to the callbacks: `onPromptChange` always, `onVisibilityChange` only when
+    /// the soft alert appears or goes away.
+    func report(from old: SunsetPromptKind?, to new: SunsetPromptKind?) {
+        onPromptChange?(new)
+        if (old == .soft) != (new == .soft) { onVisibilityChange?(new == .soft) }
+    }
+
     func body(content: Content) -> some View {
         content
             .alert(strings.softTitle, isPresented: softPresented, presenting: softPrompt) { prompt in
@@ -49,6 +65,7 @@ struct SunsetPromptModifier: ViewModifier {
             .modifier(SunsetHardBlockPresenter(
                 prompt: hardPrompt, strings: strings, appIcon: appIcon, tint: tint, tintLabel: tintLabel
             ))
+            .modifier(VisibilityChangeReporter(value: promptKind, hidden: nil, report: report(from:to:)))
     }
 
     private var softPrompt: SunsetPrompt? {
@@ -119,7 +136,7 @@ extension View {
     ///
     /// This modifier only displays a decision; it never fetches. Get one from the Sunset checker (or
     /// ``SunsetDecider``) and assign it to `decision`, or let
-    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:)`` run the checks.
+    /// ``sunsetPrompt(checker:installedVersion:locale:minimumInterval:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)`` run the checks.
     ///
     /// - Parameters:
     ///   - decision: The decision to show, `nil` while unknown.
@@ -136,6 +153,12 @@ extension View {
     ///     tint. The soft alert always uses the app's tint.
     ///   - tintLabel: The hard block's button label color on the `tint` fill. `nil` (the default) picks black or
     ///     white, whichever contrasts more with `tint` in the current light or dark mode. Ignored without a `tint`.
+    ///   - onVisibilityChange: Called with `true` when the soft "Update available" alert appears and `false` when it
+    ///     goes away (answered, cleared, or this view goes away). Not called for the hard block; use
+    ///     `onPromptChange` for both.
+    ///   - onPromptChange: Called with the prompt showing (`.soft`, `.hard` or `nil`) whenever that changes, never for
+    ///     the initial `nil`, and with `nil` when this view goes away while one was showing. Report both to a review
+    ///     coordinator with `{ review.setSunsetPromptKind($0) }`.
     public func sunsetPrompt(
         decision: Binding<SunsetDecision?>,
         latestVersion: String? = nil,
@@ -143,7 +166,9 @@ extension View {
         strings: SunsetStrings = SunsetStrings(),
         appIcon: Image? = nil,
         tint: Color? = nil,
-        tintLabel: Color? = nil
+        tintLabel: Color? = nil,
+        onVisibilityChange: ((Bool) -> Void)? = nil,
+        onPromptChange: ((SunsetPromptKind?) -> Void)? = nil
     ) -> some View {
         modifier(SunsetPromptModifier(
             decision: decision,
@@ -153,7 +178,9 @@ extension View {
             strings: strings,
             appIcon: appIcon,
             tint: tint,
-            tintLabel: tintLabel
+            tintLabel: tintLabel,
+            onVisibilityChange: onVisibilityChange,
+            onPromptChange: onPromptChange
         ))
     }
 }

@@ -10,9 +10,11 @@ let review = isDebugOrTest ? .disabled : ReviewCoordinator(isEligible: { !sessio
 review.recordSuccess()                                        // after an entry is saved
 review.noteInterruption()                                     // after a paywall or error
 review.setInterruptionVisible(true, source: "paywall")        // while one of your modals is up
-// The SwiftUI adapter (a later release) checks shouldPrompt(isIdle:) on a settled screen, then calls
-// markPrompted() right before AppStore.requestReview.
+HomeView().reviewPrompt(coordinator: review)                  // CherKitUI: settles, then asks StoreKit
 ```
+
+The SwiftUI adapter (`.reviewPrompt`, `.reviewInterruption`, the Sunset and What's New hookups) lives in
+[CherKitUI](../CherKitUI/README.md#review).
 
 Foundation only (no UIKit/StoreKit), so it builds and tests on Linux. State lives in `UserDefaults.standard` under
 `cherkit.review.*` (`UserDefaultsReviewStore(defaults:keyPrefix:)`); `InMemoryReviewStore` is for tests.

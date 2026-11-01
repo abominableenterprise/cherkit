@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The hard "Update required" block: optional app icon, title, message and an "Update" button that opens the store.
 ///
-/// It has no way to dismiss it. Present it full screen (``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:)``
+/// It has no way to dismiss it. Present it full screen (``SwiftUI/View/sunsetPrompt(decision:latestVersion:memory:strings:appIcon:tint:tintLabel:onVisibilityChange:onPromptChange:)``
 /// does) for ``SunsetDecision/hardUpdate(_:)``. The text scrolls when it does not fit, so nothing clips on small
 /// screens or at the largest Dynamic Type sizes, while the "Update" button stays pinned at the bottom, always visible.
 @available(iOS 16, macOS 13, *)
