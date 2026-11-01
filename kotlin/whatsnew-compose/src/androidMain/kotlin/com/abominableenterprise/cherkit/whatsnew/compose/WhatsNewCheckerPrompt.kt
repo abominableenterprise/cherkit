@@ -31,6 +31,15 @@ import com.abominableenterprise.cherkit.whatsnew.WhatsNewChecker
  *   soft dialog or hard block. It shows once this turns `false`. `sunsetKind` is `null` while Sunset's first check
  *   fetches, so to always show Sunset first, also keep this `true` until that check finishes, with a process-wide
  *   flag set from `onFirstCheckComplete` (not `rememberSaveable`, which restores a stale `true` after process death).
+ * @param onLaunchCheckComplete Called once the launch `onLaunch` has returned, with `hasNotes`: whether there are notes
+ *   to show (`false` for nothing new, and when `onLaunch` failed open). Once per process, with the same guard as the
+ *   `onLaunch` call: recomposition, rebuilding the root and recreating the activity (rotation) never call it again.
+ *   [suppressed] does not hold it back: the launch check runs anyway and only the sheet waits. When `hasNotes` is
+ *   `true` and the sheet is not suppressed, [onVisibilityChange]`(true)` for it runs first, in the same frame, so a
+ *   flag set from [onVisibilityChange] is already `true` when this runs; while suppressed, the sheet's `true` comes
+ *   later, when it shows. Use it like Sunset's `onFirstCheckComplete`, e.g. to hold back Play's update prompt until
+ *   it runs (see the README). Keep the flag it sets per process too (an `object`), not in `remember` or
+ *   `rememberSaveable`.
  * @param onVisibilityChange Called with `true` when the sheet appears and `false` when it goes away, e.g.
  *   `{ review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) }`.
  */
@@ -41,9 +50,32 @@ public fun WhatsNewPrompt(
     locales: List<String> = AndroidWhatsNew.preferredLocales(),
     strings: WhatsNewStrings = WhatsNewStrings(),
     suppressed: Boolean = false,
+    onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)? = null,
     onVisibilityChange: ((Boolean) -> Unit)? = null,
 ) {
-    WhatsNewCheckerPrompt(WhatsNewLaunch.shared, checker, installedVersion, locales, strings, suppressed, onVisibilityChange)
+    WhatsNewCheckerPrompt(
+        WhatsNewLaunch.shared, checker, installedVersion, locales, strings, suppressed,
+        onLaunchCheckComplete = onLaunchCheckComplete,
+        onVisibilityChange = onVisibilityChange,
+    )
+}
+
+/** The 0.6.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun WhatsNewPrompt(
+    checker: WhatsNewChecker,
+    installedVersion: String = rememberInstalledVersion(),
+    locales: List<String> = AndroidWhatsNew.preferredLocales(),
+    strings: WhatsNewStrings = WhatsNewStrings(),
+    suppressed: Boolean = false,
+    onVisibilityChange: ((Boolean) -> Unit)? = null,
+) {
+    WhatsNewPrompt(
+        checker, installedVersion, locales, strings, suppressed,
+        onLaunchCheckComplete = null,
+        onVisibilityChange = onVisibilityChange,
+    )
 }
 
 /** [WhatsNewPrompt] (checker) with its [launch] state, so host tests can pass their own. */
@@ -55,6 +87,7 @@ internal fun WhatsNewCheckerPrompt(
     locales: List<String>,
     strings: WhatsNewStrings,
     suppressed: Boolean,
+    onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)? = null,
     onVisibilityChange: ((Boolean) -> Unit)?,
 ) {
     SideEffect { launch.launched(checker, installedVersion, locales) }
@@ -66,6 +99,8 @@ internal fun WhatsNewCheckerPrompt(
         onVisibilityChange = onVisibilityChange,
         onDismiss = launch::dismissed,
     )
+    // After the sheet above, so its onVisibilityChange(true) for the same notes runs first.
+    ReportWhatsNewLaunch(launch, onLaunchCheckComplete)
 }
 
 /** [AndroidWhatsNew.installedVersion], read once per context rather than on every recomposition. */

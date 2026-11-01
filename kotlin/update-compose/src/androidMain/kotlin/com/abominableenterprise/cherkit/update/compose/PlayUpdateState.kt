@@ -34,6 +34,10 @@ public class PlayUpdateState internal constructor(internal val manager: AppUpdat
     /**
      * Installs the downloaded update: Play restarts the app. Returns `false` (doing nothing) when nothing is
      * downloaded, and when Play throws; a later Play failure is ignored. Call it from the main thread.
+     *
+     * The app process is killed and restarted right away, with no chance to finish work in progress. If the app
+     * queues local writes (e.g. an offline database or a sync queue), flush or confirm them before calling this, or
+     * disable or delay the "Restart to install" button until nothing is pending.
      */
     public fun completeUpdate(): Boolean {
         val manager = manager ?: return false

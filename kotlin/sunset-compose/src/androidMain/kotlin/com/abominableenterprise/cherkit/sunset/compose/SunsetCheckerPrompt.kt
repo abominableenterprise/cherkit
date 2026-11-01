@@ -62,6 +62,14 @@ import kotlin.time.Duration
  *   ([SunsetChecker.timeout], 5 seconds by default), so it always comes. Keep the flag it sets per process too
  *   (`object LaunchGate { var sunsetSettled by mutableStateOf(false) }`), not in `remember` (lost on rotation, and
  *   this is not called again) or `rememberSaveable` (a stale `true` after process death, before the new check).
+ * @param onCheckingChange Called with `true` when a check starts (the launch check, a re-check on return from the
+ *   background, or the quick retry after a failure) and `false` when it has finished, with any outcome (up to date,
+ *   soft, hard, failed or thrown). Any [onPromptChange] and [onVisibilityChange] call for that check's result runs
+ *   before the `false`, so when it comes the prompt kind you hold is current. Each `true` is followed by one `false`
+ *   (also when this leaves the composition mid-check), to the same callback. Checks never overlap. Never `true` for
+ *   [SunsetChecker.disabled]. A check already running when this is first composed (e.g. after a rotation) is
+ *   reported as `true` at once. Use it to hold back Play's update sheet while a re-check might still find a hard
+ *   block: `suppressed = ... || sunsetChecking` (see the README). An inline lambda is fine.
  */
 @Composable
 public fun SunsetPrompt(
@@ -72,6 +80,7 @@ public fun SunsetPrompt(
     appIcon: Painter? = null,
     onPromptChange: (SunsetPromptKind?) -> Unit = {},
     onFirstCheckComplete: (() -> Unit)? = null,
+    onCheckingChange: ((Boolean) -> Unit)? = null,
     onVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
@@ -84,6 +93,7 @@ public fun SunsetPrompt(
         onVisibilityChange = onVisibilityChange,
         onPromptChange = onPromptChange,
         onFirstCheckComplete = onFirstCheckComplete,
+        onCheckingChange = onCheckingChange,
         disabled = checker.isDisabled,
         check = {
             checker.checkReportingFailure(
@@ -106,13 +116,17 @@ internal fun SunsetCheckerPrompt(
     onVisibilityChange: (Boolean) -> Unit,
     onPromptChange: (SunsetPromptKind?) -> Unit = {},
     onFirstCheckComplete: (() -> Unit)? = null,
+    onCheckingChange: ((Boolean) -> Unit)? = null,
     disabled: Boolean = false,
     check: suspend () -> SunsetCheckOutcome,
 ) {
     val currentCheck by rememberUpdatedState(check)
+    val checking = rememberSunsetCheckingReporter(runner, onCheckingChange, enabled = !disabled)
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = LocalContext.current.findActivity()
     SideEffect { runner.setMinimumInterval(minimumInterval) }
+    // Before the effect below, so the launch check it starts is reported `true` as it starts.
+    checking.Attach()
     DisposableEffect(runner, lifecycleOwner, activity) {
         runner.setMinimumInterval(minimumInterval)
         runner.launched { currentCheck() }
@@ -137,6 +151,30 @@ internal fun SunsetCheckerPrompt(
     )
     // After the prompt above, so its onPromptChange / onVisibilityChange effects for the same decision run first.
     ReportFirstSunsetCheck(runner, settled = disabled || runner.firstCheckFinished, onFirstCheckComplete)
+    // Last, so the prompt's reports and onFirstCheckComplete for a check's result come before its `false`.
+    checking.End(runner.checksFinished)
+}
+
+/** The 0.6.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun SunsetPrompt(
+    checker: SunsetChecker,
+    minimumInterval: Duration = SunsetCheckScheduler.DEFAULT_MINIMUM_INTERVAL,
+    memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
+    strings: SunsetStrings = SunsetStrings(),
+    appIcon: Painter? = null,
+    onPromptChange: (SunsetPromptKind?) -> Unit = {},
+    onFirstCheckComplete: (() -> Unit)? = null,
+    onVisibilityChange: (Boolean) -> Unit = {},
+) {
+    SunsetPrompt(
+        checker, minimumInterval, memory, strings, appIcon,
+        onPromptChange = onPromptChange,
+        onFirstCheckComplete = onFirstCheckComplete,
+        onCheckingChange = null,
+        onVisibilityChange = onVisibilityChange,
+    )
 }
 
 /** The 0.4.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */

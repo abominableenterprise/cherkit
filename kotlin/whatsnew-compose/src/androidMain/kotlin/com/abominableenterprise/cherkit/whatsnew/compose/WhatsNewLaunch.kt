@@ -29,6 +29,17 @@ internal class WhatsNewLaunch(
     var entries: List<WhatsNewEntry> by mutableStateOf(emptyList())
         private set
 
+    /**
+     * What the launch check found: `null` until `onLaunch` returns, then whether it returned notes to show (`false`
+     * for nothing new and when it failed open). Set right after [entries], with no suspension in between, so a
+     * composition that sees it also sees those notes. Unlike [entries] it keeps its value after the dismissal.
+     */
+    var launchHadNotes: Boolean? by mutableStateOf(null)
+        private set
+
+    /** Whether `onLaunchCheckComplete` has been called: at most once per instance (per process for [shared]). */
+    var launchReported: Boolean = false
+
     /** Whether [launched] already ran `onLaunch` (or started it). */
     var hasLaunched: Boolean = false
         private set
@@ -42,7 +53,7 @@ internal class WhatsNewLaunch(
         hasLaunched = true
         this.checker = checker
         scope.launch {
-            entries = try {
+            val found = try {
                 withContext(io) { checker.onLaunch(installedVersion, locales) }
             } catch (e: CancellationException) {
                 throw e
@@ -50,6 +61,8 @@ internal class WhatsNewLaunch(
                 // The checker never throws; should it still, show nothing (fail open).
                 emptyList()
             }
+            entries = found
+            launchHadNotes = found.isNotEmpty()
         }
     }
 
