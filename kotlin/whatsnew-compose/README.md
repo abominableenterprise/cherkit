@@ -57,33 +57,35 @@ the "What's new" sheet never stacks with either Sunset prompt: while the soft "U
 "Update required" block shows, the sheet waits (or steps aside) and comes back afterwards. `onVisibilityChange`
 reports the soft dialog only, so prefer `onPromptChange`.
 
-`onPromptChange` says nothing while Sunset's first check is still fetching, so the sheet can appear first and step
-aside when a prompt comes. To always show Sunset first, keep `suppressed` true until that first check finishes. Run
-the check yourself with the `decision` overload, which tells you when it is done (it fails open, so it always
-finishes):
+`onPromptChange` says nothing while Sunset's first check is still fetching, so on a cold start the sheet can appear
+first and then step aside when a prompt comes. To always show Sunset first, also keep `suppressed` true until Sunset's
+`onFirstCheckComplete` runs: once per process, when the launch check has finished with any outcome (up to date, soft,
+hard or a failed fetch), and after the `onPromptChange` call for that decision, so `sunsetKind` is already up to date.
+This is the recommended root setup:
 
 ```kotlin
-var sunsetDecision by remember { mutableStateOf<SunsetDecision?>(null) }
-var sunsetChecked by remember { mutableStateOf(false) }
 var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
-LaunchedEffect(Unit) {
-    sunsetDecision = AndroidSunset.check(sunset, context)
-    sunsetChecked = true
-}
+var sunsetSettled by rememberSaveable { mutableStateOf(false) }
 
-SunsetPrompt(sunsetDecision, onDecisionHandled = { sunsetDecision = null }, onPromptChange = { sunsetKind = it })
-WhatsNewPrompt(checker = whatsNew, suppressed = !sunsetChecked || sunsetKind != null)
+SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it }, onFirstCheckComplete = { sunsetSettled = true })
+WhatsNewPrompt(
+    checker = whatsNew,
+    suppressed = !sunsetSettled || sunsetKind != null,
+    onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) },
+)
 ```
 
-This form checks once; re-check on a return from the background yourself (see
-[Sunset Compose](../sunset-compose/README.md)) if you rely on that.
+The Sunset fetch has a timeout (`SunsetChecker.timeout`, 5 seconds by default) and a failed or timed-out fetch still
+completes the check, so the sheet is never held back for good. `SunsetChecker.disabled()` (UI tests) completes it at
+once. Keep `sunsetSettled` in `rememberSaveable`: `onFirstCheckComplete` is not called again after a rotation, so a
+plain `remember` would hold the sheet back. See [Sunset Compose](../sunset-compose/README.md) for the details.
 
 To keep a store-review prompt from appearing over the sheet, report it as an interruption:
 
 ```kotlin
 WhatsNewPrompt(
     checker = whatsNew,
-    suppressed = sunsetKind != null,
+    suppressed = !sunsetSettled || sunsetKind != null,
     onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) },
 )
 ```
@@ -120,15 +122,30 @@ and look like an alert. Use `WhatsNewSheet(entries, strings, onContinue)` direct
 
 `WhatsNewHistoryScreen` lists every release for Settings, like iOS's `WhatsNewHistoryView`. The installed release
 carries a "You're on this version" badge, a release without bullets shows "Bug fixes and improvements." and an empty
-list shows "No release notes yet.". It has no top bar: put it in your own `Scaffold`, with `strings.historyTitle`
-("Version History") as the title if you like.
+list shows "No release notes yet.". Get the list with `AndroidWhatsNew.history(context)`: read-only (it never appends
+to the install history or marks notes seen), so Settings needs no checker of its own. It reads the bundled assets, so
+load it off the main thread.
+
+It has no top bar: put it in your own `Scaffold`, with `strings.historyTitle` ("Version History") as the title if you
+like:
 
 ```kotlin
+val context = LocalContext.current
 val strings = WhatsNewStrings()
-val history = remember { whatsNew.history(AndroidWhatsNew.preferredLocales()) }
+val history by produceState(emptyList<WhatsNewHistoryEntry>()) {
+    value = withContext(Dispatchers.IO) { AndroidWhatsNew.history(context.applicationContext) }
+}
 Scaffold(topBar = { TopAppBar(title = { Text(strings.historyTitle) }, navigationIcon = { BackButton() }) }) { padding ->
     WhatsNewHistoryScreen(history, strings = strings, contentPadding = padding)
 }
+```
+
+When your screen has no title of its own, pass `showTitle = true`: `strings.historyTitle` then shows as a heading
+(for TalkBack too) at the top of the list and scrolls with it. It is off by default. There is still no top bar or
+back button; navigation stays with the app.
+
+```kotlin
+WhatsNewHistoryScreen(history, strings = strings, showTitle = true)
 ```
 
 ## API
@@ -138,10 +155,11 @@ Scaffold(topBar = { TopAppBar(title = { Text(strings.historyTitle) }, navigation
 | `.whatsNew(checker:installedVersion:locale:strings:)` | `WhatsNewPrompt(checker, installedVersion, locales, strings, suppressed, onVisibilityChange)` |
 | `.whatsNew(entries:strings:onDismiss:)` | `WhatsNewPrompt(entries, onDismiss, strings, suppressed, onVisibilityChange)` |
 | `WhatsNewSheet(entries:strings:onContinue:)` | `WhatsNewSheet(entries, strings, onContinue)` |
-| `WhatsNewHistoryView(entries:strings:)` | `WhatsNewHistoryScreen(entries, modifier, strings, contentPadding)` |
+| `WhatsNewHistoryView(entries:strings:)` | `WhatsNewHistoryScreen(entries, modifier, strings, contentPadding, showTitle)` |
 | `WhatsNewStrings(...)` | `WhatsNewStrings(...)`: `title`, `continueButton`, `versionTitle`, `historyTitle`, `installedBadge`, `noNotes`, `emptyHistory` |
 
-`suppressed` and `onVisibilityChange` are Android additions.
+`suppressed`, `onVisibilityChange` and `showTitle` are Android additions (iOS shows `historyTitle` as the navigation
+title).
 
 Accessibility: the sheet title and each version are headings for TalkBack, each bullet is its own node (the "•" is
 not read), and both screens scroll, so nothing clips at the largest font scale. `@Preview`s (light, dark, largest

@@ -33,6 +33,7 @@ Each app repo has one file per release, `whatsnew/<version>.json`:
 | Launch + history | `WhatsNewChecker(source:store:)`, `.onLaunch(installedVersion:locale:)`, `.markSeen()`, `.history(locale:)` | `WhatsNewChecker(source, store)`, same methods |
 | Bundled notes | `BundleReleaseNotesSource(bundle: = .main, subdirectory: = "whatsnew", onSkip:)` | `LoadedReleaseNotesSource(onSkip) { pairs }`, Android `AndroidWhatsNew.assetsSource(assets)` |
 | State | `UserDefaultsWhatsNewStore(defaults: = .standard, keyPrefix:)` | `KeyValueWhatsNewStore(storage, keyPrefix)`, Android `AndroidWhatsNew.store(context)` |
+| History only (read-only) | `WhatsNewChecker().history(locale:)` | Android `AndroidWhatsNew.history(context, locales)` |
 | Installed version | `WhatsNewChecker.installedVersion(bundle:)` (`CFBundleShortVersionString`) | Android `AndroidWhatsNew.installedVersion(context)` (`versionName`) |
 | Plug-in points | `WhatsNewStore`, `ReleaseNotesSource` protocols | `WhatsNewStore`, `ReleaseNotesSource`, `KeyValueStorage` interfaces |
 
@@ -58,6 +59,15 @@ if (entries.isNotEmpty()) {
     whatsNew.markSeen()
 }
 val all = whatsNew.history(AndroidWhatsNew.preferredLocales())
+```
+
+For a Settings screen that has no checker of its own, `AndroidWhatsNew.history(context)` returns the same list as
+`AndroidWhatsNew.checker(context).history(locales)` (locales default to `AndroidWhatsNew.preferredLocales()`). It is
+read-only: it never appends to the install history or marks anything seen, so it cannot change what the next launch
+shows. It reads the bundled assets, so call it off the main thread:
+
+```kotlin
+val all = withContext(Dispatchers.IO) { AndroidWhatsNew.history(context) }
 ```
 
 Outside Android (e.g. a consumer app's shared Kotlin code) pass any loader:

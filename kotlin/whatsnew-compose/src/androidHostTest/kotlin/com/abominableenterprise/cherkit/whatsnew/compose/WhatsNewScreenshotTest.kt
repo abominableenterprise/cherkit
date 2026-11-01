@@ -50,6 +50,12 @@ class WhatsNewScreenshotTest {
     @Test
     fun historyDark() = history(dark = true, "history-dark")
 
+    @Test
+    fun historyWithTitleLight() = history(dark = false, "history-title-light", showTitle = true)
+
+    @Test
+    fun historyWithTitleDark() = history(dark = true, "history-title-dark", showTitle = true)
+
     private fun sheet(dark: Boolean, name: String) {
         compose.setContent {
             WhatsNewPreviewTheme(dark) {
@@ -75,8 +81,10 @@ class WhatsNewScreenshotTest {
         save(draw(compose.activity.window.decorView), name)
     }
 
-    private fun history(dark: Boolean, name: String) {
-        compose.setContent { WhatsNewPreviewTheme(dark) { WhatsNewHistoryScreen(WhatsNewPreviewData.history) } }
+    private fun history(dark: Boolean, name: String, showTitle: Boolean = false) {
+        compose.setContent {
+            WhatsNewPreviewTheme(dark) { WhatsNewHistoryScreen(WhatsNewPreviewData.history, showTitle = showTitle) }
+        }
         compose.waitForIdle()
         save(draw(compose.activity.window.decorView), name)
     }

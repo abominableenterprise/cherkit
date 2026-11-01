@@ -53,6 +53,13 @@ import kotlin.time.Duration
  *   goes away, e.g. to hold back your own work while it is open. Not called for the hard block.
  * @param onPromptChange Called with the prompt now showing whenever it changes: [SunsetPromptKind.SOFT],
  *   [SunsetPromptKind.HARD] (the hard block) or `null` (neither). Never called for the initial `null`.
+ * @param onFirstCheckComplete Called once the launch check's first attempt has finished, whatever it found: up to
+ *   date, a soft or hard update, or a failed fetch (which fails open). At once for [SunsetChecker.disabled]. At most
+ *   once per process: recomposition, rebuilding the root, recreating the activity and later re-checks (on return from
+ *   the background, or the quick retry after a failure) never call it again. [onPromptChange] and
+ *   [onVisibilityChange] for that first decision run before it, so when it runs the prompt kind you got is final for
+ *   the launch: e.g. hold back the "What's new" sheet until then (see the README). The fetch has a timeout
+ *   ([SunsetChecker.timeout], 5 seconds by default), so it always comes.
  */
 @Composable
 public fun SunsetPrompt(
@@ -62,6 +69,7 @@ public fun SunsetPrompt(
     strings: SunsetStrings = SunsetStrings(),
     appIcon: Painter? = null,
     onPromptChange: (SunsetPromptKind?) -> Unit = {},
+    onFirstCheckComplete: (() -> Unit)? = null,
     onVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
@@ -73,6 +81,8 @@ public fun SunsetPrompt(
         appIcon = appIcon,
         onVisibilityChange = onVisibilityChange,
         onPromptChange = onPromptChange,
+        onFirstCheckComplete = onFirstCheckComplete,
+        disabled = checker.isDisabled,
         check = {
             checker.checkReportingFailure(
                 AndroidSunset.installedVersion(context),
@@ -93,6 +103,8 @@ internal fun SunsetCheckerPrompt(
     appIcon: Painter?,
     onVisibilityChange: (Boolean) -> Unit,
     onPromptChange: (SunsetPromptKind?) -> Unit = {},
+    onFirstCheckComplete: (() -> Unit)? = null,
+    disabled: Boolean = false,
     check: suspend () -> SunsetCheckOutcome,
 ) {
     val currentCheck by rememberUpdatedState(check)
@@ -120,6 +132,28 @@ internal fun SunsetCheckerPrompt(
         appIcon = appIcon,
         onVisibilityChange = onVisibilityChange,
         onPromptChange = onPromptChange,
+    )
+    // After the prompt above, so its onPromptChange / onVisibilityChange effects for the same decision run first.
+    ReportFirstSunsetCheck(runner, settled = disabled || runner.firstCheckFinished, onFirstCheckComplete)
+}
+
+/** The 0.4.0 signature, kept so code compiled against it still links. Source calls resolve to the one above. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun SunsetPrompt(
+    checker: SunsetChecker,
+    minimumInterval: Duration = SunsetCheckScheduler.DEFAULT_MINIMUM_INTERVAL,
+    memory: SunsetSoftPromptMemory = rememberSunsetSoftPromptMemory(),
+    strings: SunsetStrings = SunsetStrings(),
+    appIcon: Painter? = null,
+    onPromptChange: (SunsetPromptKind?) -> Unit = {},
+    onVisibilityChange: (Boolean) -> Unit = {},
+) {
+    SunsetPrompt(
+        checker, minimumInterval, memory, strings, appIcon,
+        onPromptChange = onPromptChange,
+        onFirstCheckComplete = null,
+        onVisibilityChange = onVisibilityChange,
     )
 }
 
