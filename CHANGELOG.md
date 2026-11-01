@@ -4,6 +4,54 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.3.0
+
+No breaking changes. One behavior change: a failed Sunset check is retried once and doesn't use up
+`minimumInterval` (see Sunset).
+
+### Sunset
+
+- fixed: `.sunsetPrompt(checker:)` (CherKitUI) and `SunsetPrompt(checker = ...)` (sunset-compose) no longer miss a
+  hard block until the next cold start when a check fails (fetch dropped or timed out, or a body that doesn't parse,
+  with no usable cached config, e.g. on a fresh install). A failed check no longer counts toward `minimumInterval`;
+  it is retried once about 3 seconds later, and if that fails too, the next return from the background re-checks
+  whatever the interval. After a success the interval applies again.
+- added: `SunsetChecker.isDisabled` is public and read-only on both platforms, `true` only for
+  `SunsetChecker.disabled` (Swift) / `SunsetChecker.disabled()` (Kotlin), so app tests can assert they wired the
+  switched-off checker.
+- added: `SunsetChecker.checkReportingFailure(installedVersion, osVersion, locale)` (Kotlin) returns a
+  `SunsetCheckOutcome(decision, failed)`, where `failed` means no usable config at all. `check(...)` is unchanged and
+  still fails open; most apps keep calling it.
+- added: `SunsetCheckScheduler` (Kotlin, common code), the pure rule for when to check, the same as CherKitUI's:
+  launch, return from the background, skip while a check is running, `minimumInterval`, and the quick retry
+  (`checkFinished(failed)` returns whether to schedule it; `shouldRetry(now)`, `failuresInARow`, `isRetryPending`).
+
+### Sunset Compose (`:sunset-compose`)
+
+Targets Android (a JVM artifact is published for tooling).
+
+- added: `SunsetPrompt(checker = ..., minimumInterval = 1.hours)` runs the Sunset check and shows the prompts, the
+  Android twin of CherKitUI's `.sunsetPrompt(checker:)`. It calls `AndroidSunset.check(checker, context)` once per
+  process at first composition, again only on a real return from the background (Lifecycle `ON_STOP`, then
+  `ON_RESUME`; not the first `ON_RESUME`, `ON_PAUSE` → `ON_RESUME` or a rotation), never while a check is running,
+  and at most once per `minimumInterval`. The decision drives the same soft dialog and hard block;
+  `SunsetChecker.disabled()` shows nothing. No new dependency: it uses `androidx.lifecycle:lifecycle-runtime-compose`,
+  which Compose `ui` already brings.
+- added: `onVisibilityChange: (Boolean) -> Unit = {}` on both `SunsetPrompt` overloads, called with `true` when the
+  soft "Update available" dialog appears and `false` when it goes away (the hard block is not reported). Apps that
+  run their own checks can skip them while it is open instead of copying `SunsetSoftPromptRule` and the stored
+  "Not now" version. The `SunsetPrompt(decision, ...)` overload stays source and binary compatible.
+- changed: the module README and the `SunsetPrompt` KDoc show `SunsetPrompt(checker = ...)` and
+  `AndroidSunset.check(checker, context)` instead of the deprecated `checker.check(context)` extension.
+
+### UI (SwiftUI, `CherKitUI`)
+
+- added: `tintLabel: Color?` on both `.sunsetPrompt` modifiers and on `SunsetUpdateView` sets the label color of the
+  hard "Update required" button on the `tint` fill. With `nil` (the default) the label is now black or white from
+  the tint's WCAG relative luminance in the current light or dark mode (white while it keeps 3:1 contrast, black on
+  brighter tints), so a bright tint such as a light dark-mode accent no longer gets an unreadable white label.
+  Without `tint` nothing changes.
+
 ## 0.2.0
 
 No breaking changes. New Android module `sunset-compose`; one Kotlin extension is deprecated (see Sunset).
