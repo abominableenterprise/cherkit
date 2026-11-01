@@ -1,6 +1,7 @@
 # CherKitUI
 
-SwiftUI views for CherKit modules, one folder per module (`Sunset/`, `WhatsNew/`). The only target that may import SwiftUI.
+SwiftUI views for CherKit modules, one folder per module (`Sunset/`, `WhatsNew/`, `Review/`; `Shared/` holds helpers
+they share). The only target that may import SwiftUI.
 Every file is wrapped in `#if canImport(SwiftUI)` so Linux builds stay green; rendering is verified on macOS only.
 A module PR edits only its own folder here.
 
@@ -85,6 +86,12 @@ Options, all with defaults:
   keeps at least 3:1 contrast (the bold-text minimum, so e.g. system blue keeps its white label), black on brighter
   tints such as a light dark-mode accent. Ignored without `tint`, which keeps the system look.
 
+- `onVisibilityChange: ((Bool) -> Void)?`: `true` when the soft alert appears, `false` when it goes away (answered,
+  cleared, or the view goes away). Not called for the hard block.
+- `onPromptChange: ((SunsetPromptKind?) -> Void)?`: which prompt is showing, `.soft`, `.hard` or `nil`, whenever that
+  changes (never for the initial `nil`). Like Android's `SunsetPrompt(onPromptChange:)`. Use it to report both prompts
+  to Review (see [Review](#review)).
+
 `SunsetUpdateView(prompt:strings:appIcon:tint:tintLabel:)` can also be used on its own. It scrolls, so it does not clip on small
 screens or at the largest Dynamic Type sizes. `SunsetSoftPromptRule.shouldShow(_:version:dismissedVersion:)` is the
 pure "show the soft prompt?" rule the modifier uses.
@@ -117,7 +124,12 @@ struct ExampleApp: App {
 - `markSeen()` runs when the sheet is dismissed (Continue or swipe), never before, so notes the user never saw come
   back next launch.
 - Optional parameters: `installedVersion:` (default `CFBundleShortVersionString`), `locale:` (default
-  `Locale.preferredLanguages`) and `strings:`.
+  `Locale.preferredLanguages`), `strings:`, plus `suppressed:` and `onVisibilityChange:` below.
+- `suppressed: Bool`: while `true` the sheet waits, or is taken away again without counting as a dismissal (so
+  `markSeen()` does not run); it shows once this turns `false`. Pass `suppressed: sunsetKind != nil` so Sunset goes
+  first (see [Review](#review)).
+- `onVisibilityChange: ((Bool) -> Void)?`: `true` when the sheet is presented, `false` when it goes away, e.g. to
+  report it to Review as `ReviewInterruption.whatsNew`.
 
 To drive it yourself, pass the entries and a dismiss action; it presents whenever `entries` becomes a new non-empty
 list and calls `onDismiss` once per dismissal:
@@ -125,6 +137,8 @@ list and calls `onDismiss` once per dismissal:
 ```swift
 ContentView().whatsNew(entries: entries) { whatsNew.markSeen() }
 ```
+
+It takes the same `suppressed:` and `onVisibilityChange:` parameters.
 
 The full history, for Settings (it sets its own navigation title; push it inside your `NavigationStack`):
 
@@ -143,3 +157,60 @@ improvements.".
   environment's `dismiss`.
 - Both views scroll, so nothing clips on small screens or at the largest Dynamic Type sizes; headings and bullets are
   separate VoiceOver elements.
+
+## Review
+
+The App Store review prompt for the `ReviewCoordinator` rules in `CherKitReview` (see the
+[Review module README](../../kotlin/review/README.md)). Keep one coordinator for the app's lifetime, inject it, and
+attach `.reviewPrompt(coordinator:)` to your main screens (not to a sheet):
+
+```swift
+import CherKitReview
+import CherKitUI
+
+let review = isTestHarness ? .disabled : ReviewCoordinator(enabled: !isDebugBuild)
+
+HomeView()
+    .reviewPrompt(coordinator: review, isIdle: !isEditing)
+```
+
+- It runs only while the view is on screen, its scene is `.active` and `isIdle` is true. It waits `settleDelay`
+  (1.5 s by default) first, then checks `shouldPrompt(isIdle:)`, and checks again every `settleDelay` (after any
+  interruption cooldown) while the screen stays idle. Returning to the app or `isIdle` turning true starts over.
+- `markPrompted()` runs right before StoreKit's `requestReview`. **The version counts as prompted even if StoreKit's
+  quota shows nothing**: StoreKit gives no signal either way. `requestReview` never throws, so failures stay quiet.
+- `ReviewCoordinator.disabled` (or `enabled: false`) does nothing. Pass it in debug builds and under every test
+  harness, not only XCTest: UI-test launch arguments, fixtures and previews too. `AnalyticsTestHost.isRunningTests`
+  (`CherKitAnalytics`) detects XCTest if you already link it:
+
+```swift
+let isTestHarness = AnalyticsTestHost.isRunningTests || ProcessInfo.processInfo.arguments.contains("-uiTesting")
+let review = isTestHarness ? .disabled : ReviewCoordinator(isEligible: { !session.isKidDevice })
+```
+
+Report your own sheets, alerts and banners, so the review never shows over them and waits a cooldown after them:
+
+```swift
+.sheet(isPresented: $showPaywall) { PaywallView() }
+.reviewInterruption(isPresented: showPaywall, source: "paywall", coordinator: review)
+```
+
+Sunset and What's New hook in through their callbacks. Show Sunset first: hold What's New while either Sunset prompt
+is up.
+
+```swift
+@State private var sunsetKind: SunsetPromptKind?
+
+ContentView()
+    .sunsetPrompt(checker: sunset, onPromptChange: { kind in
+        sunsetKind = kind
+        review.setSunsetPromptKind(kind)   // .soft → ReviewInterruption.sunsetPrompt, .hard → .sunsetBlock
+    })
+    .whatsNew(checker: whatsNew, suppressed: sunsetKind != nil, onVisibilityChange: {
+        review.setInterruptionVisible($0, source: ReviewInterruption.whatsNew)
+    })
+    .reviewPrompt(coordinator: review)
+```
+
+The soft alert alone, in one line:
+`.sunsetPrompt(checker: c, onVisibilityChange: { review.setInterruptionVisible($0, source: ReviewInterruption.sunsetPrompt) })`.

@@ -14,7 +14,7 @@ its own product, so an app imports only what it needs.
 | [Review Compose](kotlin/review-compose/README.md) | Play In-App Review and Compose effects for Review (Android) | n/a | `:review-compose` |
 | [WhatsNew](kotlin/whatsnew/README.md) | "What's new" notes and installed-version history | `CherKitWhatsNew` | `:whatsnew` |
 | [Review](kotlin/review/README.md) | Store-review prompt rules: when to ask, once per version, never over a modal (core only, no UI yet) | `CherKitReview` | `:review` |
-| [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew | `CherKitUI` | n/a |
+| [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew, and the App Store review prompt | `CherKitUI` | n/a |
 
 Status: v0.3.0: Analytics (PostHog), Sunset and WhatsNew logic plus SwiftUI views; Android UI: Sunset Compose only.
 
@@ -26,7 +26,7 @@ Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
 
 Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
 "Up to Next Major Version" from 0.3.0), then link only the products you use:
-`CherKitAnalytics`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew) and
+`CherKitAnalytics`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
 ```swift

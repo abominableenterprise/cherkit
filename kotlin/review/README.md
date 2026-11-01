@@ -1,7 +1,8 @@
 # CherKit Review
 
 The store-review ("rate this app") rules: when to ask, never too often, never over a modal. This module is the
-**contract and core rules only**: no platform review API, no UI. The SwiftUI adapter (`AppStore.requestReview`) and the
+**contract and core rules only**: no platform review API, no UI. The SwiftUI adapter
+([CherKitUI](../../Sources/CherKitUI/README.md#review): `.reviewPrompt` over StoreKit's `requestReview`) and the
 Android adapter ([review-compose](../review-compose/README.md): Play In-App Review plus Compose effects) build on it.
 
 Swift: `Sources/CherKitReview` ([Swift usage](../../Sources/CherKitReview/README.md)), Foundation only. Kotlin:
@@ -54,7 +55,7 @@ ReviewPromptEffect(review, isIdle = !isEditing)                     // review-co
 ## Sunset counts as an interruption
 
 `:review` does not depend on `:sunset` (and `CherKitReview` not on `CherKitSunset`/`CherKitUI`); the automatic bridge
-belongs in the platform adapters. Until then, hook it up in one line per prompt, with the well-known sources
+belongs in the platform adapters, which report them in one line per prompt with the well-known sources
 `ReviewInterruption.SUNSET_PROMPT` / `.sunsetPrompt` (soft dialog) and `SUNSET_BLOCK` / `.sunsetBlock` (hard block).
 Kotlin also has `ReviewInterruption.WHATS_NEW` (`"whatsNew"`, the same string as Swift's `.whatsNew`) for the
 "What's new" sheet.
@@ -73,16 +74,14 @@ SunsetPrompt(checker = checker, onPromptChange = { kind ->
 `SunsetPrompt(checker = c, onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.SUNSET_PROMPT) })`
 keeps working but misses the hard block; use `onPromptChange` for it.
 
-```swift
-// Decision-based `.sunsetPrompt(decision:)`: report the hard block from the decision you hold.
-.onChange(of: decision) { decision in
-    if case .hardUpdate? = decision { review.setInterruptionVisible(true, source: ReviewInterruption.sunsetBlock) }
-    else { review.setInterruptionVisible(false, source: ReviewInterruption.sunsetBlock) }
-}
-```
+On iOS, both `.sunsetPrompt` modifiers take `onPromptChange` (`SunsetPromptKind.soft`, `.hard` or `nil`), and
+`ReviewCoordinator.setSunsetPromptKind(_:)` (in `CherKitUI`) reports both sources; `.whatsNew(onVisibilityChange:)`
+reports the sheet as `ReviewInterruption.whatsNew` (`"whatsNew"`):
 
-The SwiftUI `.sunsetPrompt` modifiers have no visibility callback yet; the iOS adapter PR wires both Sunset sources
-automatically inside `CherKitUI`, which already depends on Sunset.
+```swift
+.sunsetPrompt(checker: sunset, onPromptChange: { review.setSunsetPromptKind($0) })
+.whatsNew(checker: whatsNew, onVisibilityChange: { review.setInterruptionVisible($0, source: ReviewInterruption.whatsNew) })
+```
 
 ## Storage
 
