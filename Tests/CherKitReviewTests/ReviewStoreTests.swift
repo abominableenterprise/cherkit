@@ -52,7 +52,7 @@ final class ReviewStoreTests: XCTestCase {
         let disabled = ReviewCoordinator.disabled
         XCTAssertTrue(disabled.isDisabled)
         disabled.arm()
-        disabled.setInterruptionVisible(true, source: ReviewInterruption.sunset)
+        disabled.setInterruptionVisible(true, source: ReviewInterruption.sunsetBlock)
         XCTAssertFalse(disabled.isDue)
         XCTAssertFalse(disabled.shouldPrompt())
         XCTAssertTrue(disabled.visibleInterruptions.isEmpty)

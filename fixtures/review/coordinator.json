@@ -306,12 +306,12 @@
       "steps": [
         { "do": "arm" },
         { "do": "interruption", "source": "paywall", "visible": true },
-        { "do": "interruption", "source": "sunset", "visible": true },
+        { "do": "interruption", "source": "sunset.prompt", "visible": true },
         { "do": "advance", "seconds": 300 },
         { "do": "interruption", "source": "paywall", "visible": false },
         { "do": "advance", "seconds": 300 },
         { "do": "check", "shouldPrompt": false, "isDue": true, "cooldownRemaining": 0 },
-        { "do": "interruption", "source": "sunset", "visible": false },
+        { "do": "interruption", "source": "sunset.prompt", "visible": false },
         { "do": "check", "shouldPrompt": false, "cooldownRemaining": 120 },
         { "do": "advance", "seconds": 120 },
         { "do": "check", "shouldPrompt": true }
@@ -332,10 +332,10 @@
       ]
     },
     {
-      "name": "the Sunset hard block (source sunset) blocks the prompt while it is up",
+      "name": "the Sunset hard block (source sunset.block) blocks the prompt while it is up",
       "version": "1.0",
       "steps": [
-        { "do": "interruption", "source": "sunset", "visible": true },
+        { "do": "interruption", "source": "sunset.block", "visible": true },
         { "do": "recordSuccess", "times": 5 },
         { "do": "check", "shouldPrompt": false, "isDue": true },
         { "do": "advance", "seconds": 86400 },
