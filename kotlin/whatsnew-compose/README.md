@@ -6,7 +6,7 @@ behavior and English text. Android only (the `jvm` artifact carries just the str
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.3.0") // brings :whatsnew; from the release after 0.3.0
+    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.4.0") // brings :whatsnew
 }
 ```
 
@@ -22,11 +22,11 @@ Keep one checker for the app's lifetime and put `WhatsNewPrompt` in your root co
 fun Root() {
     val context = LocalContext.current
     val whatsNew = remember { AndroidWhatsNew.checker(context.applicationContext) } // assets/whatsnew/ + SharedPreferences
-    var sunsetVisible by remember { mutableStateOf(false) }
+    var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
 
     AppContent()
-    SunsetPrompt(checker = sunset, onVisibilityChange = { sunsetVisible = it })
-    WhatsNewPrompt(checker = whatsNew, suppressed = sunsetVisible)
+    SunsetPrompt(checker = sunset, onPromptChange = { sunsetKind = it })
+    WhatsNewPrompt(checker = whatsNew, suppressed = sunsetKind != null)
 }
 ```
 
@@ -50,23 +50,35 @@ Options, all with defaults:
 
 ### Order with Sunset and the review prompt
 
-Pass `suppressed = sunsetVisible`, fed from `SunsetPrompt`'s `onVisibilityChange`, so the soft "Update available"
-dialog and the "What's new" sheet never stack: while the dialog shows, the sheet waits (or steps aside) and it
-comes back afterwards. This only covers the time the soft dialog is visible, with two limits:
+Pass `suppressed = sunsetKind != null`, fed from `SunsetPrompt`'s `onPromptChange` (`SOFT`, `HARD` or `null`), so
+the "What's new" sheet never stacks with either Sunset prompt: while the soft "Update available" dialog or the hard
+"Update required" block shows, the sheet waits (or steps aside) and comes back afterwards. `onVisibilityChange`
+reports the soft dialog only, so prefer `onPromptChange`.
 
-- `sunsetVisible` is `false` while Sunset's first check is still fetching, so the sheet can appear first; a soft
-  update decided after that takes the sheet away until the dialog is answered. To always show Sunset first, gate
-  `suppressed` on your own "first Sunset check finished" flag too (and release it if the check fails).
-- `SunsetPrompt`'s `onVisibilityChange` does not report the hard "Update required" block, so with only
-  `sunsetVisible` the sheet can open on top of it. Nobody gets past the block: dismissing the sheet leaves it in
-  place. If your Sunset version reports the hard block, suppress the sheet for it too.
+`onPromptChange` says nothing while Sunset's first check is still fetching, so the sheet can appear first and step
+aside when a prompt comes. To always show Sunset first, keep `suppressed` true until that first check finishes. Run
+the check yourself with the `decision` overload, which tells you when it is done (it fails open, so it always
+finishes):
+
+```kotlin
+var sunsetDecision by remember { mutableStateOf<SunsetDecision?>(null) }
+var sunsetChecked by remember { mutableStateOf(false) }
+var sunsetKind by remember { mutableStateOf<SunsetPromptKind?>(null) }
+LaunchedEffect(Unit) {
+    sunsetDecision = AndroidSunset.check(sunset, context)
+    sunsetChecked = true
+}
+
+SunsetPrompt(sunsetDecision, onDecisionHandled = { sunsetDecision = null }, onPromptChange = { sunsetKind = it })
+WhatsNewPrompt(checker = whatsNew, suppressed = !sunsetChecked || sunsetKind != null)
+```
 
 To keep a store-review prompt from appearing over the sheet, report it as an interruption:
 
 ```kotlin
 WhatsNewPrompt(
     checker = whatsNew,
-    suppressed = sunsetVisible,
+    suppressed = sunsetKind != null,
     onVisibilityChange = { review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) },
 )
 ```

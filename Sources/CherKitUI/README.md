@@ -126,8 +126,9 @@ struct ExampleApp: App {
 - Optional parameters: `installedVersion:` (default `CFBundleShortVersionString`), `locale:` (default
   `Locale.preferredLanguages`), `strings:`, plus `suppressed:` and `onVisibilityChange:` below.
 - `suppressed: Bool`: while `true` the sheet waits, or is taken away again without counting as a dismissal (so
-  `markSeen()` does not run); it shows once this turns `false`. Pass `suppressed: sunsetKind != nil` so Sunset goes
-  first (see [Review](#review)).
+  `markSeen()` does not run); it shows once this turns `false`. Pass `suppressed: sunsetKind != nil`, fed from
+  `.sunsetPrompt(onPromptChange:)`, so neither Sunset prompt (soft alert or hard block) stacks with the sheet; keep
+  it `true` until the first Sunset check finishes to always show Sunset first (see [Review](#review)).
 - `onVisibilityChange: ((Bool) -> Void)?`: `true` when the sheet is presented, `false` when it goes away, e.g. to
   report it to Review as `ReviewInterruption.whatsNew`.
 
@@ -210,6 +211,24 @@ ContentView()
         review.setInterruptionVisible($0, source: ReviewInterruption.whatsNew)
     })
     .reviewPrompt(coordinator: review)
+```
+
+`onPromptChange` says nothing while Sunset's first check is still fetching, so the sheet can appear first and step
+aside when a prompt comes. To always show Sunset first, keep `suppressed` true until that first check finishes: run
+the check yourself with the `decision:` form (it fails open, so it always finishes).
+
+```swift
+@State private var sunsetDecision: SunsetDecision?
+@State private var sunsetChecked = false
+@State private var sunsetKind: SunsetPromptKind?
+
+ContentView()
+    .sunsetPrompt(decision: $sunsetDecision, onPromptChange: { sunsetKind = $0 })
+    .whatsNew(checker: whatsNew, suppressed: !sunsetChecked || sunsetKind != nil)
+    .task {
+        sunsetDecision = await sunset.check()
+        sunsetChecked = true
+    }
 ```
 
 The soft alert alone, in one line:
