@@ -5,6 +5,9 @@ final class RecordingBackend: TelemetryBackend {
     enum Failure: Error { case expected }
     var calls: [String] = []
     var failNext: Set<String> = []
+    var restrictionUpdates: [Bool] = []
+    var appliedRestriction: Bool?
+    var startRestrictions: [Bool?] = []
     var errors: [TelemetryError] = []
     var breadcrumbs: [String] = []
     var traceNames: [String] = []
@@ -20,7 +23,15 @@ final class RecordingBackend: TelemetryBackend {
         if failNext.remove(name) != nil { throw Failure.expected }
     }
 
-    func start() throws { try call("start") }
+    func update(restricted: Bool) throws {
+        restrictionUpdates.append(restricted)
+        if failNext.remove("update") != nil { throw Failure.expected }
+        appliedRestriction = restricted
+    }
+    func start() throws {
+        startRestrictions.append(appliedRestriction)
+        try call("start")
+    }
     func stop() throws {
         liveTraces.removeAll()
         try call("stop")

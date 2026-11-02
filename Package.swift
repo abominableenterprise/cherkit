@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "CherKitCore", targets: ["CherKitCore"]),
         .library(name: "CherKitAnalytics", targets: ["CherKitAnalytics"]),
         .library(name: "CherKitTelemetry", targets: ["CherKitTelemetry"]),
+        .library(name: "CherKitTelemetryFirebase", targets: ["CherKitTelemetryFirebase"]),
         .library(name: "CherKitSunset", targets: ["CherKitSunset"]),
         .library(name: "CherKitWhatsNew", targets: ["CherKitWhatsNew"]),
         .library(name: "CherKitReview", targets: ["CherKitReview"]),
@@ -35,6 +36,18 @@ let package = Package(
             exclude: ["README.md"]
         ),
         .target(name: "CherKitTelemetry", dependencies: ["CherKitCore"]),
+        .target(
+            name: "CherKitTelemetryFirebase",
+            dependencies: [
+                "CherKitTelemetry", "CherKitCore",
+                .product(name: "FirebaseCrashlytics", package: "firebase-ios-sdk",
+                         condition: .when(platforms: [.iOS, .macOS])),
+                // Firebase Performance does not support macOS.
+                .product(name: "FirebasePerformance", package: "firebase-ios-sdk",
+                         condition: .when(platforms: [.iOS])),
+            ],
+            exclude: ["README.md"]
+        ),
         .target(name: "CherKitSunset", dependencies: ["CherKitCore"], exclude: ["README.md"]),
         .target(name: "CherKitWhatsNew", dependencies: ["CherKitCore"], exclude: ["README.md"]),
         // CherKitReview: store-review prompt rules only; the StoreKit/SwiftUI adapter lives in CherKitUI.
@@ -50,6 +63,8 @@ let package = Package(
         .testTarget(name: "CherKitCoreTests", dependencies: ["CherKitCore", "CherKitTestSupport"]),
         .testTarget(name: "CherKitAnalyticsTests", dependencies: ["CherKitAnalytics", "CherKitTestSupport"]),
         .testTarget(name: "CherKitTelemetryTests", dependencies: ["CherKitTelemetry", "CherKitTestSupport"]),
+        .testTarget(name: "CherKitTelemetryFirebaseTests",
+                    dependencies: ["CherKitTelemetryFirebase", "CherKitTelemetry", "CherKitCore"]),
         .testTarget(name: "CherKitSunsetTests", dependencies: ["CherKitSunset", "CherKitTestSupport"]),
         .testTarget(name: "CherKitWhatsNewTests", dependencies: ["CherKitWhatsNew", "CherKitTestSupport"]),
         .testTarget(name: "CherKitReviewTests", dependencies: ["CherKitReview", "CherKitTestSupport"]),
