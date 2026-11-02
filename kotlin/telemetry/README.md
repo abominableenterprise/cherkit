@@ -69,8 +69,9 @@ val telemetry = Telemetry(
     backend = myBackend,
     buildEnabled = !BuildConfig.DEBUG && !AnalyticsTestHost.isRunningTests && !isEmulator,
 )
-telemetry.enabled = settings.diagnosticsEnabled
+// Apply restriction before enabled: assigning enabled may start automatic collection.
 telemetry.restricted = session.isRestricted
+telemetry.enabled = settings.diagnosticsEnabled
 telemetry.breadcrumb("sync.started", mapOf("source" to "manual"))
 telemetry.recordError(domain = "storage", code = 3, attributes = mapOf("retry" to true))
 telemetry.setKey("app.version", AppVersion.parse("1.2.3")!!)
@@ -93,7 +94,7 @@ build/user gate, not restricted mode (errors remain available there).
 
 Adapters implement `start`, `stop`, `recordError`, `breadcrumb`, `startTrace` (returning an opaque string ID),
 `stopTrace`, `setAttribute` and `setKey`. Kotlin adapters may also override the default no-op
-`setRestricted(restricted: Boolean)`: the core calls it with the current state before every `start`, and immediately
+`updateRestricted(restricted: Boolean)`: the core calls it with the current state before every `start`, and immediately
 on each restriction change while the backend is active, after terminating live spans. Unchanged assignments do not
 call the hook; assigning `restricted` never starts an inactive backend. The hook must apply the restriction without
 starting collection itself. In restricted sessions it must disable automatic diagnostics and Performance collection

@@ -97,7 +97,7 @@ It blocks debuggable apps, detects common JVM/instrumentation test hosts and emu
 accepts explicit app flags for hosts those heuristics miss. Never pass false test/emulator flags on a test host.
 Use one instance on the main thread. `FirebaseTelemetryBackend(performanceEnabled = false)` is also public for
 apps constructing `Telemetry` themselves; those apps must supply the core build gate and set restriction before
-opening `enabled`. It implements the existing backend methods plus the additive default `setRestricted` hook.
+opening `enabled`. It implements the existing backend methods plus the additive default `updateRestricted(restricted: Boolean)` hook.
 
 ### Performance privacy and opt-in
 

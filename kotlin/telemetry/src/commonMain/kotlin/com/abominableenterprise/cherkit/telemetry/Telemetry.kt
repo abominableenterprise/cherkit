@@ -29,7 +29,7 @@ public class Telemetry(
             // Finish while diagnostics are still permitted, before storing a restrictive gate.
             invalidateSpans()
             field = value
-            if (backendStarted && !bestEffort { backend.setRestricted(value) }) {
+            if (backendStarted && !bestEffort { backend.updateRestricted(value) }) {
                 backendStarted = false
                 bestEffort { backend.stop() }
             }
@@ -128,7 +128,7 @@ public class Telemetry(
 
     private fun ensureStarted(): Boolean {
         if (!backendStarted) {
-            backendStarted = bestEffort { backend.setRestricted(restricted) } &&
+            backendStarted = bestEffort { backend.updateRestricted(restricted) } &&
                 bestEffort { backend.start() }
             // A provider may have partly opted in before throwing. Roll that attempt back.
             if (!backendStarted) bestEffort { backend.stop() }

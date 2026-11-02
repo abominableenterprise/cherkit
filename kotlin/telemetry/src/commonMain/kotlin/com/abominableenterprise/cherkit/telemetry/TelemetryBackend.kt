@@ -10,7 +10,7 @@ public interface TelemetryBackend {
      * errors only: disable automatic diagnostics and performance collection without starting here.
      * A failure prevents startup, or stops an active backend. Default is a no-op for manual-only adapters.
      */
-    public fun setRestricted(restricted: Boolean) {}
+    public fun updateRestricted(restricted: Boolean) {}
     public fun start()
     public fun stop()
     public fun recordError(error: TelemetryError, attributes: Map<String, Any>)

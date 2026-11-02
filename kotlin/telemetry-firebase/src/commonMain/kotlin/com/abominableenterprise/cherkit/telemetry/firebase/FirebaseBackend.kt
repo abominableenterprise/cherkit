@@ -32,7 +32,7 @@ internal class FirebaseBackend(
         clearKeys()
     }
 
-    override fun setRestricted(restricted: Boolean) {
+    override fun updateRestricted(restricted: Boolean) {
         this.restricted = restricted
         if (restricted) {
             bestEffort { client.performanceCollection(false) }

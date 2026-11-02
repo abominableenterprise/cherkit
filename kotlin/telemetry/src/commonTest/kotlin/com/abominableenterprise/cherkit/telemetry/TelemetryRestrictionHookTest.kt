@@ -6,6 +6,18 @@ import kotlin.test.assertTrue
 
 class TelemetryRestrictionHookTest {
     @Test
+    fun updateRestrictedDefaultsToNoOpForExistingBackends() {
+        val backend: TelemetryBackend = RecordingBackend()
+        backend.updateRestricted(true)
+        backend.updateRestricted(false)
+        assertTrue((backend as RecordingBackend).calls.isEmpty())
+        val telemetry = Telemetry(backend, true)
+        telemetry.restricted = true
+        telemetry.recordError("network", 1)
+        assertEquals(listOf("start", "error"), backend.calls)
+    }
+
+    @Test
     fun currentRestrictionIsAppliedBeforeEveryStart() {
         for (restricted in listOf(false, true)) {
             val backend = HookBackend()
@@ -114,7 +126,7 @@ class TelemetryRestrictionHookTest {
         val calls: MutableList<String> get() = recording.calls
         var failNextRestriction = false
 
-        override fun setRestricted(restricted: Boolean) {
+        override fun updateRestricted(restricted: Boolean) {
             calls += "restricted:$restricted"
             if (failNextRestriction) {
                 failNextRestriction = false

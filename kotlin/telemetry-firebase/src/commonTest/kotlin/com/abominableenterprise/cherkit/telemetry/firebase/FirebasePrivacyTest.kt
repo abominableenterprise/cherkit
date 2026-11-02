@@ -73,7 +73,7 @@ class FirebasePrivacyTest {
         assertEquals(listOf("sync.ready source=manual"), sdk.logs)
         backend.breadcrumb("private text", emptyMap())
         backend.setKey("bad", Any())
-        backend.setRestricted(true)
+        backend.updateRestricted(true)
         backend.breadcrumb("ready", emptyMap())
         backend.setKey("state", "ready")
         assertEquals("", backend.startTrace("load", emptyMap()))
