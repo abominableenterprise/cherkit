@@ -19,6 +19,8 @@ let package = Package(
         // PostHog SDK for the Analytics adapter, pinned version.
         // Linked only on Apple platforms (see CherKitAnalytics), so Linux never compiles it.
         .package(url: "https://github.com/PostHog/posthog-ios", exact: "3.71.4"),
+        // Firebase products are linked by the optional Apple adapter only.
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", "11.0.0"..<"14.0.0"),
     ],
     targets: [
         // Logic modules: Foundation only, built and tested on Linux.
