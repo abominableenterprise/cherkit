@@ -22,7 +22,12 @@ public struct ReleaseNotes: Hashable, Sendable {
 
     /// The bullets to display for the user's `preferredLocales` (e.g. `Locale.preferredLanguages`), resolved with
     /// ``LocaleFallback``; empty when no locale matches.
-    public func bullets(preferredLocales: [String]) -> [String] {
-        LocaleFallback.resolve(preferred: preferredLocales, available: notes.keys).flatMap { notes[$0] } ?? []
+    public func bullets(preferredLocales: [String], telemetrySink: TelemetrySink? = nil) -> [String] {
+        bullets(preferredLocales: preferredLocales, reportingTo: telemetrySink.map(WhatsNewTelemetry.init))
+    }
+
+    internal func bullets(preferredLocales: [String], reportingTo telemetry: WhatsNewTelemetry?) -> [String] {
+        LocaleFallback.resolve(preferred: preferredLocales, available: notes.keys, reportingTo: telemetry)
+            .flatMap { notes[$0] } ?? []
     }
 }

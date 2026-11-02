@@ -59,6 +59,35 @@ let decision = await checker.check(channel: channel)   // reads CFBundleShortVer
   is available", opens TestFlight on **Update**, and remembers both answers per build with
   `SunsetTestBuildPromptRule` (see the CherKitUI README). If you show it yourself, apply that rule too.
 
+## Optional telemetry
+
+Pass `telemetrySink: telemetry` to either `SunsetChecker` initializer to report through an app's
+`CherKitCore.TelemetrySink` (the `CherKitTelemetry.Telemetry` facade already conforms). The default is `nil`,
+so existing callers do not report anything. The checker stays async and `Sendable`; sink calls are awaited on
+the main actor before `check` returns.
+
+Errors use domain `cherkit.sunset` with empty attributes:
+
+| Code | Meaning |
+| --- | --- |
+| 1 | Config fetch failed (transport error, non-2xx, empty body, or custom source returned `nil`) |
+| 2 | Config timed out (native URLSession timeout or checker deadline) |
+| 3 | Config undecodable or unsupported schema |
+| 4 | Store lookup failed (transport error, non-2xx, empty body, or custom source returned `nil`) |
+| 5 | Store lookup timed out (native URLSession timeout or checker deadline) |
+| 6 | Store lookup undecodable or required result fields unusable |
+
+Each failed attempted source reports exactly once, even when a cached config supplies a successful decision.
+A bad cached body does not add another error. Custom sources keep the existing `fetch(timeout:) -> Data?` API;
+when they return `nil` themselves, no cause is available, so this is code 1 or 4 rather than a timeout code.
+A source that exceeds the checker's deadline is always code 2 or 5. Lookups skipped outside the store channel
+emit nothing, and the disabled checker emits no telemetry.
+
+Every enabled check also emits one `cherkit.sunset.decision` breadcrumb with exactly one attribute, `kind`:
+`none`, `soft`, `hard`, or `test_build`. These describe decisions, not presentation; no UI is instrumented here.
+No error messages, response bodies, URLs, versions, build numbers or user data are passed to the sink.
+The shared cross-platform contract is [`fixtures/sunset/telemetry.json`](../../fixtures/sunset/telemetry.json).
+
 ## Turn it off in UI tests and on the simulator
 
 `SunsetChecker.disabled` always answers `upToDate` without touching the network or the cache:

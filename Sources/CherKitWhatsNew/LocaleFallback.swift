@@ -1,3 +1,5 @@
+import CherKitCore
+
 /// Picks which notes locale to show: `pt-BR` -> `pt` -> (next preferred locale) -> `en`.
 /// The contract is `fixtures/whatsnew/locale.json`.
 public enum LocaleFallback {
@@ -7,7 +9,23 @@ public enum LocaleFallback {
     /// The key of `available` to use for `preferred` (most preferred first, e.g. `Locale.preferredLanguages`).
     /// Each preferred locale is tried, then shortened by dropping trailing subtags; ``defaultLocale`` is tried last.
     /// Matching ignores ASCII case and treats `_` like `-`. Returns the key as spelled in `available`, or `nil`.
-    public static func resolve<Locales: Sequence>(preferred: [String], available: Locales) -> String?
+    /// With a sink, a selection other than the normalized first preference reports code 3 asynchronously, including
+    /// parent locales, later preferences and default English. No selection reports nothing.
+    public static func resolve<Locales: Sequence>(
+        preferred: [String], available: Locales, telemetrySink: TelemetrySink? = nil
+    ) -> String? where Locales.Element == String {
+        resolve(preferred: preferred, available: available, reportingTo: telemetrySink.map(WhatsNewTelemetry.init))
+    }
+
+    internal static func resolve<Locales: Sequence>(
+        preferred: [String], available: Locales, reportingTo telemetry: WhatsNewTelemetry?
+    ) -> String? where Locales.Element == String {
+        let selected = select(preferred: preferred, available: available)
+        if let selected, preferred.first.map(normalize) != normalize(selected) { telemetry?.error(3) }
+        return selected
+    }
+
+    private static func select<Locales: Sequence>(preferred: [String], available: Locales) -> String?
     where Locales.Element == String {
         var byNormalized: [String: String] = [:]
         for key in available.sorted() where byNormalized[normalize(key)] == nil {

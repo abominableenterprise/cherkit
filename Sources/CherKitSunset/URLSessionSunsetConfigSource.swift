@@ -8,7 +8,7 @@ import FoundationNetworking
 /// The request ignores the HTTP cache (local and remote), so a raised `minimumVersion` reaches users on their next
 /// launch. Only a 2xx response with a non-empty body counts; anything else returns `nil` and Sunset falls back to the
 /// cached config.
-public struct URLSessionSunsetConfigSource: SunsetConfigSource {
+public struct URLSessionSunsetConfigSource: SunsetConfigSource, SunsetDetailedSource {
     /// The hosted config file, e.g. `https://example.github.io/app/sunset.json`.
     public let url: URL
     private let session: URLSession
@@ -21,9 +21,11 @@ public struct URLSessionSunsetConfigSource: SunsetConfigSource {
 
     /// The body of a 2xx response, or `nil` on any error, non-2xx status, empty body or after `timeout` seconds.
     public func fetch(timeout: TimeInterval) async -> Data? {
-        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
-        guard let (data, response) = try? await session.data(for: request) else { return nil }
-        return Self.body(data, response: response)
+        await fetchResult(timeout: timeout).data
+    }
+
+    func fetchResult(timeout: TimeInterval) async -> SunsetFetchResult {
+        await SunsetURLSessionFetch.run(url: url, session: session, timeout: timeout)
     }
 
     /// `data` when `response` is an HTTP 2xx and `data` is not empty, else `nil`.

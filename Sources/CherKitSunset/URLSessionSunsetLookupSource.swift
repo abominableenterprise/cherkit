@@ -4,7 +4,7 @@ import FoundationNetworking
 #endif
 
 /// Asks Apple's public App Store lookup with `URLSession` (Foundation only).
-public struct URLSessionSunsetLookupSource: SunsetLookupSource {
+public struct URLSessionSunsetLookupSource: SunsetLookupSource, SunsetDetailedSource {
     /// The lookup URL, e.g. `https://itunes.apple.com/lookup?bundleId=com.example.app&country=us`.
     public let url: URL
     private let session: URLSession
@@ -27,8 +27,10 @@ public struct URLSessionSunsetLookupSource: SunsetLookupSource {
     /// The body of a 2xx response, or `nil` on any error, non-2xx status, empty body or after `timeout` seconds.
     /// The HTTP cache is ignored, like the config's.
     public func fetch(timeout: TimeInterval) async -> Data? {
-        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
-        guard let (data, response) = try? await session.data(for: request) else { return nil }
-        return URLSessionSunsetConfigSource.body(data, response: response)
+        await fetchResult(timeout: timeout).data
+    }
+
+    func fetchResult(timeout: TimeInterval) async -> SunsetFetchResult {
+        await SunsetURLSessionFetch.run(url: url, session: session, timeout: timeout)
     }
 }

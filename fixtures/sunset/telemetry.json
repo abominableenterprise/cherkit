@@ -1,0 +1,310 @@
+{
+  "description": "Sunset telemetry contract. Each check emits errors in config-then-lookup order, exactly once per failed attempted source, and one decision breadcrumb. Errors have domain cherkit.sunset and empty attributes; breadcrumb cherkit.sunset.decision has only kind. A nil sink emits nothing. Config and cached values name bodies below. Source outcomes: failed = custom source returns null; network_error = transport error; http_error = non-2xx response; empty = 2xx empty body (fetch failure); native_timeout = transport timeout; deadline = source exceeds checker deadline; undecodable = malformed JSON; unsupported_schema = config schema 2. Other values name valid bodies. A malformed cache adds no error. Lookup is skipped outside store channel. disabled performs no work or telemetry. cacheSaved describes saving the fetched config only.",
+  "domain": "cherkit.sunset",
+  "breadcrumb": "cherkit.sunset.decision",
+  "codes": {
+    "config_fetch_failed": 1,
+    "config_timeout": 2,
+    "config_undecodable": 3,
+    "store_lookup_failed": 4,
+    "lookup_timeout": 5,
+    "lookup_undecodable": 6
+  },
+  "bodies": {
+    "current": "{\"schemaVersion\":1}",
+    "soft": "{\"schemaVersion\":1,\"ios\":{\"latestVersion\":\"2.0\",\"storeURL\":\"https://apps.apple.com/app/id1\"},\"android\":{\"latestVersion\":\"2.0\",\"storeURL\":\"https://play.google.com/store/apps/details?id=example\"}}",
+    "hard": "{\"schemaVersion\":1,\"ios\":{\"minimumVersion\":\"2.0\",\"storeURL\":\"https://apps.apple.com/app/id1\"},\"android\":{\"minimumVersion\":\"2.0\",\"storeURL\":\"https://play.google.com/store/apps/details?id=example\"}}",
+    "test_build": "{\"schemaVersion\":1,\"ios\":{\"storeURL\":\"https://apps.apple.com/app/id1\",\"testFlight\":{\"latestBuild\":\"2\",\"url\":\"https://testflight.apple.com/join/AbCd1234\"}}}",
+    "lookup_current": "{\"resultCount\":1,\"results\":[{\"version\":\"1.0\",\"minimumOsVersion\":\"16.0\",\"trackViewUrl\":\"https://apps.apple.com/app/id1\"}]}",
+    "lookup_soft": "{\"resultCount\":1,\"results\":[{\"version\":\"2.0\",\"minimumOsVersion\":\"16.0\",\"trackViewUrl\":\"https://apps.apple.com/app/id1\"}]}",
+    "lookup_invalid": "{\"resultCount\":0,\"results\":[]}",
+    "undecodable": "private response text, not JSON",
+    "unsupported_schema": "{\"schemaVersion\":2}"
+  },
+  "cases": [
+    {
+      "name": "config custom failure",
+      "config": "failed",
+      "errors": [
+        1
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "config transport failure",
+      "config": "network_error",
+      "errors": [
+        1
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "config HTTP failure",
+      "config": "http_error",
+      "errors": [
+        1
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "config empty body",
+      "config": "empty",
+      "errors": [
+        1
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "config native timeout",
+      "config": "native_timeout",
+      "errors": [
+        2
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "config deadline",
+      "config": "deadline",
+      "errors": [
+        2
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "config undecodable",
+      "config": "undecodable",
+      "errors": [
+        3
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "config unsupported schema",
+      "config": "unsupported_schema",
+      "errors": [
+        3
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "lookup custom failure",
+      "config": "current",
+      "lookup": "failed",
+      "errors": [
+        4
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup transport failure",
+      "config": "current",
+      "lookup": "network_error",
+      "errors": [
+        4
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup HTTP failure",
+      "config": "current",
+      "lookup": "http_error",
+      "errors": [
+        4
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup empty body",
+      "config": "current",
+      "lookup": "empty",
+      "errors": [
+        4
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup native timeout",
+      "config": "current",
+      "lookup": "native_timeout",
+      "errors": [
+        5
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup deadline",
+      "config": "current",
+      "lookup": "deadline",
+      "errors": [
+        5
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup undecodable",
+      "config": "current",
+      "lookup": "undecodable",
+      "errors": [
+        6
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup invalid fields",
+      "config": "current",
+      "lookup": "lookup_invalid",
+      "errors": [
+        6
+      ],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "both failures reported once",
+      "config": "undecodable",
+      "lookup": "http_error",
+      "errors": [
+        3,
+        4
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "cache fallback still reports fetch failure",
+      "config": "network_error",
+      "cached": "soft",
+      "errors": [
+        1
+      ],
+      "kind": "soft",
+      "cacheSaved": false
+    },
+    {
+      "name": "cache fallback still reports timeout",
+      "config": "deadline",
+      "cached": "hard",
+      "errors": [
+        2
+      ],
+      "kind": "hard",
+      "cacheSaved": false
+    },
+    {
+      "name": "cache fallback still reports parse failure",
+      "config": "undecodable",
+      "cached": "hard",
+      "errors": [
+        3
+      ],
+      "kind": "hard",
+      "cacheSaved": false
+    },
+    {
+      "name": "bad cache adds no duplicate error",
+      "config": "failed",
+      "cached": "undecodable",
+      "errors": [
+        1
+      ],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "fresh success overrides bad cache",
+      "config": "current",
+      "cached": "undecodable",
+      "errors": [],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "soft decision",
+      "config": "soft",
+      "errors": [],
+      "kind": "soft",
+      "cacheSaved": true
+    },
+    {
+      "name": "hard decision",
+      "config": "hard",
+      "errors": [],
+      "kind": "hard",
+      "cacheSaved": true
+    },
+    {
+      "name": "test build decision",
+      "config": "test_build",
+      "channel": "testFlight",
+      "errors": [],
+      "kind": "test_build",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup success no update",
+      "config": "current",
+      "lookup": "lookup_current",
+      "errors": [],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup success soft update",
+      "config": "current",
+      "lookup": "lookup_soft",
+      "errors": [],
+      "kind": "soft",
+      "cacheSaved": true
+    },
+    {
+      "name": "lookup skipped for other channel",
+      "config": "current",
+      "lookup": "failed",
+      "channel": "other",
+      "errors": [],
+      "kind": "none",
+      "cacheSaved": true
+    },
+    {
+      "name": "nil sink failure no-op",
+      "config": "undecodable",
+      "lookup": "failed",
+      "sink": false,
+      "errors": [],
+      "kind": "none",
+      "cacheSaved": false
+    },
+    {
+      "name": "nil sink success no-op",
+      "config": "soft",
+      "sink": false,
+      "errors": [],
+      "kind": "soft",
+      "cacheSaved": true
+    },
+    {
+      "name": "disabled is silent",
+      "config": "failed",
+      "lookup": "failed",
+      "disabled": true,
+      "errors": [],
+      "kind": "none",
+      "cacheSaved": false
+    }
+  ]
+}

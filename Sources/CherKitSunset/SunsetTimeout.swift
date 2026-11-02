@@ -5,18 +5,21 @@ enum SunsetTimeout {
     /// The longest wait, so a huge or infinite timeout still ends.
     static let maximumSeconds: TimeInterval = 600
 
-    /// `operation`'s result, or `nil` when it does not finish within `seconds` (it is then cancelled).
-    /// A zero, negative or NaN `seconds` returns `nil` without starting `operation`.
-    static func run(seconds: TimeInterval, _ operation: @escaping @Sendable () async -> Data?) async -> Data? {
-        guard seconds > 0 else { return nil }
+    /// Preserves the fetch outcome, or returns `timedOut` when the deadline expires (then cancels the work).
+    /// A zero, negative or NaN `seconds` times out without starting `operation`.
+    static func run(
+        seconds: TimeInterval,
+        _ operation: @escaping @Sendable () async -> SunsetFetchResult
+    ) async -> SunsetFetchResult {
+        guard seconds > 0 else { return .timedOut }
         return await withCheckedContinuation { continuation in
             let once = ResumeOnce(continuation)
             let work = Task { await operation() }
             let timer = Task {
                 try? await Task.sleep(nanoseconds: nanoseconds(seconds))
                 guard !Task.isCancelled else { return }
+                once.resume(.timedOut)
                 work.cancel()
-                once.resume(nil)
             }
             Task {
                 once.resume(await work.value)
@@ -34,13 +37,13 @@ enum SunsetTimeout {
 /// Resumes a continuation once, with whichever result arrives first.
 private final class ResumeOnce: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<Data?, Never>?
+    private var continuation: CheckedContinuation<SunsetFetchResult, Never>?
 
-    init(_ continuation: CheckedContinuation<Data?, Never>) {
+    init(_ continuation: CheckedContinuation<SunsetFetchResult, Never>) {
         self.continuation = continuation
     }
 
-    func resume(_ value: Data?) {
+    func resume(_ value: SunsetFetchResult) {
         lock.lock()
         let waiting = continuation
         continuation = nil
