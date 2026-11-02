@@ -10,7 +10,8 @@ its own product, so an app imports only what it needs.
 | --- | --- | --- | --- |
 | [Analytics](kotlin/analytics/README.md) | Typed, opt-in PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
 | [Telemetry](kotlin/telemetry/README.md) | Privacy-filtered errors, breadcrumbs and spans; vendor-free core contract | `CherKitTelemetry` | `:telemetry` |
-| [Telemetry Firebase (Apple)](Sources/CherKitTelemetryFirebase/README.md) | Crashlytics and privacy-gated manual Performance traces | `CherKitTelemetryFirebase` | n/a |
+| [Telemetry Firebase (Apple)](Sources/CherKitTelemetryFirebase/README.md) | Crashlytics and privacy-gated Performance spans | `CherKitTelemetryFirebase` | n/a |
+| [Telemetry Firebase](kotlin/telemetry-firebase/README.md) | Android Crashlytics and opt-in Performance backend | n/a | `:telemetry-firebase` |
 | [Sunset](kotlin/sunset/README.md) | Soft or hard "please update" from a hosted min-version config | `CherKitSunset` | `:sunset` |
 | [Sunset Compose](kotlin/sunset-compose/README.md) | Jetpack Compose update dialog and blocking screen for Sunset (Android) | n/a | `:sunset-compose` |
 | [Review Compose](kotlin/review-compose/README.md) | Play In-App Review and Compose effects for Review (Android) | n/a | `:review-compose` |
@@ -76,6 +77,9 @@ dependencies {
     implementation("com.github.abominableenterprise.cherkit:core:v0.7.0")             // already included by sunset and whatsnew
 }
 ```
+
+Available from the next release: `com.github.abominableenterprise.cherkit:telemetry-firebase:<next-tag>`;
+see [Firebase app-side setup](kotlin/telemetry-firebase/README.md) for the required BoM, SDKs and plugins.
 
 The Kotlin packages stay `com.abominableenterprise.cherkit.<module>`; only the Maven group follows JitPack's
 `com.github.<owner>.<repo>` convention.
