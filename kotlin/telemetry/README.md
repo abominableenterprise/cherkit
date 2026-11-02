@@ -104,7 +104,11 @@ while leaving error reporting available. If the hook throws, the core skips star
 Adapters must clear retained context and traces on `stop`. The core drops all new diagnostic context while restricted;
 adapters must not enable automatic breadcrumb or trace capture. The core cannot retract vendor data already recorded before a
 switch changes. A tiny [TelemetrySink](../../Sources/CherKitCore/TelemetrySink.swift) in Core exposes domain/code
-errors and breadcrumbs for future module wiring; no other module reports telemetry in this PR.
+errors and breadcrumbs without depending on this module. Kotlin `Telemetry` already implements `TelemetrySink`:
+pass the facade as `telemetrySink` to the optional module APIs in [Sunset](../sunset/README.md),
+[WhatsNew](../whatsnew/README.md), [Review](../review/README.md), [Review Compose](../review-compose/README.md)
+and [Update Compose](../update-compose/README.md). Interface calls use the same build/user/restricted gates and
+attribute validation described above. No central configuration registry is needed.
 
 ## Backends: Firebase adapter coming
 

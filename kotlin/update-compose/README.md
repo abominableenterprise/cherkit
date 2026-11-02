@@ -139,6 +139,29 @@ the same.)
   one ask, hide the Sunset soft prompt on Play installs yourself (e.g. pass `SunsetDecision`s through only when the
   installer is not Play).
 
+## Telemetry (optional)
+
+Pass `telemetrySink = telemetry` to `rememberPlayUpdateState` (also covers `completeUpdate`) or
+`PlayUpdatePrompt`. The prompt uses its explicit sink, or the state's sink when omitted. For platform-free
+launches pass it to `UpdateLauncher.launch`. All default to `null`; existing binaries retain hidden deprecated
+entry points. Only the following stable names and integer codes are sent, with empty attributes—never exception
+messages, URLs, versions, package names or user data. Cancellation is not a failure.
+
+| Domain | Code | Meaning |
+| --- | --- | --- |
+| `cherkit.update` | 1 | `appUpdateInfo` request/status failure |
+| `cherkit.update` | 2 | Start-flow failure (throw, false result, or failed activity result) |
+| `cherkit.update` | Play integer error code | `InstallStatus.FAILED`, or `completeUpdate` failure with `InstallException` |
+| `cherkit.update` | 3 | `completeUpdate` failure without a Play error code |
+
+| Breadcrumb | When | Attributes |
+| --- | --- | --- |
+| `cherkit.update.available` | Each successful check reporting an available, not-yet-downloaded update | None |
+| `cherkit.update.downloaded` | First downloaded observation per `UpdateSession`, shared by checks and listener | None |
+
+Play's integer codes are passed unchanged (including zero if Play supplies zero). Sink exceptions do not alter
+update behavior. Missing UI/manager prerequisites remain a quiet no-op, not a failed Play request.
+
 ## Testing
 
 `rememberPlayUpdateState(manager = { FakeAppUpdateManager(it) })` runs everything against Play's fake

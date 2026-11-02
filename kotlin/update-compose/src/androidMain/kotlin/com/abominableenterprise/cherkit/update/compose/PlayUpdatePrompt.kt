@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.InstallStatus
 
@@ -78,14 +79,30 @@ public fun PlayUpdatePrompt(
     store: UpdatePromptStore = rememberUpdatePromptStore(),
     onVisibilityChange: (Boolean) -> Unit = {},
     onDownloaded: () -> Unit = {},
+    telemetrySink: TelemetrySink? = null,
     onResult: (UpdateLaunchResult) -> Unit = {},
 ) {
     val isPlayInstall: (Context) -> Boolean = if (requirePlayInstall) PlayInstall::isPlayInstall else { _ -> true }
     PlayUpdatePrompt(
         state, suppressed, enabled, store, onVisibilityChange, onDownloaded, onResult,
-        UpdateSession.shared, isPlayInstall,
+        UpdateSession.shared, isPlayInstall, telemetrySink ?: state.telemetrySink,
     )
 }
+
+@Deprecated("Use the overload with telemetrySink", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun PlayUpdatePrompt(
+    state: PlayUpdateState = rememberPlayUpdateState(),
+    suppressed: Boolean = false,
+    enabled: Boolean = AndroidUpdate.isEnabledByDefault(LocalContext.current),
+    requirePlayInstall: Boolean = true,
+    store: UpdatePromptStore = rememberUpdatePromptStore(),
+    onVisibilityChange: (Boolean) -> Unit = {},
+    onDownloaded: () -> Unit = {},
+    onResult: (UpdateLaunchResult) -> Unit = {},
+): Unit = PlayUpdatePrompt(
+    state, suppressed, enabled, requirePlayInstall, store, onVisibilityChange, onDownloaded, null, onResult,
+)
 
 /** [PlayUpdatePrompt] with its session and installer check, so host tests can run it fresh. */
 @Composable
@@ -99,6 +116,7 @@ internal fun PlayUpdatePrompt(
     onResult: (UpdateLaunchResult) -> Unit,
     session: UpdateSession,
     isPlayInstall: (Context) -> Boolean,
+    telemetrySink: TelemetrySink? = state.telemetrySink,
 ) {
     val context = LocalContext.current
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -106,6 +124,8 @@ internal fun PlayUpdatePrompt(
     val currentSuppressed by rememberUpdatedState(suppressed)
     val currentResumed by rememberUpdatedState(resumed)
     val currentStore by rememberUpdatedState(store)
+    val currentSink by rememberUpdatedState(telemetrySink)
+    state.telemetrySink = telemetrySink
     val currentOnVisibilityChange by rememberUpdatedState(onVisibilityChange)
     val currentOnDownloaded by rememberUpdatedState(onDownloaded)
     val currentOnResult by rememberUpdatedState(onResult)
@@ -122,7 +142,13 @@ internal fun PlayUpdatePrompt(
     DisposableEffect(manager, enabled) {
         if (manager == null || !enabled) return@DisposableEffect onDispose {}
         val listener = InstallStateUpdatedListener { installState ->
-            if (installState.installStatus() == InstallStatus.DOWNLOADED && state.markDownloaded()) currentOnDownloaded()
+            if (installState.installStatus() == InstallStatus.FAILED) {
+                UpdateTelemetry.error(currentSink, installState.installErrorCode())
+            }
+            if (installState.installStatus() == InstallStatus.DOWNLOADED && state.markDownloaded()) {
+                session.recordDownloaded(currentSink)
+                currentOnDownloaded()
+            }
         }
         val registered = try {
             manager.registerListener(listener)
@@ -139,7 +165,7 @@ internal fun PlayUpdatePrompt(
             !enabled -> UpdateLaunchResult.DISABLED
             !isPlayInstall(context) -> UpdateLaunchResult.NOT_PLAY_INSTALL
             manager == null || sheet == null -> UpdateLaunchResult.CHECK_FAILED
-            else -> UpdateLauncher.launch(PlayUpdateFlow(manager, sheet), currentStore, session) {
+            else -> UpdateLauncher.launch(PlayUpdateFlow(manager, sheet), currentStore, session, currentSink) {
                 !currentSuppressed && currentResumed
             }
         }

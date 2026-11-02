@@ -1,5 +1,6 @@
 package com.abominableenterprise.cherkit.update.compose
 
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import kotlin.coroutines.cancellation.CancellationException
 
 /** The launch order over any [UpdateFlow]; plain Kotlin, so it runs on the JVM. `PlayUpdatePrompt` calls it. */
@@ -22,6 +23,7 @@ public object UpdateLauncher {
         flow: UpdateFlow<T>,
         store: UpdatePromptStore,
         session: UpdateSession,
+        telemetrySink: TelemetrySink? = null,
         isAllowed: () -> Boolean = { true },
     ): UpdateLaunchResult {
         val info: T
@@ -31,22 +33,40 @@ public object UpdateLauncher {
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
+            UpdateTelemetry.error(telemetrySink, 1)
             return UpdateLaunchResult.CHECK_FAILED
         }
-        if (status.downloaded) return UpdateLaunchResult.DOWNLOADED
+        if (status.downloaded) {
+            session.recordDownloaded(telemetrySink)
+            return UpdateLaunchResult.DOWNLOADED
+        }
+        if (status.updateAvailable) UpdateTelemetry.breadcrumb(telemetrySink, "available")
         if (session.prompted) return UpdateLaunchResult.ALREADY_PROMPTED
         if (!status.updateAvailable || !status.flexibleAllowed) return UpdateLaunchResult.NO_UPDATE
         if (declined(store) == status.availableVersionCode) return UpdateLaunchResult.DECLINED_BEFORE
         if (!isAllowed()) return UpdateLaunchResult.SUPPRESSED
         val started = try {
             flow.startFlexible(info)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             false
         }
-        if (!started) return UpdateLaunchResult.START_FAILED
+        if (!started) {
+            UpdateTelemetry.error(telemetrySink, 2)
+            return UpdateLaunchResult.START_FAILED
+        }
         session.markPrompted(status.availableVersionCode)
         return UpdateLaunchResult.STARTED
     }
+
+    @Deprecated("Use the overload with telemetrySink", level = DeprecationLevel.HIDDEN)
+    public suspend fun <T> launch(
+        flow: UpdateFlow<T>,
+        store: UpdatePromptStore,
+        session: UpdateSession,
+        isAllowed: () -> Boolean = { true },
+    ): UpdateLaunchResult = launch(flow, store, session, null, isAllowed)
 
     /** Applies the sheet's answer for [versionCode]: [UpdateFlowResult.CANCELLED] is remembered in [store]. */
     public fun finish(result: UpdateFlowResult, versionCode: Int, store: UpdatePromptStore) {
