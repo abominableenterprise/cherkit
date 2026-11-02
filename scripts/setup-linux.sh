@@ -252,4 +252,4 @@ fi
 log "Done in $((SECONDS - START))s"
 swift --version 2>&1 | head -1
 java -version 2>&1 | head -1
-echo "Run: scripts/test.sh [analytics|review|sunset|whatsnew]"
+echo "Run: scripts/test.sh [analytics|review|sunset|telemetry|whatsnew]"

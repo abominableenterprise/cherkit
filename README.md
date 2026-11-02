@@ -9,6 +9,7 @@ its own product, so an app imports only what it needs.
 | Module | What it does | Swift product | Kotlin module |
 | --- | --- | --- | --- |
 | [Analytics](kotlin/analytics/README.md) | Typed, opt-in PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
+| [Telemetry](kotlin/telemetry/README.md) | Privacy-filtered errors, breadcrumbs and spans; vendor-free core contract | `CherKitTelemetry` | `:telemetry` |
 | [Sunset](kotlin/sunset/README.md) | Soft or hard "please update" from a hosted min-version config | `CherKitSunset` | `:sunset` |
 | [Sunset Compose](kotlin/sunset-compose/README.md) | Jetpack Compose update dialog and blocking screen for Sunset (Android) | n/a | `:sunset-compose` |
 | [Review Compose](kotlin/review-compose/README.md) | Play In-App Review and Compose effects for Review (Android) | n/a | `:review-compose` |
@@ -28,7 +29,7 @@ Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
 
 Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
 "Up to Next Major Version" from 0.7.0), then link only the products you use:
-`CherKitAnalytics`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
+`CherKitAnalytics`, `CherKitTelemetry`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
 ```swift
@@ -90,7 +91,7 @@ conflicts. The build itself writes the right coordinates and refuses to publish 
 ```sh
 scripts/setup-linux.sh       # once per machine: Swift, JDK, Android SDK (idempotent, cached)
 scripts/test.sh              # size check + swift test + Gradle JVM and Android host tests
-scripts/test.sh sunset       # one module (analytics, review, sunset or whatsnew) on both platforms
+scripts/test.sh telemetry    # one module (analytics, review, sunset, telemetry or whatsnew) on both platforms
 ```
 
 On macOS with Xcode, Swift tests run with `swift test` and Kotlin tests with `./gradlew jvmTest`.

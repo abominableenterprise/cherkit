@@ -1,0 +1,22 @@
+[
+  {
+    "name": "close_and_reopen",
+    "steps": ["error", "disable", "error", "enable", "error"],
+    "expected": ["start", "error", "stop", "start", "error"]
+  },
+  {
+    "name": "restricted_errors_only",
+    "steps": ["restrict", "error", "breadcrumb", "span", "key", "unrestrict", "breadcrumb"],
+    "expected": ["start", "error", "breadcrumb"]
+  },
+  {
+    "name": "restricted_still_respects_user_switch",
+    "steps": ["restrict", "disable", "error", "enable", "error"],
+    "expected": ["start", "error"]
+  },
+  {
+    "name": "repeated_switch_does_not_restart",
+    "steps": ["enable", "enable", "restrict", "restrict", "unrestrict", "disable", "disable"],
+    "expected": ["start", "stop"]
+  }
+]

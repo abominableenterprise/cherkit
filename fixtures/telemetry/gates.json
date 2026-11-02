@@ -1,0 +1,58 @@
+[
+  {
+    "buildEnabled": false,
+    "enabled": false,
+    "restricted": false,
+    "errors": 0,
+    "diagnostics": 0
+  },
+  {
+    "buildEnabled": false,
+    "enabled": false,
+    "restricted": true,
+    "errors": 0,
+    "diagnostics": 0
+  },
+  {
+    "buildEnabled": false,
+    "enabled": true,
+    "restricted": false,
+    "errors": 0,
+    "diagnostics": 0
+  },
+  {
+    "buildEnabled": false,
+    "enabled": true,
+    "restricted": true,
+    "errors": 0,
+    "diagnostics": 0
+  },
+  {
+    "buildEnabled": true,
+    "enabled": false,
+    "restricted": false,
+    "errors": 0,
+    "diagnostics": 0
+  },
+  {
+    "buildEnabled": true,
+    "enabled": false,
+    "restricted": true,
+    "errors": 0,
+    "diagnostics": 0
+  },
+  {
+    "buildEnabled": true,
+    "enabled": true,
+    "restricted": false,
+    "errors": 1,
+    "diagnostics": 1
+  },
+  {
+    "buildEnabled": true,
+    "enabled": true,
+    "restricted": true,
+    "errors": 1,
+    "diagnostics": 0
+  }
+]
