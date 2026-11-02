@@ -3,6 +3,21 @@
 // Each module is its own library product: apps import only what they need.
 import PackageDescription
 
+var firebaseProducts: [Product] = []
+var firebasePackages: [Package.Dependency] = []
+var firebaseTargetDependencies: [Target.Dependency] = ["CherKitTelemetry", "CherKitCore"]
+#if !os(Linux)
+firebaseProducts = [.library(name: "CherKitTelemetryFirebase", targets: ["CherKitTelemetryFirebase"])]
+firebasePackages = [.package(url: "https://github.com/firebase/firebase-ios-sdk", "11.0.0"..<"14.0.0")]
+firebaseTargetDependencies += [
+    .product(name: "FirebaseCrashlytics", package: "firebase-ios-sdk",
+             condition: .when(platforms: [.iOS, .macOS])),
+    // Firebase Performance does not support macOS.
+    .product(name: "FirebasePerformance", package: "firebase-ios-sdk",
+             condition: .when(platforms: [.iOS])),
+]
+#endif
+
 let package = Package(
     name: "CherKit",
     platforms: [.iOS(.v16), .macOS(.v13)],
@@ -10,7 +25,7 @@ let package = Package(
         .library(name: "CherKitCore", targets: ["CherKitCore"]),
         .library(name: "CherKitAnalytics", targets: ["CherKitAnalytics"]),
         .library(name: "CherKitTelemetry", targets: ["CherKitTelemetry"]),
-        .library(name: "CherKitTelemetryFirebase", targets: ["CherKitTelemetryFirebase"]),
+    ] + firebaseProducts + [
         .library(name: "CherKitSunset", targets: ["CherKitSunset"]),
         .library(name: "CherKitWhatsNew", targets: ["CherKitWhatsNew"]),
         .library(name: "CherKitReview", targets: ["CherKitReview"]),
@@ -20,9 +35,7 @@ let package = Package(
         // PostHog SDK for the Analytics adapter, pinned version.
         // Linked only on Apple platforms (see CherKitAnalytics), so Linux never compiles it.
         .package(url: "https://github.com/PostHog/posthog-ios", exact: "3.71.4"),
-        // Firebase products are linked by the optional Apple adapter only.
-        .package(url: "https://github.com/firebase/firebase-ios-sdk", "11.0.0"..<"14.0.0"),
-    ],
+    ] + firebasePackages,
     targets: [
         // Logic modules: Foundation only, built and tested on Linux.
         // CherKitCore: tiny shared helpers (AppVersion) used by other modules.
@@ -38,14 +51,9 @@ let package = Package(
         .target(name: "CherKitTelemetry", dependencies: ["CherKitCore"]),
         .target(
             name: "CherKitTelemetryFirebase",
-            dependencies: [
-                "CherKitTelemetry", "CherKitCore",
-                .product(name: "FirebaseCrashlytics", package: "firebase-ios-sdk",
-                         condition: .when(platforms: [.iOS, .macOS])),
-                // Firebase Performance does not support macOS.
-                .product(name: "FirebasePerformance", package: "firebase-ios-sdk",
-                         condition: .when(platforms: [.iOS])),
-            ],
+            // Keep the Foundation-only policy and recording-fake tests on Linux.
+            // Live SDK imports are already guarded with canImport in the sources.
+            dependencies: firebaseTargetDependencies,
             exclude: ["README.md"]
         ),
         .target(name: "CherKitSunset", dependencies: ["CherKitCore"], exclude: ["README.md"]),
