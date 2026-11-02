@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # Idempotent Linux setup for CherKit: Swift toolchain, JDK and Android SDK.
 # Everything lands in $CHERKIT_TOOLS (default ~/.cherkit-tools); scripts/test.sh
-# sources $CHERKIT_TOOLS/env.sh. Swift, the JDK and the Android SDK always come from
-# upstream (checksums pinned; that is faster than a cache restore). Only Gradle's
-# dependency cache (~/.gradle/caches/modules-2) and wrapper distributions
-# (~/.gradle/wrapper/dists) are cached with the VM's `task-cache` when present
-# (key = SHA-256 of the recipe); without it Gradle downloads normally. Never all of
-# ~/.gradle: daemon logs, configuration cache and transforms only bloat it.
-# Directories larger than CHERKIT_CACHE_MAX_MB (uncompressed, default 1500) are not
-# saved, keeping archives under the hub's 2 GB compressed cap.
+# sources $CHERKIT_TOOLS/env.sh. With the VM's `task-cache` present, four directories
+# are cached, each as its own entry keyed on a SHA-256 of its recipe: the Swift toolchain
+# (version, OS, arch), the JDK + Android SDK (versions, packages, arch), Gradle's
+# dependency cache (~/.gradle/caches/modules-2) and its wrapper distributions
+# (~/.gradle/wrapper/dists). Never all of ~/.gradle: daemon logs, configuration cache and
+# transforms only bloat it. A miss, a failed restore or a restore without its marker
+# (usr/bin/swift, .complete) falls back to the upstream download (checksums and
+# signature pinned); each toolchain is saved right after its install, so a later failure
+# does not lose it. Saves never fail setup. Size limits (uncompressed; archives must stay
+# under the hub's ~2 GB compressed cap, and a save the hub refuses is only a warning):
+# CHERKIT_TOOLCHAIN_CACHE_MAX_MB (default 5000) for the toolchains, CHERKIT_CACHE_MAX_MB
+# (default 1500) for the Gradle entries. The Gradle warm-up compile is not fatal: if it
+# fails, setup warns, skips the Gradle save (no half-filled cache) and still exits 0.
 set -euo pipefail
 
 SWIFT_VERSION="6.4.1"
@@ -16,11 +21,15 @@ JDK_VERSION="21.0.13+9" # Eclipse Temurin
 JDK_SHA256_x64="d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c"
 JDK_SHA256_aarch64="e3522e707fc7dbe2a72c30746b1e7068301a0213ecd213d4491f35a14eb55578"
 RECIPE_REVISION="2" # bump to invalidate every cache key below
+# Uncompressed limit for the toolchain entries (Swift, JDK + Android SDK), which compress well.
+TOOLCHAIN_CACHE_MAX_MB="${CHERKIT_TOOLCHAIN_CACHE_MAX_MB:-5000}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # ANDROID_CMDLINE_TOOLS, ANDROID_CMDLINE_TOOLS_SHA256, ANDROID_PACKAGES (shared with the JitPack build).
 # shellcheck source=lib/android-sdk-versions.sh
 . "$ROOT/scripts/lib/android-sdk-versions.sh"
+# shellcheck source=lib/gradle-warmup.sh
+. "$ROOT/scripts/lib/gradle-warmup.sh"
 TOOLS="${CHERKIT_TOOLS:-$HOME/.cherkit-tools}"
 START=$SECONDS
 mkdir -p "$TOOLS"
@@ -59,13 +68,15 @@ cache_restore() {
   STAGE=""
   return "$rc"
 }
+# cache_save <key> <dir> [max MB]: never fails setup. Skips <dir> when it is larger than [max MB]
+# (uncompressed; default CHERKIT_CACHE_MAX_MB, else 1500).
 cache_save() {
   has_cache || return 0
   [ -d "$2" ] || { echo "not caching $2: missing"; return 0; }
-  local mb
-  mb="$(du -sm "$2" | cut -f1)"
-  if [ "$mb" -gt "${CHERKIT_CACHE_MAX_MB:-1500}" ]; then
-    echo "not caching $2: ${mb} MB > CHERKIT_CACHE_MAX_MB=${CHERKIT_CACHE_MAX_MB:-1500}"
+  local mb max="${3:-${CHERKIT_CACHE_MAX_MB:-1500}}"
+  mb="$(du -sm "$2" | cut -f1)" || { echo "not caching $2: du failed"; return 0; }
+  if [ "$mb" -gt "$max" ]; then
+    echo "not caching $2: ${mb} MB > limit ${max} MB"
     return 0
   fi
   echo "saving $2 (${mb} MB) to task-cache"
@@ -104,59 +115,81 @@ fi
 # --- Swift -------------------------------------------------------------------
 SWIFT_DIR="$TOOLS/swift-$SWIFT_VERSION-$SWIFT_OS-$ARCH"
 log "Swift $SWIFT_VERSION ($SWIFT_OS, $ARCH)"
+SWIFT_KEY="$(echo "cherkit-swift|$SWIFT_VERSION|$SWIFT_OS|$ARCH|$RECIPE_REVISION" | sha)"
 if [ -x "$SWIFT_DIR/usr/bin/swift" ]; then
   echo "already installed"
 else
   rm -rf "$SWIFT_DIR"
-  SUFFIX=""; [ "$ARCH" = "aarch64" ] && SUFFIX="-aarch64"
-  PLATFORM="${SWIFT_OS//./}$SUFFIX"
-  NAME="swift-$SWIFT_VERSION-RELEASE-$SWIFT_OS$SUFFIX"
-  URL="https://download.swift.org/swift-$SWIFT_VERSION-release/$PLATFORM/swift-$SWIFT_VERSION-RELEASE/$NAME.tar.gz"
-  STAGE="$(mktemp -d "$TOOLS/.staging.XXXXXX")"
-  TMP="$STAGE"
-  curl -fsSL "$URL" -o "$TMP/swift.tar.gz"
-  curl -fsSL "$URL.sig" -o "$TMP/swift.tar.gz.sig"
-  export GNUPGHOME="$TMP/gnupg"; mkdir -m 700 "$GNUPGHOME"
-  curl -fsSL --compressed https://www.swift.org/keys/all-keys.asc | gpg --batch --quiet --import
-  gpg --batch --verify "$TMP/swift.tar.gz.sig" "$TMP/swift.tar.gz"
-  unset GNUPGHOME
-  mkdir "$TMP/swift"
-  tar -xzf "$TMP/swift.tar.gz" -C "$TMP/swift" --strip-components=1
-  mv "$TMP/swift" "$SWIFT_DIR"
-  rm -rf "$TMP"
-  STAGE=""
+  t=$SECONDS
+  if cache_restore "$SWIFT_KEY" "$SWIFT_DIR" && [ -x "$SWIFT_DIR/usr/bin/swift" ]; then
+    echo "swift: restored $(du -sm "$SWIFT_DIR" | cut -f1) MB from task-cache in $((SECONDS - t))s"
+  else
+    rm -rf "$SWIFT_DIR" # a restore without usr/bin/swift is unusable: install from upstream instead
+    SUFFIX=""; [ "$ARCH" = "aarch64" ] && SUFFIX="-aarch64"
+    PLATFORM="${SWIFT_OS//./}$SUFFIX"
+    NAME="swift-$SWIFT_VERSION-RELEASE-$SWIFT_OS$SUFFIX"
+    URL="https://download.swift.org/swift-$SWIFT_VERSION-release/$PLATFORM/swift-$SWIFT_VERSION-RELEASE/$NAME.tar.gz"
+    STAGE="$(mktemp -d "$TOOLS/.staging.XXXXXX")"
+    TMP="$STAGE"
+    curl -fsSL "$URL" -o "$TMP/swift.tar.gz"
+    curl -fsSL "$URL.sig" -o "$TMP/swift.tar.gz.sig"
+    export GNUPGHOME="$TMP/gnupg"; mkdir -m 700 "$GNUPGHOME"
+    curl -fsSL --compressed https://www.swift.org/keys/all-keys.asc | gpg --batch --quiet --import
+    gpg --batch --verify "$TMP/swift.tar.gz.sig" "$TMP/swift.tar.gz"
+    unset GNUPGHOME
+    mkdir "$TMP/swift"
+    tar -xzf "$TMP/swift.tar.gz" -C "$TMP/swift" --strip-components=1
+    mv "$TMP/swift" "$SWIFT_DIR"
+    rm -rf "$TMP"
+    STAGE=""
+    echo "swift: installed from upstream in $((SECONDS - t))s"
+    t=$SECONDS
+    cache_save "$SWIFT_KEY" "$SWIFT_DIR" "$TOOLCHAIN_CACHE_MAX_MB"
+    echo "swift: save step took $((SECONDS - t))s"
+  fi
 fi
 
 # --- JDK + Android SDK ---------------------------------------------------------
 JA_RECIPE="cherkit-jdk-android|temurin-$JDK_VERSION|cmdline-$ANDROID_CMDLINE_TOOLS|${ANDROID_PACKAGES[*]}|$ARCH|$RECIPE_REVISION"
 JA_DIR="$TOOLS/jdk-android-$(echo "$JA_RECIPE" | sha | cut -c1-12)"
 log "JDK $JDK_VERSION + Android SDK (${ANDROID_PACKAGES[*]})"
+JA_KEY="$(echo "$JA_RECIPE" | sha)"
 if [ -f "$JA_DIR/.complete" ]; then
   echo "already installed"
 else
   rm -rf "$JA_DIR"
-  STAGE="$(mktemp -d "$TOOLS/.staging.XXXXXX")"
-  TMP="$STAGE"
-  mkdir -p "$TMP/out/jdk" "$TMP/out/android-sdk/cmdline-tools"
-  JDK_FEATURE="${JDK_VERSION%%.*}"
-  JDK_FILE="OpenJDK${JDK_FEATURE}U-jdk_${JDK_ARCH}_linux_hotspot_${JDK_VERSION/+/_}.tar.gz"
-  JDK_URL="https://github.com/adoptium/temurin${JDK_FEATURE}-binaries/releases/download/jdk-${JDK_VERSION/+/%2B}/$JDK_FILE"
-  JDK_SHA_VAR="JDK_SHA256_$JDK_ARCH"
-  curl -fsSL "$JDK_URL" -o "$TMP/jdk.tar.gz"
-  echo "${!JDK_SHA_VAR}  $TMP/jdk.tar.gz" | sha256sum -c --quiet
-  tar -xzf "$TMP/jdk.tar.gz" -C "$TMP/out/jdk" --strip-components=1
-  curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS}_latest.zip" -o "$TMP/clt.zip"
-  echo "$ANDROID_CMDLINE_TOOLS_SHA256  $TMP/clt.zip" | sha256sum -c --quiet
-  unzip -q "$TMP/clt.zip" -d "$TMP/clt"
-  mv "$TMP/clt/cmdline-tools" "$TMP/out/android-sdk/cmdline-tools/latest"
-  SDKMANAGER="$TMP/out/android-sdk/cmdline-tools/latest/bin/sdkmanager"
-  export JAVA_HOME="$TMP/out/jdk"
-  yes | "$SDKMANAGER" --sdk_root="$TMP/out/android-sdk" --licenses >/dev/null || true
-  "$SDKMANAGER" --sdk_root="$TMP/out/android-sdk" "${ANDROID_PACKAGES[@]}" >/dev/null
-  touch "$TMP/out/.complete"
-  mv "$TMP/out" "$JA_DIR"
-  rm -rf "$TMP"
-  STAGE=""
+  t=$SECONDS
+  if cache_restore "$JA_KEY" "$JA_DIR" && [ -f "$JA_DIR/.complete" ]; then
+    echo "jdk-android: restored $(du -sm "$JA_DIR" | cut -f1) MB from task-cache in $((SECONDS - t))s"
+  else
+    rm -rf "$JA_DIR" # a restore without the .complete marker is unusable: install from upstream instead
+    STAGE="$(mktemp -d "$TOOLS/.staging.XXXXXX")"
+    TMP="$STAGE"
+    mkdir -p "$TMP/out/jdk" "$TMP/out/android-sdk/cmdline-tools"
+    JDK_FEATURE="${JDK_VERSION%%.*}"
+    JDK_FILE="OpenJDK${JDK_FEATURE}U-jdk_${JDK_ARCH}_linux_hotspot_${JDK_VERSION/+/_}.tar.gz"
+    JDK_URL="https://github.com/adoptium/temurin${JDK_FEATURE}-binaries/releases/download/jdk-${JDK_VERSION/+/%2B}/$JDK_FILE"
+    JDK_SHA_VAR="JDK_SHA256_$JDK_ARCH"
+    curl -fsSL "$JDK_URL" -o "$TMP/jdk.tar.gz"
+    echo "${!JDK_SHA_VAR}  $TMP/jdk.tar.gz" | sha256sum -c --quiet
+    tar -xzf "$TMP/jdk.tar.gz" -C "$TMP/out/jdk" --strip-components=1
+    curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS}_latest.zip" -o "$TMP/clt.zip"
+    echo "$ANDROID_CMDLINE_TOOLS_SHA256  $TMP/clt.zip" | sha256sum -c --quiet
+    unzip -q "$TMP/clt.zip" -d "$TMP/clt"
+    mv "$TMP/clt/cmdline-tools" "$TMP/out/android-sdk/cmdline-tools/latest"
+    SDKMANAGER="$TMP/out/android-sdk/cmdline-tools/latest/bin/sdkmanager"
+    export JAVA_HOME="$TMP/out/jdk"
+    yes | "$SDKMANAGER" --sdk_root="$TMP/out/android-sdk" --licenses >/dev/null || true
+    "$SDKMANAGER" --sdk_root="$TMP/out/android-sdk" "${ANDROID_PACKAGES[@]}" >/dev/null
+    touch "$TMP/out/.complete"
+    mv "$TMP/out" "$JA_DIR"
+    rm -rf "$TMP"
+    STAGE=""
+    echo "jdk-android: installed from upstream in $((SECONDS - t))s"
+    t=$SECONDS
+    cache_save "$JA_KEY" "$JA_DIR" "$TOOLCHAIN_CACHE_MAX_MB"
+    echo "jdk-android: save step took $((SECONDS - t))s"
+  fi
 fi
 
 # --- env.sh --------------------------------------------------------------------
@@ -201,11 +234,14 @@ for i in "${!GRADLE_NAMES[@]}"; do
     TO_SAVE+=("$i")
   fi
 done
-# Resolve every dependency and compile once, so later test runs only build our code.
-(cd "$ROOT" && ./gradlew --quiet jvmTestClasses compileAndroidHostTest)
+# Resolve every dependency and compile once, so later test runs only build our code. Not fatal: env.sh
+# and the toolchains are already in place, but a failed warm-up skips the save (no half-filled cache).
+if ! gradle_warmup "$ROOT"; then
+  TO_SAVE=()
+fi
 if [ ${#TO_SAVE[@]} -gt 0 ] && has_cache; then
   # Stop the daemon so nothing writes to the caches while they are archived.
-  (cd "$ROOT" && ./gradlew --quiet --stop)
+  (cd "$ROOT" && ./gradlew --quiet --stop) || true
   for i in "${TO_SAVE[@]}"; do
     t=$SECONDS
     cache_save "${GRADLE_KEYS[$i]}" "${GRADLE_DIRS[$i]}"
