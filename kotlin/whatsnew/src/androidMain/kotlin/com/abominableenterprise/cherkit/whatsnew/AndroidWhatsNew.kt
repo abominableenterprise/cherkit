@@ -3,6 +3,7 @@ package com.abominableenterprise.cherkit.whatsnew
 import android.content.Context
 import android.content.res.AssetManager
 import android.os.LocaleList
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import java.io.InputStream
 
 /** Android wiring for [WhatsNewChecker]: notes from `assets/whatsnew/`, state in SharedPreferences. */
@@ -14,8 +15,22 @@ public object AndroidWhatsNew {
     public const val DEFAULT_PREFERENCES_NAME: String = "cherkit.whatsnew"
 
     /** A checker over [assetsSource] and [store] for [context]. */
-    public fun checker(context: Context, onSkip: SkipHandler? = null): WhatsNewChecker =
-        WhatsNewChecker(assetsSource(context.assets, onSkip = onSkip), store(context))
+    public fun checker(
+        context: Context,
+        telemetrySink: TelemetrySink? = null,
+        onSkip: SkipHandler? = null,
+    ): WhatsNewChecker = WhatsNewChecker(assetsSource(context.assets, onSkip = onSkip), store(context), telemetrySink)
+
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public fun checker(context: Context, onSkip: SkipHandler? = null): WhatsNewChecker = checker(context, null, onSkip)
+
+    /** Source compatibility for callers passing the skip callback positionally. */
+    @Suppress("UNUSED_PARAMETER")
+    public fun checker(
+        context: Context,
+        legacyOnSkip: SkipHandler?,
+        compatibility: Unit = Unit,
+    ): WhatsNewChecker = checker(context, null, legacyOnSkip)
 
     /**
      * Every bundled release newest first, the same list as `checker(context).history(locales)`, for a Settings screen
@@ -25,8 +40,15 @@ public object AndroidWhatsNew {
      *
      * @param locales The user's locales, most preferred first; [preferredLocales] by default.
      */
+    public fun history(
+        context: Context,
+        locales: List<String> = preferredLocales(),
+        telemetrySink: TelemetrySink? = null,
+    ): List<WhatsNewHistoryEntry> = WhatsNewChecker(assetsSource(context.assets), store(context), telemetrySink).history(locales)
+
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
     public fun history(context: Context, locales: List<String> = preferredLocales()): List<WhatsNewHistoryEntry> =
-        history(assetsSource(context.assets), store(context), locales)
+        history(context, locales, null)
 
     /** [history] over any [source] and [store], so host tests can pass fakes. */
     internal fun history(source: ReleaseNotesSource, store: WhatsNewStore, locales: List<String>): List<WhatsNewHistoryEntry> =
@@ -36,8 +58,27 @@ public object AndroidWhatsNew {
     public fun assetsSource(
         assets: AssetManager,
         directory: String = DEFAULT_ASSETS_DIRECTORY,
+        telemetrySink: TelemetrySink? = null,
         onSkip: SkipHandler? = null,
-    ): ReleaseNotesSource = LoadedReleaseNotesSource(onSkip) { readAssets(directory, assets::list, assets::open) }
+    ): ReleaseNotesSource = LoadedReleaseNotesSource.fromFiles(onSkip, telemetrySink) {
+        readAssetFiles(directory, assets::list, assets::open)
+    }
+
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public fun assetsSource(
+        assets: AssetManager,
+        directory: String = DEFAULT_ASSETS_DIRECTORY,
+        onSkip: SkipHandler? = null,
+    ): ReleaseNotesSource = assetsSource(assets, directory, null, onSkip)
+
+    /** Source compatibility for callers passing the skip callback positionally. */
+    @Suppress("UNUSED_PARAMETER")
+    public fun assetsSource(
+        assets: AssetManager,
+        directory: String = DEFAULT_ASSETS_DIRECTORY,
+        legacyOnSkip: SkipHandler?,
+        compatibility: Unit = Unit,
+    ): ReleaseNotesSource = assetsSource(assets, directory, null, legacyOnSkip)
 
     /** A [WhatsNewStore] in the SharedPreferences file [name], keys starting with [keyPrefix]. */
     public fun store(
@@ -68,12 +109,25 @@ public object AndroidWhatsNew {
         directory: String,
         list: (String) -> Array<String>?,
         open: (String) -> InputStream,
-    ): List<Pair<String, String>> = list(directory).orEmpty().filter { it.endsWith(".json") }.map { name ->
-        val text = try {
-            open("$directory/$name").use { it.readBytes().decodeToString() }
-        } catch (_: Exception) {
-            ""
+    ): List<Pair<String, String>> = readAssetFiles(directory, list, open).files.map { (name, bytes) ->
+        name to bytes.decodeToString()
+    }
+
+    /** Keep missing files distinct from malformed bytes; never report both codes for one open failure. */
+    internal fun readAssetFiles(
+        directory: String,
+        list: (String) -> Array<String>?,
+        open: (String) -> InputStream,
+    ): NotesFiles {
+        val missing = mutableSetOf<String>()
+        val files = list(directory).orEmpty().filter { it.endsWith(".json") }.associateWith { name ->
+            try {
+                open("$directory/$name").use { it.readBytes() }
+            } catch (_: Exception) {
+                missing += name
+                byteArrayOf()
+            }
         }
-        name to text
+        return NotesFiles(files, missing)
     }
 }

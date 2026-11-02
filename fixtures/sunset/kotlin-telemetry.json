@@ -1,0 +1,15 @@
+{
+  "domain": "cherkit.sunset",
+  "breadcrumb": "cherkit.sunset.decision",
+  "cases": [
+    { "operation": "config", "result": "missing", "code": 1 },
+    { "operation": "config", "result": "throws", "code": 1 },
+    { "operation": "config", "result": "timeout", "code": 2 },
+    { "operation": "config", "result": "undecodable", "code": 3 },
+    { "operation": "lookup", "result": "missing", "code": 4 },
+    { "operation": "lookup", "result": "throws", "code": 4 },
+    { "operation": "lookup", "result": "timeout", "code": 5 },
+    { "operation": "lookup", "result": "undecodable", "code": 6 }
+  ],
+  "decisionKinds": ["none", "soft", "hard", "test_build"]
+}

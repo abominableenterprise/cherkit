@@ -1,6 +1,7 @@
 package com.abominableenterprise.cherkit.whatsnew
 
 import com.abominableenterprise.cherkit.core.AppVersion
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import kotlin.jvm.Synchronized
 
 /**
@@ -9,7 +10,13 @@ import kotlin.jvm.Synchronized
  * Calls are synchronized, so any thread may use it. On Android, `AndroidWhatsNew.checker(context)`
  * wires the assets source and SharedPreferences store.
  */
-public class WhatsNewChecker(private val source: ReleaseNotesSource, private val store: WhatsNewStore) {
+public class WhatsNewChecker(
+    private val source: ReleaseNotesSource,
+    private val store: WhatsNewStore,
+    private val telemetrySink: TelemetrySink? = null,
+) {
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public constructor(source: ReleaseNotesSource, store: WhatsNewStore) : this(source, store, null)
     private var pendingLastSeen: String? = null
 
     /**
@@ -25,13 +32,14 @@ public class WhatsNewChecker(private val source: ReleaseNotesSource, private val
         if (updated != history) store.setInstallHistory(updated)
 
         val lastSeen = store.lastSeenVersion()
-        val plan = LaunchPlan.make(source.releaseNotes(), installedVersion, lastSeen)
+        val plan = LaunchPlan.make(releaseNotes(), installedVersion, lastSeen)
         if (plan.show.isEmpty()) {
             pendingLastSeen = null
             plan.lastSeen?.takeIf { it != lastSeen }?.let(store::setLastSeenVersion)
             return@failOpen emptyList()
         }
         pendingLastSeen = plan.lastSeen
+        plan.show.reportLocaleFallback(locale, telemetrySink)
         plan.show.map { WhatsNewEntry(it.version, it.date, it.bullets(locale)) }
     }
 
@@ -41,8 +49,10 @@ public class WhatsNewChecker(private val source: ReleaseNotesSource, private val
      */
     @Synchronized
     public fun markSeen() {
+        val shown = pendingLastSeen != null
         failOpen(Unit) { pendingLastSeen?.let(store::setLastSeenVersion) }
         pendingLastSeen = null
+        if (shown) telemetrySink.notesShown()
     }
 
     /**
@@ -51,10 +61,18 @@ public class WhatsNewChecker(private val source: ReleaseNotesSource, private val
      */
     public fun history(locale: List<String>): List<WhatsNewHistoryEntry> = failOpen(emptyList()) {
         val installed = store.installHistory().lastOrNull()?.let(AppVersion::parse)
-        source.releaseNotes()
-            .distinctBy { it.version }
+        val notes = releaseNotes()
+        notes.reportLocaleFallback(locale, telemetrySink)
+        notes.distinctBy { it.version }
             .sortedByDescending { it.version }
             .map { WhatsNewHistoryEntry(it.version, it.date, it.bullets(locale), it.version == installed) }
+    }
+
+    private fun releaseNotes(): List<ReleaseNotes> = try {
+        source.releaseNotes(telemetrySink)
+    } catch (_: Exception) {
+        telemetrySink.notesError(1)
+        emptyList()
     }
 
     /** A throwing app-supplied store or source must not crash the app at launch. */

@@ -3,6 +3,7 @@ package com.abominableenterprise.cherkit.sunset
 import android.content.Context
 import android.os.Build
 import android.os.LocaleList
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import kotlin.time.Duration
 
 /** Android wiring for [SunsetChecker]: the cache in SharedPreferences and the app and OS versions. */
@@ -14,8 +15,25 @@ public object AndroidSunset {
     public fun checker(
         context: Context,
         timeout: Duration = SunsetChecker.DEFAULT_TIMEOUT,
+        telemetrySink: TelemetrySink? = null,
         fetch: SunsetFetch,
-    ): SunsetChecker = SunsetChecker(FetchSunsetConfigSource(fetch), cache(context), timeout)
+    ): SunsetChecker = SunsetChecker(FetchSunsetConfigSource(fetch), cache(context), timeout, telemetrySink = telemetrySink)
+
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public fun checker(
+        context: Context,
+        timeout: Duration = SunsetChecker.DEFAULT_TIMEOUT,
+        fetch: SunsetFetch,
+    ): SunsetChecker = checker(context, timeout, null, fetch)
+
+    /** Source compatibility for callers passing the fetch callback positionally. */
+    @Suppress("UNUSED_PARAMETER")
+    public fun checker(
+        context: Context,
+        timeout: Duration = SunsetChecker.DEFAULT_TIMEOUT,
+        legacyFetch: SunsetFetch,
+        compatibility: Unit = Unit,
+    ): SunsetChecker = checker(context, timeout, null, legacyFetch)
 
     /** A cache in the SharedPreferences file [name] under [key]. */
     public fun cache(

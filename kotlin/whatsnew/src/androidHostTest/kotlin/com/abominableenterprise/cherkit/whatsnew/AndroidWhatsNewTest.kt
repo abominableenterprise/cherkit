@@ -1,6 +1,7 @@
 package com.abominableenterprise.cherkit.whatsnew
 
 import android.content.SharedPreferences
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
 import kotlin.test.Test
@@ -30,6 +31,42 @@ class AndroidWhatsNewTest {
         assertEquals(listOf("1.1.0.json" to assets.getValue("whatsnew/1.1.0.json"), "broken.json" to ""), files)
         assertEquals(listOf("whatsnew/1.1.0.json", "whatsnew/broken.json"), opened)
         assertEquals(emptyList(), AndroidWhatsNew.readAssets("missing", { null }, { error("not called") }))
+    }
+
+    @Test
+    fun assetOpenFailureIsMissingNotUndecodableAndOtherFilesStillLoad() {
+        val codes = mutableListOf<Int>()
+        val sink = object : TelemetrySink {
+            override fun recordError(domain: String, code: Int, attributes: Map<String, Any>) {
+                assertEquals("cherkit.whatsnew", domain)
+                assertEquals(emptyMap(), attributes)
+                codes += code
+            }
+            override fun breadcrumb(name: String, attributes: Map<String, Any>) = Unit
+        }
+        val source = LoadedReleaseNotesSource.fromFiles(null, sink) {
+            AndroidWhatsNew.readAssetFiles("whatsnew", { arrayOf("missing.json", "invalid.json", "1.1.json") }) { path ->
+                when {
+                    path.endsWith("missing.json") -> throw FileNotFoundException("private path")
+                    path.endsWith("invalid.json") -> ByteArrayInputStream(byteArrayOf(0xff.toByte()))
+                    else -> ByteArrayInputStream("""{"version":"1.1","notes":{"en":["New tools."]}}""".encodeToByteArray())
+                }
+            }
+        }
+        assertEquals(1, source.releaseNotes().size)
+        assertEquals(listOf(2, 1), codes)
+        codes.clear()
+        val absent = LoadedReleaseNotesSource.fromFiles(null, sink) {
+            AndroidWhatsNew.readAssetFiles("missing", { null }, { error("not opened") })
+        }
+        assertEquals(emptyList(), absent.releaseNotes())
+        assertEquals(listOf(1), codes)
+        codes.clear()
+        val unreadable = LoadedReleaseNotesSource.fromFiles(null, sink) {
+            AndroidWhatsNew.readAssetFiles("missing", { error("private path") }, { error("not opened") })
+        }
+        assertEquals(emptyList(), unreadable.releaseNotes())
+        assertEquals(listOf(1), codes)
     }
 
     @Test

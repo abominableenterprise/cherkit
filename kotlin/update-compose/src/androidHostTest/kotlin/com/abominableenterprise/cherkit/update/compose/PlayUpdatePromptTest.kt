@@ -17,6 +17,7 @@ import com.google.android.play.core.appupdate.AppUpdateOptions
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.appupdate.testing.FakeAppUpdateManager
 import com.google.android.play.core.install.model.ActivityResult
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +41,18 @@ class PlayUpdatePromptTest {
     private val results = mutableListOf<UpdateLaunchResult>()
     private val visibility = mutableListOf<Boolean>()
     private var downloads = 0
+    private val errors = mutableListOf<Pair<String, Int>>()
+    private val crumbs = mutableListOf<String>()
+    private val sink = object : TelemetrySink {
+        override fun recordError(domain: String, code: Int, attributes: Map<String, Any>) {
+            assertEquals(emptyMap(), attributes)
+            errors += domain to code
+        }
+        override fun breadcrumb(name: String, attributes: Map<String, Any>) {
+            assertEquals(emptyMap(), attributes)
+            crumbs += name
+        }
+    }
     private var suppressed by mutableStateOf(false)
     private var playInstall = true
     private lateinit var state: PlayUpdateState
@@ -52,10 +65,11 @@ class PlayUpdatePromptTest {
         enabled: Boolean = true,
         manager: (Context) -> AppUpdateManager = { fake },
         isSuppressed: () -> Boolean = { suppressed },
+        telemetrySink: TelemetrySink? = null,
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
-                state = rememberPlayUpdateState(manager)
+                state = rememberPlayUpdateState(manager = manager, telemetrySink = telemetrySink)
                 PlayUpdatePrompt(
                     state, isSuppressed(), enabled, store,
                     onVisibilityChange = { visibility += it },
@@ -67,6 +81,94 @@ class PlayUpdatePromptTest {
             }
         }
         compose.waitForIdle()
+    }
+
+    @Test
+    fun positionalManagerAndPromptCallbacksStillCompile() {
+        compose.setContent {
+            val manager: (Context) -> AppUpdateManager = { fake }
+            val update = rememberPlayUpdateState(manager)
+            val onResult: (UpdateLaunchResult) -> Unit = { results += it }
+            PlayUpdatePrompt(update, false, false, false, store, {}, {}, onResult)
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(UpdateLaunchResult.DISABLED), results)
+    }
+
+    @Test
+    fun telemetrySeesAvailableAndDownloadedOnlyOncePerDownload() {
+        fake.setUpdateAvailable(42)
+        show(telemetrySink = sink)
+        compose.runOnIdle {
+            fake.userAcceptsUpdate()
+            fake.downloadStarts()
+            fake.downloadCompletes()
+        }
+        compose.waitForIdle()
+        owner.registry.currentState = Lifecycle.State.STARTED
+        compose.waitForIdle()
+        owner.registry.currentState = Lifecycle.State.RESUMED
+        compose.waitForIdle()
+        assertEquals(listOf("cherkit.update.available", "cherkit.update.downloaded"), crumbs)
+        assertEquals(emptyList(), errors)
+    }
+
+    @Test
+    fun installFailureUsesThePlayIntegerCodeWithoutAttributes() {
+        fake.setUpdateAvailable(42)
+        show(telemetrySink = sink)
+        compose.runOnIdle {
+            fake.userAcceptsUpdate()
+            fake.downloadStarts()
+            fake.downloadFails()
+        }
+        compose.waitForIdle()
+        assertEquals(listOf("cherkit.update" to 0), errors)
+    }
+
+    @Test
+    fun playInfoFailureIsReportedOnce() {
+        fake.setInstallErrorCode(-6)
+        show(telemetrySink = sink)
+        assertEquals(listOf(UpdateLaunchResult.CHECK_FAILED), results)
+        assertEquals(listOf("cherkit.update" to 1), errors)
+        assertEquals(emptyList(), crumbs)
+    }
+
+    @Test
+    fun synchronousCompletionFailureUsesTheDocumentedFallback() {
+        val manager = object : AppUpdateManager by fake {
+            override fun completeUpdate(): com.google.android.gms.tasks.Task<Void> = error("private message")
+        }
+        val state = PlayUpdateState(manager, sink)
+        state.isDownloaded = true
+        assertFalse(state.completeUpdate())
+        assertEquals(listOf("cherkit.update" to 3), errors)
+    }
+
+    @Test
+    fun asynchronousSheetFailureIsReportedOnce() {
+        fake.setUpdateAvailable(42)
+        show(telemetrySink = sink)
+        compose.runOnIdle {
+            state.onFlowResult(ActivityResult.RESULT_IN_APP_UPDATE_FAILED, session, store)
+        }
+        assertEquals(listOf("cherkit.update" to 2), errors)
+    }
+
+    @Test
+    fun completionFailureIsReportedWithoutMessageText() {
+        fake.setUpdateAvailable(42)
+        show(telemetrySink = sink)
+        compose.runOnIdle {
+            fake.userAcceptsUpdate()
+            fake.downloadStarts()
+            fake.downloadCompletes()
+            fake.setInstallErrorCode(-6)
+            state.completeUpdate()
+        }
+        compose.waitForIdle()
+        assertEquals(listOf("cherkit.update" to -6), errors)
     }
 
     @Test

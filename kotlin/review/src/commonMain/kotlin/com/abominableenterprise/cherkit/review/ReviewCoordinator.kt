@@ -1,5 +1,6 @@
 package com.abominableenterprise.cherkit.review
 
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -25,6 +26,7 @@ import kotlin.time.Duration.Companion.minutes
  * @param cooldown How long an interruption holds the prompt; negative values count as zero.
  * @param isEligible Whether the current session may count and prompt, read on every call.
  * @param clock Epoch milliseconds.
+ * @param telemetrySink Optional diagnostics; only a fixed breadcrumb name, never versions or interruption sources.
  */
 public class ReviewCoordinator(
     private val store: ReviewStore,
@@ -33,8 +35,34 @@ public class ReviewCoordinator(
     successThreshold: Int = DEFAULT_SUCCESS_THRESHOLD,
     cooldown: Duration = DEFAULT_COOLDOWN,
     public var isEligible: () -> Boolean = { true },
+    private val telemetrySink: TelemetrySink? = null,
     private val clock: () -> Long = ::currentTimeMillis,
 ) {
+    /** Keeps positional callbacks source-compatible; named and trailing callbacks use the primary constructor. */
+    @Suppress("UNUSED_PARAMETER")
+    public constructor(
+        store: ReviewStore,
+        appVersion: String,
+        enabled: Boolean = true,
+        successThreshold: Int = DEFAULT_SUCCESS_THRESHOLD,
+        cooldown: Duration = DEFAULT_COOLDOWN,
+        legacyIsEligible: () -> Boolean,
+        legacyClock: () -> Long,
+        compatibility: Unit = Unit,
+    ) : this(store, appVersion, enabled, successThreshold, cooldown, legacyIsEligible, null, legacyClock)
+
+    /** The original constructor, including its defaults, retained for already compiled callers. */
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public constructor(
+        store: ReviewStore,
+        appVersion: String,
+        enabled: Boolean = true,
+        successThreshold: Int = DEFAULT_SUCCESS_THRESHOLD,
+        cooldown: Duration = DEFAULT_COOLDOWN,
+        isEligible: () -> Boolean = { true },
+        clock: () -> Long = ::currentTimeMillis,
+    ) : this(store, appVersion, enabled, successThreshold, cooldown, isEligible, null, clock)
+
     /** `true` for [disabled] and `enabled = false`: nothing counts, arms or prompts and the store is never touched. */
     public val isDisabled: Boolean = !enabled
 
@@ -108,6 +136,11 @@ public class ReviewCoordinator(
     public fun markPrompted(): Boolean {
         if (!shouldPrompt()) return false
         update(ReviewState(successCount = 0, isDue = false, lastPromptedVersion = appVersion))
+        try {
+            telemetrySink?.breadcrumb("cherkit.review.prompted")
+        } catch (_: Exception) {
+            // Optional diagnostics must not turn a successfully persisted prompt into a failed handoff.
+        }
         return true
     }
 

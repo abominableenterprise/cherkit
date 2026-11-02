@@ -11,6 +11,9 @@ import kotlin.time.Duration
  * result, or one slower than the timeout, is a failure (`null`).
  */
 public class FetchSunsetConfigSource(private val fetch: SunsetFetch) : SunsetConfigSource {
+    /** The checker supplies the deadline, so timeout and fetch failure remain distinguishable. */
+    internal suspend fun fetchForCheck(): String? = fetch.fetch()?.takeIf { it.isNotEmpty() }
+
     override suspend fun fetch(timeout: Duration): String? = try {
         withTimeoutOrNull(timeout) { fetch.fetch() }?.takeIf { it.isNotEmpty() }
     } catch (e: CancellationException) {

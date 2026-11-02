@@ -82,6 +82,23 @@ class ReviewPromptEffectTest {
     }
 
     @Test
+    fun positionalNamedAndTrailingResultCallbacksRemainUnambiguous() {
+        val disabled = ReviewCoordinator.disabled()
+        compose.setContent {
+            CompositionLocalProvider(
+                LocalLifecycleOwner provides owner,
+                LocalContext provides ContextWrapper(activity),
+            ) {
+                ReviewPromptEffect(disabled, true, 1500.milliseconds, false, { results += it })
+                ReviewPromptEffect(disabled, onResult = { results += it })
+                ReviewPromptEffect(disabled) { results += it }
+            }
+        }
+        compose.waitForIdle()
+        assertEquals(List(3) { ReviewLaunchResult.SKIPPED }, results)
+    }
+
+    @Test
     fun launchesOnceAfterTheSettleDelay() {
         show()
         advance(1_000)

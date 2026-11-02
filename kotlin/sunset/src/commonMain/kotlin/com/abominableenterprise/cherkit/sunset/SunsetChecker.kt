@@ -1,6 +1,8 @@
 package com.abominableenterprise.cherkit.sunset
 
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -37,7 +39,17 @@ public class SunsetChecker(
      * just means no lookup prompt.
      */
     public val lookup: SunsetLookupSource? = null,
+    /** Optional diagnostics; only fixed codes and the decision kind are sent. */
+    private val telemetrySink: TelemetrySink? = null,
 ) {
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public constructor(
+        source: SunsetConfigSource,
+        cache: SunsetConfigCache,
+        timeout: Duration = DEFAULT_TIMEOUT,
+        platform: SunsetPlatform = SunsetPlatform.ANDROID,
+        lookup: SunsetLookupSource? = null,
+    ) : this(source, cache, timeout, platform, lookup, null)
     /** The 0.1.0 constructor, kept so code compiled against it still links. Source calls resolve to the one above. */
     @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
     public constructor(
@@ -98,21 +110,38 @@ public class SunsetChecker(
     ): SunsetCheckOutcome {
         if (isDisabled) return SunsetCheckOutcome(SunsetDecision.UpToDate, failed = false)
         val lookupSource = lookup?.takeIf { channel == SunsetChannel.STORE }
-        val looked = lookupSource?.let { CoroutineScope(Dispatchers.Default).async { withDeadline { it.fetch(timeout) } } }
-        val fetched: String?
-        val lookupBody: String?
+        val looked = lookupSource?.let {
+            CoroutineScope(Dispatchers.Default).async { withDeadline(4, 5) { it.fetch(timeout) } }
+        }
+        val fetchedResult: FetchResult
+        val lookedResult: FetchResult?
         try {
-            fetched = withDeadline { source.fetch(timeout) }
-            lookupBody = looked?.let { failOpen { it.await() } }
+            fetchedResult = withDeadline(1, 2) {
+                // This adapter normally swallows failures. Let this deadline own classification and reporting.
+                if (source is FetchSunsetConfigSource) source.fetchForCheck() else source.fetch(timeout)
+            }
+            lookedResult = looked?.let { failOpen { it.await() } }
         } finally {
             looked?.cancel()
         }
+        val fetched = fetchedResult.body
+        val lookupBody = lookedResult?.body
         val choice = SunsetConfigChoice.choose(fetched, failOpen { cache.load() })
+        report(fetchedResult.failure ?: if (fetched != null && choice.source != SunsetConfigChoice.Source.FETCHED) 3 else null)
         if (choice.source == SunsetConfigChoice.Source.FETCHED && fetched != null) failOpen { cache.save(fetched) }
         val lookupResult = lookupBody?.let(SunsetLookupResult::parse)
+        report(lookedResult?.failure ?: if (lookupBody != null && lookupResult == null) 6 else null)
         val decision = SunsetDecider.decide(
             choice.config, platform, installedVersion, osVersion, locale, channel, installedBuild, lookupResult, now,
         )
+        val kind = when {
+            decision.prompt?.kind == SunsetUpdateKind.TEST_BUILD -> "test_build"
+            decision is SunsetDecision.HardUpdate -> "hard"
+            decision is SunsetDecision.SoftUpdate -> "soft"
+            else -> "none"
+        }
+        // A diagnostics provider must not change the fail-open result.
+        runCatching { telemetrySink?.breadcrumb("cherkit.sunset.decision", mapOf("kind" to kind)) }
         return SunsetCheckOutcome(decision, failed = choice.source == SunsetConfigChoice.Source.MISSING)
     }
 
@@ -128,13 +157,30 @@ public class SunsetChecker(
      * [fetch]'s body, or `null` after [timeout]. The fetch runs detached, so a source that blocks or ignores
      * cancellation is abandoned at the deadline instead of holding up the launch.
      */
-    private suspend fun withDeadline(fetch: suspend () -> String?): String? {
+    private data class FetchResult(val body: String? = null, val failure: Int? = null)
+
+    private suspend fun withDeadline(failed: Int, timedOut: Int, fetch: suspend () -> String?): FetchResult {
         val job = CoroutineScope(Dispatchers.Default).async { fetch() }
         return try {
-            failOpen { withTimeoutOrNull(timeout) { job.await() } }
+            withTimeoutOrNull(timeout) {
+                val body = job.await()
+                if (body == null) FetchResult(failure = failed) else FetchResult(body = body)
+            } ?: FetchResult(failure = timedOut)
+        } catch (_: TimeoutCancellationException) {
+            currentCoroutineContext().ensureActive()
+            FetchResult(failure = timedOut)
+        } catch (_: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            FetchResult(failure = failed)
+        } catch (_: Exception) {
+            FetchResult(failure = failed)
         } finally {
             job.cancel()
         }
+    }
+
+    private fun report(code: Int?) {
+        if (code != null) runCatching { telemetrySink?.recordError("cherkit.sunset", code) }
     }
 
     /** [block]'s result, or `null` when it throws. Rethrows only when the caller itself was cancelled. */

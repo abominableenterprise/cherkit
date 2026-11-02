@@ -29,6 +29,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            api(project(":core"))
             implementation(libs.kotlinx.coroutines.core)
         }
         androidMain.dependencies {
