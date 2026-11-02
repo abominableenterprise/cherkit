@@ -10,6 +10,7 @@ its own product, so an app imports only what it needs.
 | --- | --- | --- | --- |
 | [Analytics](kotlin/analytics/README.md) | Typed, opt-in PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
 | [Telemetry](kotlin/telemetry/README.md) | Privacy-filtered errors, breadcrumbs and spans; vendor-free core contract | `CherKitTelemetry` | `:telemetry` |
+| [Telemetry Firebase (Apple)](Sources/CherKitTelemetryFirebase/README.md) | Crashlytics and privacy-gated manual Performance traces | `CherKitTelemetryFirebase` | n/a |
 | [Sunset](kotlin/sunset/README.md) | Soft or hard "please update" from a hosted min-version config | `CherKitSunset` | `:sunset` |
 | [Sunset Compose](kotlin/sunset-compose/README.md) | Jetpack Compose update dialog and blocking screen for Sunset (Android) | n/a | `:sunset-compose` |
 | [Review Compose](kotlin/review-compose/README.md) | Play In-App Review and Compose effects for Review (Android) | n/a | `:review-compose` |
@@ -29,7 +30,7 @@ Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
 
 Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
 "Up to Next Major Version" from 0.7.0), then link only the products you use:
-`CherKitAnalytics`, `CherKitTelemetry`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
+`CherKitAnalytics`, `CherKitTelemetry`, `CherKitTelemetryFirebase`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
 ```swift

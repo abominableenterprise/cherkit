@@ -16,7 +16,10 @@ public final class Telemetry: TelemetrySink {
     /// Restricted sessions allow errors only. A change permanently invalidates existing spans.
     public var restricted = false {
         willSet { if restricted != newValue { closeTraces() } }
-        didSet { if restricted != oldValue { generation &+= 1 } }
+        didSet {
+            if restricted != oldValue { generation &+= 1 }
+            try? backend?.update(restricted: restricted)
+        }
     }
     public var isDisabled: Bool { !buildEnabled || !enabled }
     public static var disabled: Telemetry { Telemetry() }
@@ -29,6 +32,7 @@ public final class Telemetry: TelemetrySink {
     public init(backend: TelemetryBackend, buildEnabled: Bool) {
         self.backend = backend
         self.buildEnabled = buildEnabled
+        try? backend.update(restricted: restricted)
     }
 
     private init() {
