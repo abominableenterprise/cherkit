@@ -25,9 +25,14 @@ public class Telemetry(
 
     public var restricted: Boolean = false
         set(value) {
+            if (field == value) return
             // Finish while diagnostics are still permitted, before storing a restrictive gate.
-            if (field != value) invalidateSpans()
+            invalidateSpans()
             field = value
+            if (backendStarted && !bestEffort { backend.updateRestricted(value) }) {
+                backendStarted = false
+                bestEffort { backend.stop() }
+            }
         }
 
     /** Restriction does not disable error reporting. */
@@ -123,7 +128,8 @@ public class Telemetry(
 
     private fun ensureStarted(): Boolean {
         if (!backendStarted) {
-            backendStarted = bestEffort { backend.start() }
+            backendStarted = bestEffort { backend.updateRestricted(restricted) } &&
+                bestEffort { backend.start() }
             // A provider may have partly opted in before throwing. Roll that attempt back.
             if (!backendStarted) bestEffort { backend.stop() }
         }

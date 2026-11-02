@@ -5,6 +5,12 @@ package com.abominableenterprise.cherkit.telemetry
  * Stop must discard queued work and context, stop traces, and support restarting.
  */
 public interface TelemetryBackend {
+    /**
+     * Apply the session restriction before start and on active transitions. Restricted sessions allow
+     * errors only: disable automatic diagnostics and performance collection without starting here.
+     * A failure prevents startup, or stops an active backend. Default is a no-op for manual-only adapters.
+     */
+    public fun updateRestricted(restricted: Boolean) {}
     public fun start()
     public fun stop()
     public fun recordError(error: TelemetryError, attributes: Map<String, Any>)
