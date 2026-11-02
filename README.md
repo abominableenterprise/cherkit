@@ -21,7 +21,7 @@ its own product, so an app imports only what it needs.
 | [Review](kotlin/review/README.md) | Store-review prompt rules: when to ask, once per version, never over a modal (iOS prompt in `CherKitUI`; Android in Review Compose) | `CherKitReview` | `:review` |
 | [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew, and the App Store review prompt | `CherKitUI` | n/a |
 
-Status: v0.7.0: Analytics (PostHog), Sunset (with "update available" prompts: App Store lookup and TestFlight test builds on iOS, Play In-App Updates on Android), WhatsNew and Review logic plus SwiftUI views (including the review prompt); Android UI: Sunset Compose, WhatsNew Compose, Review Compose and Update Compose, with launch signals (`onCheckingChange`, `onLaunchCheckComplete`) to order Play's update prompt after Sunset and "What's new".
+Status: v0.8.0: Telemetry (vendor-free crash/error diagnostics, breadcrumbs and timings with optional Firebase Crashlytics + Performance backends and module TelemetrySink wiring), Analytics (PostHog), Sunset (with "update available" prompts: App Store lookup and TestFlight test builds on iOS, Play In-App Updates on Android), WhatsNew and Review logic plus SwiftUI views (including the review prompt); Android UI: Sunset Compose, WhatsNew Compose, Review Compose and Update Compose, with launch signals (`onCheckingChange`, `onLaunchCheckComplete`) to order Play's update prompt after Sunset and "What's new".
 
 ## Install
 
@@ -30,13 +30,13 @@ Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
 ### iOS / macOS (SwiftPM)
 
 Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
-"Up to Next Major Version" from 0.7.0), then link only the products you use:
+"Up to Next Major Version" from 0.8.0), then link only the products you use:
 `CherKitAnalytics`, `CherKitTelemetry`, `CherKitTelemetryFirebase`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.7.0"),
+    .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.8.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -66,20 +66,24 @@ JVM variant automatically, and from a Kotlin Multiplatform module you can add th
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:analytics:v0.7.0")
-    implementation("com.github.abominableenterprise.cherkit:sunset:v0.7.0")
-    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.7.0")   // Android only; brings sunset
-    implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.7.0")
-    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.7.0") // Android only; brings whatsnew
-    implementation("com.github.abominableenterprise.cherkit:review:v0.7.0")
-    implementation("com.github.abominableenterprise.cherkit:review-compose:v0.7.0")   // Android only; brings review
-    implementation("com.github.abominableenterprise.cherkit:update-compose:v0.7.0")   // Android only; Play In-App Updates
-    implementation("com.github.abominableenterprise.cherkit:core:v0.7.0")             // already included by sunset and whatsnew
+    implementation("com.github.abominableenterprise.cherkit:analytics:v0.8.0")
+    implementation("com.github.abominableenterprise.cherkit:telemetry:v0.8.0")
+    implementation("com.github.abominableenterprise.cherkit:telemetry-firebase:v0.8.0") // Android only; app supplies Firebase
+    implementation("com.github.abominableenterprise.cherkit:sunset:v0.8.0")
+    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.8.0")   // Android only; brings sunset
+    implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.8.0")
+    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.8.0") // Android only; brings whatsnew
+    implementation("com.github.abominableenterprise.cherkit:review:v0.8.0")
+    implementation("com.github.abominableenterprise.cherkit:review-compose:v0.8.0")   // Android only; brings review
+    implementation("com.github.abominableenterprise.cherkit:update-compose:v0.8.0")   // Android only; Play In-App Updates
+    implementation("com.github.abominableenterprise.cherkit:core:v0.8.0")             // already included by sunset and whatsnew
 }
 ```
 
-Available from the next release: `com.github.abominableenterprise.cherkit:telemetry-firebase:<next-tag>`;
-see [Firebase app-side setup](kotlin/telemetry-firebase/README.md) for the required BoM, SDKs and plugins.
+Android Firebase is compileOnly: the app supplies the BoM, SDKs and plugins; Performance is off by default.
+See [Firebase app-side setup](kotlin/telemetry-firebase/README.md). On iOS, call
+`try FirebaseTelemetryBackend.prepareForConfiguration()` before every `FirebaseApp.configure()`; see the
+[Apple setup guide](Sources/CherKitTelemetryFirebase/README.md) for mandatory startup privacy defaults.
 
 The Kotlin packages stay `com.abominableenterprise.cherkit.<module>`; only the Maven group follows JitPack's
 `com.github.<owner>.<repo>` convention.

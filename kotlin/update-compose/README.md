@@ -5,7 +5,7 @@ download, then "Restart to install") plus a Jetpack Compose effect.
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:update-compose:v0.7.0")
+    implementation("com.github.abominableenterprise.cherkit:update-compose:v0.8.0")
 }
 ```
 

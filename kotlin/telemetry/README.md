@@ -20,12 +20,13 @@
 - **Errors:** adapters receive a `TelemetryError` containing only type/domain/code and filtered attributes, never the
   original error, `localizedDescription`, `message`, user info or cause. Domains should be static identifiers, not
   user-controlled text. The core deliberately does not transport a raw exception or stack: those may contain private
-  text. Crash-stack capture and sanitization belong to the later platform adapters. There is no free-text message API.
+  text. Crash-stack capture and sanitization belong to the platform adapters. There is no free-text message API.
 
 ## Swift usage
 
 Link `CherKitTelemetry`; import `CherKitCore` when passing an `AppVersion`. Calls are `@MainActor`, like Analytics.
-The app supplies a backend implementing `TelemetryBackend`; no concrete vendor backend ships in this PR.
+The app supplies a backend implementing `TelemetryBackend`, or uses an optional
+[Apple](../../Sources/CherKitTelemetryFirebase/README.md) or [Android](../telemetry-firebase/README.md) Firebase backend.
 
 ```swift
 import CherKitTelemetry
@@ -57,7 +58,7 @@ span.end(status: .ok)
 
 ## Kotlin usage
 
-Depend on `:telemetry` (published as `com.github.abominableenterprise.cherkit:telemetry` at the next release).
+Depend on `:telemetry` (published as `com.github.abominableenterprise.cherkit:telemetry:v0.8.0`).
 Use one instance on the main thread; the Kotlin facade is not thread-safe, matching the Swift main-actor contract.
 
 ```kotlin
@@ -110,12 +111,13 @@ pass the facade as `telemetrySink` to the optional module APIs in [Sunset](../su
 and [Update Compose](../update-compose/README.md). Interface calls use the same build/user/restricted gates and
 attribute validation described above. No central configuration registry is needed.
 
-## Backends: Firebase adapter coming
+## Backends: optional Firebase adapters
 
-This is the core contract only: no Firebase or other vendor SDK dependencies. Later Android and Apple adapters will
-use Crashlytics and Performance. Automatic Performance network monitoring must default **off**, because URLs may
-contain private query strings. App-side Firebase setup, crash collection controls and symbol upload documentation
-will ship with those adapters.
+The core has no Firebase or other vendor SDK dependencies. Optional
+[Apple](../../Sources/CherKitTelemetryFirebase/README.md) and [Android](../telemetry-firebase/README.md) adapters
+use Crashlytics and Performance. Automatic Performance network monitoring defaults **off**, because URLs may
+contain private query strings; Android Performance collection is also off by default. Follow the adapter guides
+for required app-side Firebase startup defaults, collection controls and symbol uploads.
 
 ## Shared tests
 

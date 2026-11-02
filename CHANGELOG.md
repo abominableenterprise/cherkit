@@ -4,6 +4,89 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.8.0
+
+Telemetry: crash reports, non-fatal errors, breadcrumbs and timings through a vendor-free facade with a Firebase
+Crashlytics + Performance backend. Diagnostics are on by default with a user switch, off in debug/tests/simulators,
+and errors-only in restricted sessions; never send IDs, free text or URLs. Apps must supply the core build gate and
+apply persisted user/restricted settings before collection. CherKit modules can now report their own failures and
+key decisions via the optional Core `TelemetrySink`, without depending on a telemetry vendor.
+
+No breaking changes. Module sinks default to `nil`/`null` (silent); existing Kotlin binaries retain their old
+signatures through hidden overloads. Diagnostics failures never interrupt app behavior.
+
+### Telemetry (new, `CherKitTelemetry`, `:telemetry`)
+
+- added: Sanitized non-fatal errors, breadcrumbs, spans/timings and crash-context keys, with shared Swift/Kotlin
+  privacy fixtures. Invalid names and unsafe attribute values are dropped; restricted mode drops breadcrumbs,
+  spans and keys. The core transports only error type/domain/code and filtered attributes, never raw errors,
+  messages, causes or original stacks. Apps must choose static, non-PII names and values; shape validation cannot
+  establish meaning ([privacy rules and usage](kotlin/telemetry/README.md)).
+- added: Tiny vendor-free `TelemetrySink` contract in Core, implemented by the Telemetry facade for module wiring.
+- added: Default no-op backend hooks, Swift `update(restricted:)` and Kotlin `updateRestricted(restricted: Boolean)`,
+  synchronize errors-only sessions without requiring changes to existing backends. Every start/restart requires a
+  successful restriction update; a failed update stops active collection.
+
+### Telemetry Firebase (new, `CherKitTelemetryFirebase`, `:telemetry-firebase`)
+
+- added: Optional Apple and Android Crashlytics backends for crashes/non-fatals, breadcrumbs and custom keys, plus
+  privacy-gated Performance traces. Automatic network instrumentation defaults off. Restricted sessions permit
+  errors only. Runtime switches cannot retract previously captured or uploaded data; review the adapter guides'
+  startup defaults, SDK revocation limits and physical release-device verification requirements.
+- added: iOS/macOS adapter supports Firebase 11.x through 13.x; Performance spans are iOS-only. Apps **must** call
+  `try FirebaseTelemetryBackend.prepareForConfiguration()` before every `FirebaseApp.configure()` to reset
+  persisted Performance overrides, and must not configure Firebase if reset fails. Crashlytics automatic uploads
+  stay disabled; reports are explicitly submitted only after current build/user gates pass. See the
+  [Apple setup guide](Sources/CherKitTelemetryFirebase/README.md) for required plist defaults, dSYM uploads and
+  limitations of automatic Performance lifecycle capture.
+- added: Android Firebase dependencies are **compileOnly**: the app supplies the Firebase BoM, SDKs and Gradle
+  plugins. **Performance is OFF by default on Android**; opting in also permits automatic app-start/screen traces.
+  Keep plugin network instrumentation disabled. See the [Android setup guide](kotlin/telemetry-firebase/README.md)
+  for required manifest defaults, collection controls, R8/ProGuard mapping uploads and app-side setup.
+
+### Sunset (`CherKitSunset`, `:sunset`)
+
+- added: Optional telemetry sinks report config/store fetch, timeout and decode failures with stable
+  `cherkit.sunset` codes 1–6, and `cherkit.sunset.decision` breadcrumbs with only the fixed decision kind.
+  Fail-open behavior is unchanged. Shared domain/code tables and wiring:
+  [Swift](Sources/CherKitSunset/README.md#optional-telemetry),
+  [Kotlin](kotlin/sunset/README.md#optional-telemetry-kotlin).
+
+### WhatsNew (`CherKitWhatsNew`, `:whatsnew`)
+
+- added: Optional telemetry sinks report notes loading, decoding and locale fallback with stable
+  `cherkit.whatsnew` codes 1–3, plus a `cherkit.whatsnew.shown` breadcrumb after pending notes are marked seen.
+  No note text, file names, locales, versions or exception messages are sent. Shared domain/code tables and wiring:
+  [Swift](Sources/CherKitWhatsNew/README.md#optional-swift-telemetry),
+  [Kotlin](kotlin/whatsnew/README.md#optional-telemetry-kotlin).
+
+### Review (`CherKitReview`, `:review`)
+
+- added: Optional telemetry sinks emit `cherkit.review.prompted` only after the coordinator successfully records
+  the prompt handoff, not as proof the store UI appeared. No version, interruption source or user data is sent.
+  See [Swift](Sources/CherKitReview/README.md#optional-telemetry) and
+  [Kotlin](kotlin/review/README.md#optional-telemetry) wiring; Play failures are reported by Review Compose below.
+
+### Review Compose (`:review-compose`)
+
+- added: Optional sinks on the Compose, Play and platform-free launch APIs report `cherkit.review` code 1 for
+  request/manager creation failure and code 2 for launch failure, without attributes or duplicate reports.
+  Cancellation and skipped/non-Play installs are not failures. Pass the same sink to the coordinator for the
+  prompt breadcrumb ([domain/code table and wiring](kotlin/review-compose/README.md#optional-telemetry)).
+
+### Update Compose (`:update-compose`)
+
+- added: Optional sinks report `cherkit.update` check/start/completion failures and fixed
+  `cherkit.update.available` / `cherkit.update.downloaded` breadcrumbs, without exception text or private data.
+  Play integer error codes pass through unchanged where available; cancellation is not a failure. See the
+  [domain/code table and wiring](kotlin/update-compose/README.md#telemetry-optional) for codes and sink precedence.
+
+### Build
+
+- changed: Contributors only: `scripts/setup-linux.sh` restores Swift and the JDK + Android SDK from the VM's
+  task-cache, saving fresh installs instead of downloading every run. A failed Gradle warm-up now warns, skips
+  saving the Gradle cache and exits successfully; the test run resolves dependencies itself. No app behavior change.
+
 ## 0.7.0
 
 No breaking changes; both new parameters default to `null` (the old behavior), and Kotlin keeps the 0.6.0
