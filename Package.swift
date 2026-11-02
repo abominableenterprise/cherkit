@@ -59,7 +59,7 @@ let package = Package(
         .target(name: "CherKitSunset", dependencies: ["CherKitCore"], exclude: ["README.md"]),
         .target(name: "CherKitWhatsNew", dependencies: ["CherKitCore"], exclude: ["README.md"]),
         // CherKitReview: store-review prompt rules only; the StoreKit/SwiftUI adapter lives in CherKitUI.
-        .target(name: "CherKitReview", exclude: ["README.md"]),
+        .target(name: "CherKitReview", dependencies: ["CherKitCore"], exclude: ["README.md"]),
         // SwiftUI views. Sources are wrapped in `#if canImport(SwiftUI)` so Linux builds stay green.
         .target(
             name: "CherKitUI",

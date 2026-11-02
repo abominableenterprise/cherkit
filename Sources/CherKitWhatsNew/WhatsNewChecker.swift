@@ -12,17 +12,21 @@ import Foundation
 public final class WhatsNewChecker: @unchecked Sendable {
     private let source: ReleaseNotesSource
     private let store: WhatsNewStore
+    internal let telemetry: WhatsNewTelemetry?
     private let lock = NSLock()
     private var pendingLastSeen: String?
 
     /// A checker reading notes from `source` and keeping state in `store`. The defaults read the app bundle's
-    /// `whatsnew` folder and `UserDefaults.standard`.
+    /// `whatsnew` folder and `UserDefaults.standard`. Optional telemetry is delivered asynchronously on MainActor;
+    /// omitting the sink leaves diagnostics off (unless the source itself has a sink).
     public init(
         source: ReleaseNotesSource = BundleReleaseNotesSource(),
-        store: WhatsNewStore = UserDefaultsWhatsNewStore()
+        store: WhatsNewStore = UserDefaultsWhatsNewStore(),
+        telemetrySink: TelemetrySink? = nil
     ) {
         self.source = source
         self.store = store
+        self.telemetry = telemetrySink.map(WhatsNewTelemetry.init)
     }
 
     /// The running app's version from `bundle`'s `CFBundleShortVersionString`, or `""` (which fails open) when absent.
@@ -46,7 +50,7 @@ public final class WhatsNewChecker: @unchecked Sendable {
         if updated != history { store.setInstallHistory(updated) }
 
         let lastSeen = store.lastSeenVersion()
-        let plan = LaunchPlan.make(notes: source.releaseNotes(), installed: installedVersion, lastSeen: lastSeen)
+        let plan = LaunchPlan.make(notes: releaseNotes(), installed: installedVersion, lastSeen: lastSeen)
         guard !plan.show.isEmpty else {
             pendingLastSeen = nil
             if let next = plan.lastSeen, next != lastSeen { store.setLastSeenVersion(next) }
@@ -54,7 +58,9 @@ public final class WhatsNewChecker: @unchecked Sendable {
         }
         pendingLastSeen = plan.lastSeen
         return plan.show.map { notes in
-            WhatsNewEntry(version: notes.version, date: notes.date, bullets: notes.bullets(preferredLocales: locale))
+            WhatsNewEntry(
+                version: notes.version, date: notes.date,
+                bullets: notes.bullets(preferredLocales: locale, reportingTo: telemetry))
         }
     }
 
@@ -63,8 +69,10 @@ public final class WhatsNewChecker: @unchecked Sendable {
     public func markSeen() {
         lock.lock()
         defer { lock.unlock() }
-        if let version = pendingLastSeen { store.setLastSeenVersion(version) }
+        guard let version = pendingLastSeen else { return }
+        store.setLastSeenVersion(version)
         pendingLastSeen = nil
+        telemetry?.shown()
     }
 
     /// Every bundled release newest first, with bullets in the user's `locale`, for the full history list.
@@ -72,13 +80,21 @@ public final class WhatsNewChecker: @unchecked Sendable {
     public func history(locale: [String] = Locale.preferredLanguages) -> [WhatsNewHistoryEntry] {
         let installed = store.installHistory().last.flatMap(AppVersion.init)
         var versions = Set<AppVersion>()
-        return source.releaseNotes()
+        return releaseNotes()
             .filter { versions.insert($0.version).inserted }
             .sorted { $1.version < $0.version }
             .map { notes in
                 WhatsNewHistoryEntry(
-                    version: notes.version, date: notes.date, bullets: notes.bullets(preferredLocales: locale),
+                    version: notes.version, date: notes.date,
+                    bullets: notes.bullets(preferredLocales: locale, reportingTo: telemetry),
                     isInstalled: notes.version == installed)
             }
+    }
+
+    private func releaseNotes() -> [ReleaseNotes] {
+        if let reportingSource = source as? ReportingReleaseNotesSource {
+            return reportingSource.releaseNotes(reportingTo: telemetry)
+        }
+        return source.releaseNotes()
     }
 }

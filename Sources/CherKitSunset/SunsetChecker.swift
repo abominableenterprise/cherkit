@@ -1,3 +1,4 @@
+import CherKitCore
 import Foundation
 
 /// The one call apps make at launch: fetch the hosted config, fall back to the last good one, and decide.
@@ -36,17 +37,22 @@ public struct SunsetChecker: Sendable {
     /// `timeout` and alongside the config fetch, only on the ``SunsetChannel/store`` channel. Not cached: a failed
     /// lookup just means no lookup prompt.
     public let lookup: SunsetLookupSource?
+    private let telemetry: SunsetTelemetry?
 
     /// A checker over any `source` and `cache`; pass a `lookup` (e.g. ``URLSessionSunsetLookupSource``) to also offer
-    /// the version live in the App Store.
+    /// the version live in the App Store. `telemetrySink` is optional; reports are awaited on the main actor.
     public init(
         source: SunsetConfigSource,
         cache: SunsetConfigCache = UserDefaultsSunsetConfigCache(),
         timeout: TimeInterval = defaultTimeout,
         platform: SunsetPlatform = .ios,
-        lookup: SunsetLookupSource? = nil
+        lookup: SunsetLookupSource? = nil,
+        telemetrySink: (any TelemetrySink)? = nil
     ) {
-        self.init(source: source, cache: cache, timeout: timeout, platform: platform, isDisabled: false, lookup: lookup)
+        self.init(
+            source: source, cache: cache, timeout: timeout, platform: platform,
+            isDisabled: false, lookup: lookup, telemetrySink: telemetrySink
+        )
     }
 
     init(
@@ -55,7 +61,8 @@ public struct SunsetChecker: Sendable {
         timeout: TimeInterval,
         platform: SunsetPlatform,
         isDisabled: Bool,
-        lookup: SunsetLookupSource? = nil
+        lookup: SunsetLookupSource? = nil,
+        telemetrySink: (any TelemetrySink)? = nil
     ) {
         self.source = source
         self.cache = cache
@@ -63,16 +70,22 @@ public struct SunsetChecker: Sendable {
         self.platform = platform
         self.isDisabled = isDisabled
         self.lookup = lookup
+        self.telemetry = telemetrySink.map(SunsetTelemetry.init)
     }
 
     /// A checker that fetches `url` with `URLSession` and caches in `UserDefaults.standard`.
+    /// `telemetrySink` defaults to `nil` (no telemetry); when supplied, it is only called on the main actor.
     public init(
         url: URL,
         cache: SunsetConfigCache = UserDefaultsSunsetConfigCache(),
         timeout: TimeInterval = defaultTimeout,
-        lookup: SunsetLookupSource? = nil
+        lookup: SunsetLookupSource? = nil,
+        telemetrySink: (any TelemetrySink)? = nil
     ) {
-        self.init(source: URLSessionSunsetConfigSource(url: url), cache: cache, timeout: timeout, lookup: lookup)
+        self.init(
+            source: URLSessionSunsetConfigSource(url: url), cache: cache, timeout: timeout,
+            lookup: lookup, telemetrySink: telemetrySink
+        )
     }
 
     /// Decides for this launch. Never throws; every failure ends in the cached config or ``SunsetDecision/upToDate``.
@@ -114,11 +127,18 @@ public struct SunsetChecker: Sendable {
         let source = self.source
         let timeout = self.timeout
         let lookupSource = channel == .store ? lookup : nil
-        async let looked = lookupSource == nil
-            ? nil : SunsetTimeout.run(seconds: timeout) { await lookupSource?.fetch(timeout: timeout) }
-        let fetched = await SunsetTimeout.run(seconds: timeout) { await source.fetch(timeout: timeout) }
+        async let looked = Self.fetchLookup(lookupSource, timeout: timeout)
+        let configResult = await SunsetTimeout.run(seconds: timeout) {
+            if let detailed = source as? any SunsetDetailedSource {
+                return await detailed.fetchResult(timeout: timeout)
+            }
+            return await source.fetch(timeout: timeout).map(SunsetFetchResult.body) ?? .failed
+        }
+        let fetched = configResult.data
         let choice = SunsetConfigChoice.choose(fetched: fetched, cached: await cache.load())
         if choice.source == .fetched, let fetched { await cache.save(fetched) }
+        let lookupResult = await looked
+        let parsedLookup = lookupResult?.data.flatMap(SunsetLookupResult.parse)
         let decision = SunsetDecider.decide(
             config: choice.config,
             platform: platform,
@@ -127,10 +147,24 @@ public struct SunsetChecker: Sendable {
             languages: locale,
             channel: channel,
             installedBuild: installedBuild,
-            lookup: await looked.flatMap(SunsetLookupResult.parse),
+            lookup: parsedLookup,
             now: now
         )
+        await telemetry?.report(
+            config: configResult, configValid: choice.source == .fetched,
+            lookup: lookupResult, lookupValid: parsedLookup != nil, decision: decision
+        )
         return (decision, choice.source == .missing)
+    }
+
+    private static func fetchLookup(_ source: SunsetLookupSource?, timeout: TimeInterval) async -> SunsetFetchResult? {
+        guard let source else { return nil }
+        return await SunsetTimeout.run(seconds: timeout) {
+            if let detailed = source as? any SunsetDetailedSource {
+                return await detailed.fetchResult(timeout: timeout)
+            }
+            return await source.fetch(timeout: timeout).map(SunsetFetchResult.body) ?? .failed
+        }
     }
 
     /// ``check(installedVersion:osVersion:locale:channel:installedBuild:)`` for the running app: its

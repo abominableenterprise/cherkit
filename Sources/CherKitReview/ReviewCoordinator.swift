@@ -1,3 +1,4 @@
+import CherKitCore
 import Foundation
 
 /// The store-review ("rate this app") rules. Pure logic: it never shows anything; a platform adapter asks
@@ -29,6 +30,7 @@ public final class ReviewCoordinator {
     /// Whether the current session may count and prompt, e.g. `{ !session.isKidDevice }`. Read on every call.
     public var isEligible: () -> Bool
 
+    private let telemetrySink: (any TelemetrySink)?
     private let store: ReviewStore
     private let now: () -> Date
     private var state: ReviewState
@@ -51,8 +53,10 @@ public final class ReviewCoordinator {
         successThreshold: Int = defaultSuccessThreshold,
         cooldown: TimeInterval = defaultCooldown,
         isEligible: @escaping () -> Bool = { true },
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        telemetrySink: (any TelemetrySink)? = nil
     ) {
+        self.telemetrySink = telemetrySink
         self.store = store
         self.appVersion = appVersion
         self.isDisabled = !enabled
@@ -124,6 +128,7 @@ public final class ReviewCoordinator {
         guard shouldPrompt() else { return false }
         state = ReviewState(successCount: 0, isDue: false, lastPromptedVersion: appVersion)
         store.save(state)
+        telemetrySink?.breadcrumb(name: "cherkit.review.prompted", attributes: [:])
         return true
     }
 

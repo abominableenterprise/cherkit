@@ -60,6 +60,7 @@ struct SlowSunsetSource: SunsetConfigSource {
 enum StubReply {
     case response(status: Int, body: Data)
     case error
+    case timeout
     case hang
 }
 
@@ -103,6 +104,8 @@ final class StubURLProtocol: URLProtocol {
             client?.urlProtocolDidFinishLoading(self)
         case .error, nil:
             client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+        case .timeout:
+            client?.urlProtocol(self, didFailWithError: URLError(.timedOut))
         case .hang:
             break
         }

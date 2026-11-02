@@ -1,0 +1,192 @@
+{
+  "description": "Telemetry is optional and never changes notes or store behavior. Errors use domain cherkit.whatsnew and empty attributes; breadcrumbs also have empty attributes. A read reports once per failed file, or once for an absent/unreadable directory. Invalid JSON and validation failures both use code 2, never also code 1. Locale fallback is any selected locale other than the first preferred locale after the resolver's ASCII whitespace/case/underscore normalization, including parent, later preference and English. Report code 3 once per notes entry resolved, not when no locale is selected. shown is emitted only on the first successful markSeen for a nonempty launch plan, never merely when planning or reading history. Re-reading may report failures again. If source and checker both have sinks, the checker sink takes precedence, with no duplicate delivery.",
+  "domain": "cherkit.whatsnew",
+  "shown": "cherkit.whatsnew.shown",
+  "failureCases": [
+    {
+      "name": "missing directory",
+      "input": "missingDirectory",
+      "codes": [
+        1
+      ]
+    },
+    {
+      "name": "absent resource directory",
+      "input": "nilDirectory",
+      "codes": [
+        1
+      ]
+    },
+    {
+      "name": "unreadable notes file",
+      "input": "unreadableFile",
+      "codes": [
+        1
+      ]
+    },
+    {
+      "name": "malformed JSON",
+      "input": "malformed",
+      "codes": [
+        2
+      ]
+    },
+    {
+      "name": "valid JSON failing validation",
+      "input": "invalid",
+      "codes": [
+        2
+      ]
+    },
+    {
+      "name": "empty existing directory",
+      "input": "emptyDirectory",
+      "codes": []
+    },
+    {
+      "name": "valid notes",
+      "input": "valid",
+      "codes": []
+    }
+  ],
+  "localeCases": [
+    {
+      "name": "exact normalized first preference",
+      "preferred": [
+        " PT_br "
+      ],
+      "available": [
+        "pt-BR",
+        "en"
+      ],
+      "selected": "pt-BR",
+      "codes": []
+    },
+    {
+      "name": "parent locale",
+      "preferred": [
+        "pt-BR"
+      ],
+      "available": [
+        "pt",
+        "en"
+      ],
+      "selected": "pt",
+      "codes": [
+        3
+      ]
+    },
+    {
+      "name": "later preferred locale",
+      "preferred": [
+        "ja",
+        "de"
+      ],
+      "available": [
+        "de",
+        "en"
+      ],
+      "selected": "de",
+      "codes": [
+        3
+      ]
+    },
+    {
+      "name": "English default",
+      "preferred": [
+        "ja"
+      ],
+      "available": [
+        "en"
+      ],
+      "selected": "en",
+      "codes": [
+        3
+      ]
+    },
+    {
+      "name": "empty preferences use English",
+      "preferred": [],
+      "available": [
+        "en"
+      ],
+      "selected": "en",
+      "codes": [
+        3
+      ]
+    },
+    {
+      "name": "English is first preference",
+      "preferred": [
+        "EN"
+      ],
+      "available": [
+        "en"
+      ],
+      "selected": "en",
+      "codes": []
+    },
+    {
+      "name": "no matching locale",
+      "preferred": [
+        "ja"
+      ],
+      "available": [
+        "de"
+      ],
+      "selected": null,
+      "codes": []
+    }
+  ],
+  "presentationCases": [
+    {
+      "name": "plan alone is not shown",
+      "lastSeen": "1.0",
+      "actions": [
+        "launch"
+      ],
+      "shownCount": 0
+    },
+    {
+      "name": "acknowledge once",
+      "lastSeen": "1.0",
+      "actions": [
+        "launch",
+        "markSeen",
+        "markSeen",
+        "launch",
+        "markSeen"
+      ],
+      "shownCount": 1
+    },
+    {
+      "name": "history is not shown",
+      "lastSeen": "1.0",
+      "actions": [
+        "history",
+        "markSeen"
+      ],
+      "shownCount": 0
+    },
+    {
+      "name": "first launch is not shown",
+      "lastSeen": null,
+      "actions": [
+        "launch",
+        "markSeen"
+      ],
+      "shownCount": 0
+    },
+    {
+      "name": "retry before display is acknowledged once",
+      "lastSeen": "1.0",
+      "actions": [
+        "launch",
+        "launch",
+        "markSeen",
+        "markSeen"
+      ],
+      "shownCount": 1
+    }
+  ]
+}
