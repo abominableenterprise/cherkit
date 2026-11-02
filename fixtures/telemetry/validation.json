@@ -1,0 +1,135 @@
+[
+  {
+    "name": "valid_name.1",
+    "validName": true,
+    "kind": "string",
+    "value": "ready-1.0",
+    "validValue": true
+  },
+  {
+    "name": "a",
+    "validName": true,
+    "kind": "bool",
+    "value": "true",
+    "validValue": true
+  },
+  {
+    "name": "int",
+    "validName": true,
+    "kind": "int",
+    "value": "42",
+    "validValue": true
+  },
+  {
+    "name": "double",
+    "validName": true,
+    "kind": "double",
+    "value": "1.25",
+    "validValue": true
+  },
+  {
+    "name": "version",
+    "validName": true,
+    "kind": "version",
+    "value": "1.2.3",
+    "validValue": true
+  },
+  {
+    "name": "Bad",
+    "validName": false,
+    "kind": "string",
+    "value": "safe",
+    "validValue": true
+  },
+  {
+    "name": "a-b",
+    "validName": false,
+    "kind": "string",
+    "value": "safe",
+    "validValue": true
+  },
+  {
+    "name": "",
+    "validName": false,
+    "kind": "string",
+    "value": "safe",
+    "validValue": true
+  },
+  {
+    "name": "1bad",
+    "validName": false,
+    "kind": "string",
+    "value": "safe",
+    "validValue": true
+  },
+  {
+    "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "validName": true,
+    "kind": "string",
+    "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "validValue": true
+  },
+  {
+    "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "validName": false,
+    "kind": "string",
+    "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "validValue": false
+  },
+  {
+    "name": "free_text",
+    "validName": true,
+    "kind": "string",
+    "value": "private text",
+    "validValue": false
+  },
+  {
+    "name": "empty",
+    "validName": true,
+    "kind": "string",
+    "value": "",
+    "validValue": false
+  },
+  {
+    "name": "uppercase",
+    "validName": true,
+    "kind": "string",
+    "value": "PRIVATE",
+    "validValue": false
+  },
+  {
+    "name": "url",
+    "validName": true,
+    "kind": "string",
+    "value": "https://example.com?q=secret",
+    "validValue": false
+  },
+  {
+    "name": "array",
+    "validName": true,
+    "kind": "array",
+    "value": "",
+    "validValue": false
+  },
+  {
+    "name": "object",
+    "validName": true,
+    "kind": "object",
+    "value": "",
+    "validValue": false
+  },
+  {
+    "name": "newline\n",
+    "validName": false,
+    "kind": "string",
+    "value": "safe\n",
+    "validValue": false
+  },
+  {
+    "name": "nan",
+    "validName": true,
+    "kind": "nan",
+    "value": "",
+    "validValue": false
+  }
+]
