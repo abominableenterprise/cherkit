@@ -92,8 +92,16 @@ Disabling or entering restricted mode terminates active traces before changing t
 build/user gate, not restricted mode (errors remain available there).
 
 Adapters implement `start`, `stop`, `recordError`, `breadcrumb`, `startTrace` (returning an opaque string ID),
-`stopTrace`, `setAttribute` and `setKey`. Adapters must clear retained context and traces on `stop`. The core drops
-all new diagnostic context while restricted; adapters must not enable automatic breadcrumb or trace capture. The core cannot retract vendor data already recorded before a
+`stopTrace`, `setAttribute` and `setKey`. Kotlin adapters may also override the default no-op
+`setRestricted(restricted: Boolean)`: the core calls it with the current state before every `start`, and immediately
+on each restriction change while the backend is active, after terminating live spans. Unchanged assignments do not
+call the hook; assigning `restricted` never starts an inactive backend. The hook must apply the restriction without
+starting collection itself. In restricted sessions it must disable automatic diagnostics and Performance collection
+while leaving error reporting available. If the hook throws, the core skips startup or stops the active backend
+(best effort); later operations may retry restriction setup before starting again.
+
+Adapters must clear retained context and traces on `stop`. The core drops all new diagnostic context while restricted;
+adapters must not enable automatic breadcrumb or trace capture. The core cannot retract vendor data already recorded before a
 switch changes. A tiny [TelemetrySink](../../Sources/CherKitCore/TelemetrySink.swift) in Core exposes domain/code
 errors and breadcrumbs for future module wiring; no other module reports telemetry in this PR.
 
