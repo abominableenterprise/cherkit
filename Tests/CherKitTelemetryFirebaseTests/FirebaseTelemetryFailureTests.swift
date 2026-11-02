@@ -6,14 +6,14 @@ import XCTest
 final class FirebaseTelemetryFailureTests: XCTestCase {
     func testInitializationAttemptsEveryPrivacyOperationEvenWhenTheyAllThrow() async {
         let sdk = RecordingFirebaseTelemetrySDK()
-        sdk.failures = ["crash.false", "performance.false", "instrumentation.false", "delete"]
+        sdk.failures = ["crash.false", "performance.false", "instrumentation.false"]
         _ = FirebaseTelemetryBackend(sdk: sdk)
-        XCTAssertEqual(sdk.calls.count, 4)
+        XCTAssertEqual(sdk.calls.count, 3)
         XCTAssertEqual(Set(sdk.calls), sdk.failures)
     }
 
     func testEveryCollectionEnableFailureThrowsAndRollsBackThenAllowsRetry() async throws {
-        for failure in ["instrumentation.true", "performance.true", "crash.true"] {
+        for failure in ["instrumentation.true", "performance.true", "crash.false", "send"] {
             let sdk = RecordingFirebaseTelemetrySDK()
             let backend = FirebaseTelemetryBackend(sdk: sdk, automaticInstrumentationEnabled: true)
             sdk.failures = [failure]
@@ -21,7 +21,7 @@ final class FirebaseTelemetryFailureTests: XCTestCase {
             XCTAssertFalse(sdk.crashEnabled, failure)
             XCTAssertFalse(sdk.performanceEnabled, failure)
             XCTAssertFalse(sdk.instrumentationEnabled, failure)
-            XCTAssertEqual(sdk.deletedReports, 2, failure)
+            XCTAssertEqual(sdk.deletedReports, 1, failure)
             let rollbackCalls = Set(sdk.calls.suffix(4))
             XCTAssertEqual(rollbackCalls, ["crash.false", "performance.false", "instrumentation.false", "delete"])
             let calls = sdk.calls
@@ -32,7 +32,7 @@ final class FirebaseTelemetryFailureTests: XCTestCase {
             XCTAssertEqual(sdk.calls, calls)
             sdk.failures = []
             try backend.start()
-            XCTAssertTrue(sdk.crashEnabled)
+            XCTAssertFalse(sdk.crashEnabled)
             XCTAssertTrue(sdk.performanceEnabled)
             XCTAssertTrue(sdk.instrumentationEnabled)
             try backend.recordError(TelemetryError(type: "TestError"), attributes: [:])
@@ -45,7 +45,7 @@ final class FirebaseTelemetryFailureTests: XCTestCase {
         let sdk = RecordingFirebaseTelemetrySDK()
         let backend = FirebaseTelemetryBackend(sdk: sdk, automaticInstrumentationEnabled: true)
         sdk.calls = []
-        sdk.failures = ["crash.true", "crash.false", "performance.false", "instrumentation.false", "delete"]
+        sdk.failures = ["send", "crash.false", "performance.false", "instrumentation.false", "delete"]
         XCTAssertThrowsError(try backend.start())
         XCTAssertEqual(Set(sdk.calls.suffix(4)), ["crash.false", "performance.false", "instrumentation.false", "delete"])
     }
@@ -54,7 +54,7 @@ final class FirebaseTelemetryFailureTests: XCTestCase {
         let sdk = RecordingFirebaseTelemetrySDK()
         let backend = FirebaseTelemetryBackend(sdk: sdk)
         let telemetry = Telemetry(backend: backend, buildEnabled: true)
-        sdk.failures = ["crash.true"]
+        sdk.failures = ["send"]
         telemetry.recordError(domain: "test.domain", code: 1)
         XCTAssertTrue(sdk.errors.isEmpty)
         XCTAssertFalse(sdk.crashEnabled)

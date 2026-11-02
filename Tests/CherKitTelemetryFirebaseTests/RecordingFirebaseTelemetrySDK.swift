@@ -12,6 +12,8 @@ final class RecordingFirebaseTelemetrySDK: FirebaseTelemetrySDK {
     var performanceEnabled = true
     var instrumentationEnabled = true
     var deletedReports = 0
+    // Firebase resolves only the first send/delete decision in a process.
+    var reportDecision: String?
     var errors: [NSError] = []
     var logs: [String] = []
     var keys: [String: String] = [:]
@@ -39,9 +41,15 @@ final class RecordingFirebaseTelemetrySDK: FirebaseTelemetrySDK {
         instrumentationEnabled = enabled
     }
 
+    func sendUnsentReports() throws {
+        try attempt("send")
+        if reportDecision == nil { reportDecision = "send" }
+    }
+
     func deleteUnsentReports() throws {
         try attempt("delete")
         deletedReports += 1
+        if reportDecision == nil { reportDecision = "delete" }
     }
 
     func record(_ error: NSError) throws {

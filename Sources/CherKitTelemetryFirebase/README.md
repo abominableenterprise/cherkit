@@ -22,9 +22,12 @@ The SDK range is `11.0.0..<14.0.0` (latest checked: 13.1.1). Newer Firebase rele
 
    These are startup privacy defaults, not optional tuning. Do not use the Performance
    `firebase_performance_collection_deactivated` flag: it permanently disables manual traces as well.
-3. On the main actor, call `FirebaseApp.configure()` once, then create and retain one backend/facade. Supply the
-   build gate yourself: false for DEBUG, unit/UI tests and simulators. Load the user's diagnostics preference
-   and restricted-session flag **before any operation or enabled assignment**:
+3. On the main actor, call `try FirebaseTelemetryBackend.prepareForConfiguration()` **before every**
+   `FirebaseApp.configure()`, including denied/restricted/debug launches. It resets persisted Performance collection
+   and instrumentation overrides before Firebase can start its automatic hooks. Do not configure Firebase if reset
+   fails. Plist defaults alone cannot override the previous process's runtime settings. Then create and retain one
+   backend/facade. Supply the build gate yourself: false for DEBUG, unit/UI tests and simulators. Load the user's
+   diagnostics preference and restricted-session flag **before any operation or enabled assignment**:
 
    ```swift
    import FirebaseCore
@@ -32,7 +35,8 @@ The SDK range is `11.0.0..<14.0.0` (latest checked: 13.1.1). Newer Firebase rele
    import CherKitTelemetryFirebase
 
    @MainActor
-   func makeTelemetry(buildAllowed: Bool, userEnabled: Bool, restricted: Bool) -> Telemetry {
+   func makeTelemetry(buildAllowed: Bool, userEnabled: Bool, restricted: Bool) throws -> Telemetry {
+       try FirebaseTelemetryBackend.prepareForConfiguration() // every launch, BEFORE configure
        FirebaseApp.configure() // once, owned by the app
        let backend = FirebaseTelemetryBackend()
        let telemetry = Telemetry(backend: backend, buildEnabled: buildAllowed)
@@ -69,10 +73,14 @@ The SDK range is `11.0.0..<14.0.0` (latest checked: 13.1.1). Newer Firebase rele
 ## Privacy and lifecycle
 
 Use the backend through `Telemetry`, not as a bypass around its gates. Construction explicitly disables both
-collections and instrumentation and requests deletion of unsent Crashlytics reports. `start` opens Crashlytics
-and manual Performance collection; `stop` disables them, ends retained traces, clears owned custom keys and
-requests deletion of unsent reports. SDK errors are best-effort; a failed start rolls collection back and the core
-may retry. Firebase SDK APIs do not throw Objective-C exceptions as Swift errors; those cannot be recovered here.
+collections and instrumentation, without making Crashlytics' one-shot send/delete decision before consent is known.
+`start` keeps **automatic Crashlytics collection disabled** and explicitly calls `sendUnsentReports()` only after the
+core's current build/user gates pass. It never persists upload consent into the next launch. Pending reports are
+submitted as a batch; current-session non-fatals/crashes normally await a later consenting launch. `start` also
+opens Performance collection. `stop` disables it, ends retained traces, clears owned custom keys and requests
+unsent-report deletion. Firebase's send/delete decision is one-shot per process: deleting after an authorized send
+cannot retract it. SDK errors are best-effort; a failed start rolls collection back and the core may retry.
+Firebase SDK APIs do not throw Objective-C exceptions as Swift errors; those cannot be recovered here.
 
 Restricted mode reports crashes/non-fatals only: no new logs, keys, manual traces or automatic Performance
 collection. The additive `TelemetryBackend.update(restricted:)` hook synchronizes this even before the first error;
@@ -90,23 +98,36 @@ order. Firebase attribute keys accept only lowercase letters/underscores, at mos
 prefixes; unsupported keys are dropped rather than renamed. Values use the core's primitive/AppVersion allowlist
 and Firebase's 100-byte cap. Updates to existing keys remain possible at the cap.
 
-**Firebase limitations:** collection and instrumentation settings persist across launches. In particular, Firebase
-documents Crashlytics collection changes and post-configuration instrumentation changes as next-launch controls.
+**Firebase limitations:** Performance collection/instrumentation settings persist across launches; the mandatory
+pre-configuration reset overwrites them before Firebase starts. Crashlytics automatic collection stays false;
+explicit submission is a per-process authorization, not persisted collection consent. An app migrating from code
+that previously persisted Crashlytics collection `true` must first disable it in a consenting process and relaunch;
+the plist cannot override that old setting and post-configure initialization cannot make that migration launch safe.
+Do not initialize Crashlytics on a denied migration launch with a prior enabled override.
+
 Do not treat a runtime switch as retracting reports already queued, sent, or logs already recorded. Crashlytics
 has no API to clear breadcrumb history; clearing custom keys is best-effort. Do not mix normal and restricted
-users in one Firebase process expecting retroactive removal of context. A restricted startup must begin with
-privacy defaults and must not inherit an app-enabled automatic instrumentation setting. Apps with stronger
-immediate revocation requirements must avoid initializing Firebase diagnostics for that process. The adapter
-cannot override Firebase's startup behavior before the app initializes it.
+users in one Firebase process expecting retroactive removal of context. Automatic collection disabled still permits
+local crash capture; a later explicit submission cannot filter individual reports by their original consent state.
+Apps requiring no local diagnostics capture or immediate cancellation of queued uploads must avoid initializing
+Firebase diagnostics. Startup resets protect new collection, not previously authorized transport work.
+
+Performance collection is **not strictly manual-only**: even with instrumentation false, Firebase can emit app-start,
+foreground/background, session and gauge metadata while collection is enabled. Only enable this backend when
+that vendor behavior is acceptable; restricted and denied sessions keep Performance collection off. See the
+[SDK collection controls](https://github.com/firebase/firebase-ios-sdk/blob/13.1.1/FirebasePerformance/Sources/Public/FirebasePerformance/FIRPerformance.h)
+and [automatic lifecycle tracker](https://github.com/firebase/firebase-ios-sdk/blob/13.1.1/FirebasePerformance/Sources/AppActivity/FPRAppActivityTracker.m).
 
 ## Optional automatic network monitoring
 
 Keep it OFF: automatic instrumentation can capture URLs, including private query strings, and automatic app-start
 metrics. If a non-restricted app explicitly accepts that risk, use
-`FirebaseTelemetryBackend(automaticInstrumentationEnabled: true)` and set the app's
-`firebase_performance_instrumentation_enabled` startup flag to `YES` **before Firebase configuration**, in an
-eligible release process only. Firebase persists runtime overrides, so changes may require a subsequent launch.
-Do not enable it in restricted/debug/test/simulator processes. Audit URL contents and consent independently;
+`FirebaseTelemetryBackend(automaticInstrumentationEnabled: true)` in an eligible release process only. Keep the
+plist defaults `NO` and always call `prepareForConfiguration()` before configuring Firebase, even after a previous
+opted-in session. The backend enables instrumentation only when the current gates permit; the next launch resets
+it before configuration. Once installed, Firebase's hooks cannot be unswizzled in-process; closing collection is
+not a promise to undo instrumentation. Do not enable it in restricted/debug/test/simulator processes. Audit URL
+contents and consent independently;
 CherKit cannot sanitize Firebase's automatic requests. See
 [Performance collection controls](https://firebase.google.com/docs/perf-mon/disable-sdk?platform=ios).
 

@@ -6,6 +6,7 @@ protocol FirebaseTelemetrySDK: AnyObject {
     func setCrashCollectionEnabled(_ enabled: Bool) throws
     func setPerformanceCollectionEnabled(_ enabled: Bool) throws
     func setInstrumentationEnabled(_ enabled: Bool) throws
+    func sendUnsentReports() throws
     func deleteUnsentReports() throws
     func record(_ error: NSError) throws
     func log(_ message: String) throws

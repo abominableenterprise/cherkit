@@ -27,6 +27,12 @@ final class LiveFirebaseTelemetrySDK: FirebaseTelemetrySDK {
         #endif
     }
 
+    func sendUnsentReports() {
+        #if canImport(FirebaseCrashlytics)
+        Crashlytics.crashlytics().sendUnsentReports()
+        #endif
+    }
+
     func deleteUnsentReports() {
         #if canImport(FirebaseCrashlytics)
         Crashlytics.crashlytics().deleteUnsentReports()

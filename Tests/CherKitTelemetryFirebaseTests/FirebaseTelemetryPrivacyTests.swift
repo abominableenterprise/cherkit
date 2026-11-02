@@ -26,7 +26,8 @@ final class FirebaseTelemetryPrivacyTests: XCTestCase {
                     XCTAssertEqual(sdk.logs.count, diagnostics ? 1 : 0, context)
                     XCTAssertEqual(sdk.keys["state"], diagnostics ? "ready" : nil, context)
                     XCTAssertEqual(sdk.traces.count, diagnostics ? 1 : 0, context)
-                    XCTAssertEqual(sdk.crashEnabled, collecting, context)
+                    XCTAssertFalse(sdk.crashEnabled, context)
+                    XCTAssertEqual(sdk.calls.contains("send"), collecting, context)
                     XCTAssertEqual(sdk.performanceEnabled, diagnostics, context)
                     XCTAssertEqual(sdk.instrumentationEnabled, diagnostics, context)
                     telemetry.enabled = false
@@ -73,7 +74,7 @@ final class FirebaseTelemetryPrivacyTests: XCTestCase {
         telemetry.restricted = true
         XCTAssertTrue(sdk.keys.isEmpty)
         XCTAssertEqual(trace.stopAttempts, 1)
-        XCTAssertTrue(sdk.crashEnabled)
+        XCTAssertFalse(sdk.crashEnabled)
         XCTAssertFalse(sdk.performanceEnabled)
         XCTAssertFalse(sdk.instrumentationEnabled)
         let calls = sdk.calls
@@ -122,7 +123,7 @@ final class FirebaseTelemetryPrivacyTests: XCTestCase {
         let telemetry = Telemetry(backend: backend, buildEnabled: true)
         telemetry.restricted = true
         telemetry.recordError(domain: "test.domain", code: 1)
-        XCTAssertTrue(sdk.crashEnabled)
+        XCTAssertFalse(sdk.crashEnabled)
         XCTAssertFalse(sdk.calls.contains("performance.true"))
         XCTAssertFalse(sdk.calls.contains("instrumentation.true"))
         XCTAssertTrue(sdk.keys.isEmpty)

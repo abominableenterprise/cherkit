@@ -16,6 +16,17 @@ public final class FirebaseTelemetryBackend: TelemetryBackend {
     }
     private var traces: [String: LiveTrace] = [:]
 
+    /// Reset persisted Performance overrides before EVERY FirebaseApp.configure(), even on denied launches.
+    /// This must precede Firebase configuration; constructing a backend afterward is too late.
+    public static func prepareForConfiguration() throws {
+        try prepareForConfiguration(sdk: LiveFirebaseTelemetrySDK())
+    }
+
+    static func prepareForConfiguration(sdk: any FirebaseTelemetrySDK) throws {
+        try sdk.setPerformanceCollectionEnabled(false)
+        try sdk.setInstrumentationEnabled(false)
+    }
+
     /// Automatic instrumentation (including URL capture) is OFF unless the app explicitly opts in.
     public convenience init(automaticInstrumentationEnabled: Bool = false) {
         self.init(sdk: LiveFirebaseTelemetrySDK(),
@@ -25,7 +36,8 @@ public final class FirebaseTelemetryBackend: TelemetryBackend {
     init(sdk: any FirebaseTelemetrySDK, automaticInstrumentationEnabled: Bool = false) {
         self.sdk = sdk
         self.automaticInstrumentationEnabled = automaticInstrumentationEnabled
-        disableCollection()
+        // Crashlytics send/delete is a one-shot decision: don't consume it before consent is known.
+        disableCollection(deleteReports: false)
     }
 
     public func start() throws {
@@ -33,7 +45,9 @@ public final class FirebaseTelemetryBackend: TelemetryBackend {
         do {
             try sdk.setInstrumentationEnabled(!restricted && automaticInstrumentationEnabled)
             try sdk.setPerformanceCollectionEnabled(!restricted)
-            try sdk.setCrashCollectionEnabled(true)
+            // Never persist upload consent into a later launch. Explicit submission is per-process.
+            try sdk.setCrashCollectionEnabled(false)
+            try sdk.sendUnsentReports()
             running = true
         } catch {
             disableCollection()
@@ -118,10 +132,10 @@ public final class FirebaseTelemetryBackend: TelemetryBackend {
         for key in old { try? sdk.setKey(key, value: nil) }
     }
 
-    private func disableCollection() {
+    private func disableCollection(deleteReports: Bool = true) {
         try? sdk.setInstrumentationEnabled(false)
         try? sdk.setPerformanceCollectionEnabled(false)
         try? sdk.setCrashCollectionEnabled(false)
-        try? sdk.deleteUnsentReports()
+        if deleteReports { try? sdk.deleteUnsentReports() }
     }
 }

@@ -4,15 +4,15 @@ import XCTest
 
 @MainActor
 final class FirebaseTelemetryLifecycleTests: XCTestCase {
-    func testInitializationDisablesEveryCollectionFlagAndDeletesPendingReports() async {
+    func testInitializationDisablesEveryCollectionFlagWithoutDecidingPendingReports() async {
         let sdk = RecordingFirebaseTelemetrySDK()
         _ = FirebaseTelemetryBackend(sdk: sdk)
-        XCTAssertEqual(sdk.calls.count, 4)
-        XCTAssertEqual(Set(sdk.calls), ["crash.false", "performance.false", "instrumentation.false", "delete"])
+        XCTAssertEqual(sdk.calls.count, 3)
+        XCTAssertEqual(Set(sdk.calls), ["crash.false", "performance.false", "instrumentation.false"])
         XCTAssertFalse(sdk.crashEnabled)
         XCTAssertFalse(sdk.performanceEnabled)
         XCTAssertFalse(sdk.instrumentationEnabled)
-        XCTAssertEqual(sdk.deletedReports, 1)
+        XCTAssertEqual(sdk.deletedReports, 0)
     }
 
     func testDirectCallsBeforeStartAndAfterStopAreInert() async throws {
@@ -38,7 +38,7 @@ final class FirebaseTelemetryLifecycleTests: XCTestCase {
         let sdk = RecordingFirebaseTelemetrySDK()
         let backend = FirebaseTelemetryBackend(sdk: sdk)
         try backend.start()
-        XCTAssertTrue(sdk.crashEnabled)
+        XCTAssertFalse(sdk.crashEnabled)
         XCTAssertTrue(sdk.performanceEnabled)
         XCTAssertFalse(sdk.instrumentationEnabled)
         XCTAssertFalse(sdk.calls.contains("instrumentation.true"))
@@ -51,7 +51,7 @@ final class FirebaseTelemetryLifecycleTests: XCTestCase {
         XCTAssertFalse(sdk.crashEnabled)
         XCTAssertFalse(sdk.performanceEnabled)
         XCTAssertFalse(sdk.instrumentationEnabled)
-        XCTAssertEqual(sdk.deletedReports, 2)
+        XCTAssertEqual(sdk.deletedReports, 1)
         try backend.start()
         try backend.setAttribute(traceID: firstID, key: "state", value: "stale")
         try backend.stopTrace(id: firstID, status: .error)
@@ -78,7 +78,7 @@ final class FirebaseTelemetryLifecycleTests: XCTestCase {
         XCTAssertTrue(sdk.keys.isEmpty)
         XCTAssertEqual(trace.stopAttempts, 1)
         telemetry.enabled = true
-        XCTAssertTrue(sdk.crashEnabled)
+        XCTAssertFalse(sdk.crashEnabled)
         XCTAssertTrue(sdk.performanceEnabled)
         XCTAssertTrue(sdk.instrumentationEnabled)
         span.end(status: .error)
