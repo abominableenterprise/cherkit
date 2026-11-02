@@ -18,7 +18,7 @@ public final class Telemetry: TelemetrySink {
         willSet { if restricted != newValue { closeTraces() } }
         didSet {
             if restricted != oldValue { generation &+= 1 }
-            try? backend?.update(restricted: restricted)
+            syncRestriction()
         }
     }
     public var isDisabled: Bool { !buildEnabled || !enabled }
@@ -32,7 +32,7 @@ public final class Telemetry: TelemetrySink {
     public init(backend: TelemetryBackend, buildEnabled: Bool) {
         self.backend = backend
         self.buildEnabled = buildEnabled
-        try? backend.update(restricted: restricted)
+        syncRestriction()
     }
 
     private init() {
@@ -131,9 +131,22 @@ public final class Telemetry: TelemetrySink {
         }
     }
 
+    private func syncRestriction() {
+        do {
+            try backend?.update(restricted: restricted)
+        } catch {
+            guard backendStarted else { return }
+            generation &+= 1
+            closeTraces()
+            backendStarted = false
+            try? backend?.stop()
+        }
+    }
+
     private func startBackend() {
         guard let backend else { return }
         do {
+            try backend.update(restricted: restricted)
             try backend.start()
             backendStarted = true
         } catch {

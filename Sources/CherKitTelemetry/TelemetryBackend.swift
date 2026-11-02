@@ -5,7 +5,9 @@ public protocol TelemetryBackend: AnyObject {
     /// Resume collection. A failed partial start is immediately rolled back with stop.
     func start() throws
     func stop() throws
-    /// Synchronize errors-only mode, including before the first start. Default keeps existing adapters compatible.
+    /// Synchronize errors-only mode before every start and on restriction assignments.
+    /// Failure stops an active backend and blocks restarts until synchronization succeeds.
+    /// Default keeps existing adapters compatible.
     func update(restricted: Bool) throws
     func recordError(_ error: TelemetryError, attributes: [String: Any]) throws
     func breadcrumb(name: String, attributes: [String: Any]) throws
