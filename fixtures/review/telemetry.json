@@ -1,0 +1,47 @@
+{
+  "domain": "cherkit.review",
+  "breadcrumb": "cherkit.review.prompted",
+  "attributes": {},
+  "cases": [
+    {
+      "name": "not_due",
+      "enabled": true,
+      "eligible": true,
+      "armed": false,
+      "interrupted": false,
+      "prompted": false
+    },
+    {
+      "name": "disabled",
+      "enabled": false,
+      "eligible": true,
+      "armed": true,
+      "interrupted": false,
+      "prompted": false
+    },
+    {
+      "name": "ineligible",
+      "enabled": true,
+      "eligible": false,
+      "armed": true,
+      "interrupted": false,
+      "prompted": false
+    },
+    {
+      "name": "interrupted",
+      "enabled": true,
+      "eligible": true,
+      "armed": true,
+      "interrupted": true,
+      "prompted": false
+    },
+    {
+      "name": "prompted",
+      "enabled": true,
+      "eligible": true,
+      "armed": true,
+      "interrupted": false,
+      "prompted": true
+    }
+  ]
+}

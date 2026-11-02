@@ -20,5 +20,21 @@ reads it lazily or assign it later (`review.isEligible = { model.isReviewEligibl
 The SwiftUI adapter (`.reviewPrompt`, `.reviewInterruption`, the Sunset and What's New hookups) lives in
 [CherKitUI](../CherKitUI/README.md#review).
 
+## Optional telemetry
+
+Pass `telemetrySink: telemetry` to `ReviewCoordinator` to use an app's `CherKitCore.TelemetrySink`.
+The default is `nil`, so existing apps emit nothing. Delivery is synchronous on the main actor after state is saved.
+
+| Domain | Integer error codes | Swift behavior |
+| --- | --- | --- |
+| `cherkit.review` | None | The Foundation coordinator does not call a store API and has no store failures to report. |
+
+| Breadcrumb | When | Attributes |
+| --- | --- | --- |
+| `cherkit.review.prompted` | `markPrompted()` returns `true`, once per version | None |
+
+Failed/disabled/ineligible/interrupted calls and repeat `markPrompted()` calls emit nothing. No version, modal
+source, message text or user data is sent. Platform review-flow errors are outside the Swift Foundation module.
+
 Foundation only (no UIKit/StoreKit), so it builds and tests on Linux. State lives in `UserDefaults.standard` under
 `cherkit.review.*` (`UserDefaultsReviewStore(defaults:keyPrefix:)`); `InMemoryReviewStore` is for tests.
