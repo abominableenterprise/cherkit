@@ -54,11 +54,14 @@ major version bump and a changelog fragment of kind `breaking` that says what br
 Run, on a Linux VM:
 
 ```sh
-scripts/setup-linux.sh          # idempotent; installs Swift, JDK, Android SDK; caches Gradle deps with task-cache
+scripts/setup-linux.sh          # idempotent; Swift, JDK, Android SDK and Gradle deps, restored from task-cache when present
 scripts/test.sh <module>        # analytics | review | sunset | whatsnew: size check + that module's Swift and Kotlin tests
 scripts/test.sh                 # everything that runs on Linux; run it before opening a PR that touches shared files
 ```
 
+- `setup-linux.sh` restores each toolchain from task-cache (falling back to the upstream download) and saves it right
+  after a fresh install. A failed Gradle warm-up compile only warns (and skips saving the Gradle cache); setup still
+  exits 0, and the test run then resolves dependencies itself.
 - After `setup-linux.sh`, `./gradlew` and `scripts/test.sh` pick up the JDK and SDKs from `~/.cherkit-tools/env.sh` by
   themselves (`./gradlew` only when `JAVA_HOME` is unset). After regenerating the wrapper, re-add the CherKit hook to
   `gradlew` (`scripts/tests/gradlew-env-test.sh` fails without it).
