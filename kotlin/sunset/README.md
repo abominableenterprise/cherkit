@@ -196,6 +196,31 @@ val checker = if (isUiTest) SunsetChecker.disabled() else AndroidSunset.checker(
 `isDisabled` is public and read-only on both platforms, so app tests can assert they wired the switched-off checker:
 `assertTrue(testEnvironment.sunsetChecker.isDisabled)` (Kotlin), `XCTAssertTrue(...sunsetChecker.isDisabled)` (Swift).
 
+## Optional telemetry (Kotlin)
+
+Pass `telemetrySink: TelemetrySink? = null` to `SunsetChecker` or
+`AndroidSunset.checker(context, telemetrySink = sink) { /* GET */ }`. The sink contract is in Core; no telemetry
+provider dependency is added. Existing JVM signatures (including default-argument bridges) remain as hidden
+deprecated overloads. Omitting the sink preserves fail-open behavior and sends nothing.
+
+| Domain | Code | Meaning |
+| --- | --- | --- |
+| `cherkit.sunset` | 1 | Config fetch failed (null, empty through the fetch adapter, or exception) |
+| `cherkit.sunset` | 2 | Config fetch timed out |
+| `cherkit.sunset` | 3 | Fetched config could not be decoded/accepted |
+| `cherkit.sunset` | 4 | Store lookup failed (null or exception) |
+| `cherkit.sunset` | 5 | Store lookup timed out |
+| `cherkit.sunset` | 6 | Lookup response could not be decoded/accepted (including no result) |
+
+Each failed operation reports once per check, even when cached config supplies a successful decision. Cached data
+and cache read/write errors do not generate additional reports. A custom source that hides a timeout by returning
+null can only be classified as a fetch failure; the built-in fetch adapter preserves timeout classification.
+Lookup is not called or reported outside the store channel. Caller cancellation and the disabled checker emit nothing.
+
+Every completed enabled check emits `cherkit.sunset.decision` with only `kind`: `none`, `soft`, `hard`, or
+`test_build`. Errors have no attributes. No URLs, versions, locale tags, exception messages or config contents are
+sent. Sink exceptions are ignored, so diagnostics cannot change the decision.
+
 ## Failed checks
 
 A check *fails* when there is no usable config at all: the fetch failed, timed out or did not parse, and nothing

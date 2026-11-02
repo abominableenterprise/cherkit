@@ -21,6 +21,9 @@ public class PlayUpdateState internal constructor(
     internal val manager: AppUpdateManager?,
     internal var telemetrySink: TelemetrySink? = null,
 ) {
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    internal constructor(manager: AppUpdateManager?) : this(manager, null)
+
     /** A flexible update finished downloading and waits for [completeUpdate]: show "Restart to install". */
     public var isDownloaded: Boolean by mutableStateOf(false)
         internal set
@@ -85,7 +88,7 @@ public fun rememberPlayUpdateState(
     manager: (Context) -> AppUpdateManager = { AppUpdateManagerFactory.create(it) },
 ): PlayUpdateState {
     val context = LocalContext.current.applicationContext
-    return remember(context, telemetrySink) {
+    return remember(context) {
         PlayUpdateState(
             try {
                 manager(context)
@@ -94,12 +97,19 @@ public fun rememberPlayUpdateState(
             },
             telemetrySink,
         )
-    }
+    }.also { it.telemetrySink = telemetrySink }
 }
+
+/** Source compatibility for a manager factory supplied positionally. */
+@Suppress("UNUSED_PARAMETER")
+@Composable
+public fun rememberPlayUpdateState(
+    legacyManager: (Context) -> AppUpdateManager,
+    compatibility: Unit = Unit,
+): PlayUpdateState = rememberPlayUpdateState(null, legacyManager)
 
 @Deprecated("Use the overload with telemetrySink", level = DeprecationLevel.HIDDEN)
 @Composable
 public fun rememberPlayUpdateState(
     manager: (Context) -> AppUpdateManager = { AppUpdateManagerFactory.create(it) },
 ): PlayUpdateState = rememberPlayUpdateState(null, manager)
-

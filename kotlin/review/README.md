@@ -6,8 +6,8 @@ The store-review ("rate this app") rules: when to ask, never too often, never ov
 Android adapter ([review-compose](../review-compose/README.md): Play In-App Review plus Compose effects) build on it.
 
 Swift: `Sources/CherKitReview` ([Swift usage](../../Sources/CherKitReview/README.md)), Foundation only. Kotlin:
-`kotlin/review` (no runtime dependencies). Shared cases: `fixtures/review/coordinator.json`. Test with
-`scripts/test.sh review`.
+`kotlin/review` (only the tiny Core diagnostics contract; no telemetry provider). Shared cases:
+`fixtures/review/coordinator.json`. Test with `scripts/test.sh review`.
 
 ## Usage
 
@@ -93,6 +93,25 @@ reports the sheet as `ReviewInterruption.whatsNew` (`"whatsNew"`):
 .sunsetPrompt(checker: sunset, onPromptChange: { review.setSunsetPromptKind($0) })
 .whatsNew(checker: whatsNew, onVisibilityChange: { review.setInterruptionVisible($0, source: ReviewInterruption.whatsNew) })
 ```
+
+## Optional telemetry
+
+Pass `telemetrySink: TelemetrySink? = null` to `ReviewCoordinator` or `AndroidReview.coordinator` to opt in.
+The sink is the Core interface; no telemetry provider is required. Existing calls keep their behavior, and hidden
+deprecated overloads retain the previous constructor and factory signatures for compiled apps.
+
+| Event | When | Attributes |
+| --- | --- | --- |
+| Breadcrumb `cherkit.review.prompted` | Exactly once after `markPrompted()` successfully saves the prompt | None |
+
+A `false` result, a failed save, disabled/ineligible state or a held prompt emits nothing. The breadcrumb records
+handoff intent, not proof the store UI was shown: Play's quota is opaque, and a later launch failure does not undo
+`markPrompted()`. No version, interruption source, exception message, URL or user data is sent. Sink exceptions are
+ignored so optional diagnostics cannot interrupt the successful prompt handoff.
+
+To also capture Play failures, pass the same sink separately to `ReviewPromptEffect` or `PlayReview.launch`
+([error codes](../review-compose/README.md#optional-telemetry)). The coordinator alone owns the breadcrumb; adapters
+never repeat it. Passing a sink only to an adapter captures errors, not the coordinator breadcrumb.
 
 ## Storage
 

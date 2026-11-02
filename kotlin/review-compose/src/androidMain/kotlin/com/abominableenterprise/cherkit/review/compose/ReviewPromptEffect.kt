@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import com.abominableenterprise.cherkit.core.TelemetrySink
 import com.abominableenterprise.cherkit.review.ReviewCoordinator
 import kotlin.time.Duration
 
@@ -36,7 +37,38 @@ import kotlin.time.Duration
  * - A disabled coordinator (debug builds by default) does nothing.
  *
  * @param onResult Called with the result that ended each run, e.g. for logging.
+ * @param telemetrySink Optional Play failure diagnostics. Pass it to the coordinator too for prompt breadcrumbs.
  */
+@Composable
+public fun ReviewPromptEffect(
+    coordinator: ReviewCoordinator,
+    isIdle: Boolean = true,
+    settleDelay: Duration = ReviewSettle.DEFAULT_DELAY,
+    requirePlayInstall: Boolean = true,
+    telemetrySink: TelemetrySink? = null,
+    onResult: (ReviewLaunchResult) -> Unit = {},
+) {
+    ReviewPromptEffect(coordinator, isIdle, settleDelay, onResult) { activity, idle ->
+        PlayReview.launch(activity, coordinator, requirePlayInstall, idle, telemetrySink = telemetrySink)
+    }
+}
+
+/** Keeps positional result callbacks source-compatible without changing named or trailing-lambda calls. */
+@Suppress("UNUSED_PARAMETER")
+@Composable
+public fun ReviewPromptEffect(
+    coordinator: ReviewCoordinator,
+    isIdle: Boolean = true,
+    settleDelay: Duration = ReviewSettle.DEFAULT_DELAY,
+    requirePlayInstall: Boolean = true,
+    legacyOnResult: (ReviewLaunchResult) -> Unit,
+    compatibility: Unit = Unit,
+) {
+    ReviewPromptEffect(coordinator, isIdle, settleDelay, requirePlayInstall, telemetrySink = null, onResult = legacyOnResult)
+}
+
+/** The original composable signature, retained for already compiled callers. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
 @Composable
 public fun ReviewPromptEffect(
     coordinator: ReviewCoordinator,
@@ -45,9 +77,7 @@ public fun ReviewPromptEffect(
     requirePlayInstall: Boolean = true,
     onResult: (ReviewLaunchResult) -> Unit = {},
 ) {
-    ReviewPromptEffect(coordinator, isIdle, settleDelay, onResult) { activity, idle ->
-        PlayReview.launch(activity, coordinator, requirePlayInstall, idle)
-    }
+    ReviewPromptEffect(coordinator, isIdle, settleDelay, requirePlayInstall, telemetrySink = null, onResult = onResult)
 }
 
 /** [ReviewPromptEffect] with its [launch], so host tests can fake Play. */

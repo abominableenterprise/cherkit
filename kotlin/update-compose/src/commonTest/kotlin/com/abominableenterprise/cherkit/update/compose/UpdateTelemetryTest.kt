@@ -22,6 +22,13 @@ class UpdateTelemetryTest {
     }
 
     @Test
+    fun positionalGateCallbackStillCompiles() = runTest {
+        val allowed: () -> Boolean = { false }
+        assertEquals(UpdateLaunchResult.SUPPRESSED,
+            UpdateLauncher.launch(FakeUpdateFlow(), InMemoryUpdatePromptStore(), UpdateSession(), allowed))
+    }
+
+    @Test
     fun failuresReportExactlyOnceWithoutMessages() = runTest {
         for (requestFailure in listOf(true, false)) {
             for (throws in listOf(true, false)) {

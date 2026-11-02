@@ -68,6 +68,16 @@ public object UpdateLauncher {
         isAllowed: () -> Boolean = { true },
     ): UpdateLaunchResult = launch(flow, store, session, null, isAllowed)
 
+    /** Source compatibility for a callback supplied positionally. */
+    @Suppress("UNUSED_PARAMETER")
+    public suspend fun <T> launch(
+        flow: UpdateFlow<T>,
+        store: UpdatePromptStore,
+        session: UpdateSession,
+        legacyIsAllowed: () -> Boolean,
+        compatibility: Unit = Unit,
+    ): UpdateLaunchResult = launch(flow, store, session, null, legacyIsAllowed)
+
     /** Applies the sheet's answer for [versionCode]: [UpdateFlowResult.CANCELLED] is remembered in [store]. */
     public fun finish(result: UpdateFlowResult, versionCode: Int, store: UpdatePromptStore) {
         if (result != UpdateFlowResult.CANCELLED) return

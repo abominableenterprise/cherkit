@@ -104,6 +104,23 @@ public fun PlayUpdatePrompt(
     state, suppressed, enabled, requirePlayInstall, store, onVisibilityChange, onDownloaded, null, onResult,
 )
 
+/** Source compatibility for callbacks supplied positionally. */
+@Suppress("UNUSED_PARAMETER")
+@Composable
+public fun PlayUpdatePrompt(
+    state: PlayUpdateState,
+    suppressed: Boolean,
+    enabled: Boolean,
+    requirePlayInstall: Boolean,
+    store: UpdatePromptStore,
+    onVisibilityChange: (Boolean) -> Unit,
+    onDownloaded: () -> Unit,
+    legacyOnResult: (UpdateLaunchResult) -> Unit,
+    compatibility: Unit = Unit,
+): Unit = PlayUpdatePrompt(
+    state, suppressed, enabled, requirePlayInstall, store, onVisibilityChange, onDownloaded, null, legacyOnResult,
+)
+
 /** [PlayUpdatePrompt] with its session and installer check, so host tests can run it fresh. */
 @Composable
 internal fun PlayUpdatePrompt(

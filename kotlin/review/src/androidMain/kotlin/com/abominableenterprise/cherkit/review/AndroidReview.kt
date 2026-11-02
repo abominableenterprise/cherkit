@@ -2,6 +2,7 @@ package com.abominableenterprise.cherkit.review
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import com.abominableenterprise.cherkit.core.TelemetrySink
 
 /** Android wiring for [ReviewCoordinator]: state in SharedPreferences, version from the PackageManager. */
 public object AndroidReview {
@@ -15,13 +16,32 @@ public object AndroidReview {
     public fun coordinator(
         context: Context,
         enabled: Boolean = !isDebuggable(context),
+        telemetrySink: TelemetrySink? = null,
         isEligible: () -> Boolean = { true },
     ): ReviewCoordinator = ReviewCoordinator(
         store = store(context),
         appVersion = installedVersion(context),
         enabled = enabled,
         isEligible = isEligible,
+        telemetrySink = telemetrySink,
     )
+
+    /** Keeps positional eligibility callbacks source-compatible without changing trailing-lambda calls. */
+    @Suppress("UNUSED_PARAMETER")
+    public fun coordinator(
+        context: Context,
+        enabled: Boolean = !isDebuggable(context),
+        legacyIsEligible: () -> Boolean,
+        compatibility: Unit = Unit,
+    ): ReviewCoordinator = coordinator(context, enabled, telemetrySink = null, isEligible = legacyIsEligible)
+
+    /** The original factory signature, retained for already compiled callers. */
+    @Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+    public fun coordinator(
+        context: Context,
+        enabled: Boolean = !isDebuggable(context),
+        isEligible: () -> Boolean = { true },
+    ): ReviewCoordinator = coordinator(context, enabled, telemetrySink = null, isEligible = isEligible)
 
     /** A [ReviewStore] in the SharedPreferences file [name], keys starting with [keyPrefix]. */
     public fun store(

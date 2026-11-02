@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 /** `disabled`, eligibility and the key-value store; the rules themselves run from the shared fixture in jvmTest. */
 class ReviewCoordinatorTest {
@@ -19,6 +20,32 @@ class ReviewCoordinatorTest {
         assertTrue(disabled.visibleInterruptions.isEmpty())
         assertFalse(ReviewCoordinator(InMemoryReviewStore(), "1.0").isDisabled)
         assertTrue(ReviewCoordinator(InMemoryReviewStore(), "1.0", enabled = false).isDisabled)
+    }
+
+    @Test
+    fun originalPositionalCallbacksStillCompileAndForward() {
+        var now = 0L
+        var eligible = true
+        val review = ReviewCoordinator(InMemoryReviewStore(), "1.0", true, 1, 5.seconds, { eligible }, { now })
+        review.recordSuccess()
+        assertTrue(review.isDue)
+        eligible = false
+        assertFalse(review.shouldPrompt())
+        eligible = true
+        review.noteInterruption()
+        assertEquals(5.seconds, review.cooldownRemaining)
+        now = 5_000L
+        assertTrue(review.shouldPrompt())
+    }
+
+    @Test
+    fun namedAndTrailingClocksRemainUnambiguous() {
+        val named = ReviewCoordinator(InMemoryReviewStore(), "1.0", clock = { 123L })
+        val trailing = ReviewCoordinator(InMemoryReviewStore(), "1.0") { 123L }
+        for (review in listOf(named, trailing)) {
+            review.noteInterruption()
+            assertEquals(ReviewCoordinator.DEFAULT_COOLDOWN, review.cooldownRemaining)
+        }
     }
 
     @Test

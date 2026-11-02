@@ -17,7 +17,11 @@ kotlin {
     jvm()
 
     sourceSets {
-        // No runtime dependencies: pure rules. Serialization is for the fixture tests only.
+        // Core supplies only the diagnostics contract; no telemetry provider dependency.
+        commonMain.dependencies {
+            api(project(":core"))
+        }
+        // Serialization is for the fixture tests only.
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.serialization.json)

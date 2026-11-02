@@ -11,7 +11,7 @@ dependencies {
 
 Code: `kotlin/review-compose`. Test with `scripts/test.sh review-compose`.
 
-**Why a module of its own:** `:review` has no runtime dependencies, so apps without Play Services (other stores,
+**Why a module of its own:** `:review` depends only on the tiny Core contract, so apps without Play Services (other stores,
 AOSP builds, the JVM) can use the rules alone. This module adds `com.google.android.play:review-ktx` and Compose,
 the same way `sunset-compose` sits on top of `sunset`. Its `jvm` artifact carries only the platform-free launch order
 (`ReviewLauncher`, `ReviewFlow`) and the settle loop (`ReviewSettle`).
@@ -31,7 +31,7 @@ ReviewInterruptionEffect(review, source = "paywall", visible = showPaywall)
 ReviewInterruptionEffect(review, source = ReviewInterruption.WHATS_NEW, visible = showWhatsNew)
 ```
 
-### `ReviewPromptEffect(coordinator, isIdle = true, settleDelay = 1.5.seconds, requirePlayInstall = true, onResult = {})`
+### `ReviewPromptEffect(coordinator, isIdle = true, settleDelay = 1.5.seconds, requirePlayInstall = true, telemetrySink = null, onResult = {})`
 
 - Runs only while the lifecycle is `RESUMED` and `isIdle` is true. It waits `settleDelay` first, then checks
   `shouldPrompt()`; while that is false it checks again every `settleDelay` (after any interruption cooldown), so a
@@ -49,7 +49,7 @@ turns false or the effect leaves the composition. Sources that flicker (an error
 the source never stays stuck visible, and every hide restarts the cooldown, so the review waits a full cooldown after
 the last one. Each source is tracked separately; give each modal its own string.
 
-### `PlayReview.launch(activity, coordinator, requirePlayInstall = true, isIdle = { true }, manager = { ... })`
+### `PlayReview.launch(activity, coordinator, requirePlayInstall = true, isIdle = { true }, telemetrySink = null, manager = { ... })`
 
 What `ReviewPromptEffect` calls; a suspend function for apps that pick the moment themselves. In order:
 
@@ -69,7 +69,38 @@ Play-installed build where Play still shows nothing because of its quota, the ve
 the API gives no way to tell.
 
 Testing: pass `manager = { FakeReviewManager(context) }` (from Play), or implement `ReviewFlow<T>` and call
-`ReviewLauncher.launch(coordinator, flow, isIdle)`, which is plain Kotlin.
+`ReviewLauncher.launch(coordinator, flow, isIdle = isIdle)`, which is plain Kotlin.
+
+## Optional telemetry
+
+Pass `telemetrySink: TelemetrySink? = null` to `ReviewPromptEffect`, `PlayReview.launch` or
+`ReviewLauncher.launch`. It defaults to no diagnostics. Pass the same sink to the coordinator to also capture its
+prompt breadcrumb:
+
+```kotlin
+val review = remember { AndroidReview.coordinator(context.applicationContext, telemetrySink = telemetry) }
+ReviewPromptEffect(review, isIdle = !isEditing, telemetrySink = telemetry)
+```
+
+| Domain | Code | Failure |
+| --- | --- | --- |
+| `cherkit.review` | `1` | `requestReviewFlow` failed (including failure to create the Play manager) |
+| `cherkit.review` | `2` | `launchReviewFlow` failed |
+
+Each failed attempt reports exactly once, with **no attributes**. The launcher owns request/launch failures;
+`PlayReview` reports only manager creation failure, so the Compose, Play and launcher layers never duplicate errors.
+Cancellation and skipped/non-Play installs are not failures and emit no error. A request failure leaves the prompt
+due; a launch failure has already consumed the version. Sink exceptions are ignored and cannot replace the review
+result or prevent the launch. The final callback parameters remain last for trailing-lambda calls.
+
+| Breadcrumb | When | Attributes |
+| --- | --- | --- |
+| `cherkit.review.prompted` | The coordinator's `markPrompted()` succeeds, even if Play later fails to launch | None |
+
+Only the coordinator emits the breadcrumb, never the adapters. It is absent if `markPrompted()` fails or returns
+`false`; it does not guarantee that Play displayed a UI. No exception message, URL, review info, version,
+interruption source or user data is sent. Hidden deprecated overloads preserve all previous public function and
+composable signatures for compiled callers; new source calls use the optional sink signatures.
 
 ## Sunset counts as an interruption
 
@@ -89,12 +120,12 @@ SunsetPrompt(checker = checker, onPromptChange = { kind ->
 
 | Kotlin (`com.abominableenterprise.cherkit.review.compose`) | What |
 | --- | --- |
-| `ReviewPromptEffect(coordinator, isIdle, settleDelay, requirePlayInstall, onResult)` | settle, check, launch Play |
+| `ReviewPromptEffect(coordinator, isIdle, settleDelay, requirePlayInstall, telemetrySink, onResult)` | settle, check, launch Play |
 | `ReviewInterruptionEffect(coordinator, source, visible)` | report a modal |
-| `PlayReview.launch(activity, coordinator, requirePlayInstall, isIdle, manager)` | one launch attempt |
+| `PlayReview.launch(activity, coordinator, requirePlayInstall, isIdle, telemetrySink, manager)` | one launch attempt |
 | `PlayInstall.installerPackageName(context)`, `isPlayInstall(context)`, `PLAY_STORE_PACKAGE` | the installer check |
 | `ReviewLaunchResult` | `SKIPPED`, `NOT_PLAY_INSTALL`, `REQUEST_FAILED`, `LAUNCHED`, `LAUNCH_FAILED` |
-| `ReviewFlow<T>`, `ReviewLauncher.launch(coordinator, flow, isIdle)` | the launch order over any store API |
+| `ReviewFlow<T>`, `ReviewLauncher.launch(coordinator, flow, telemetrySink, isIdle)` | the launch order over any store API |
 | `ReviewSettle.awaitThenLaunch(coordinator, delay, launch)`, `DEFAULT_DELAY` | the settle loop |
 
 ## Versions

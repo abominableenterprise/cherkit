@@ -8,7 +8,7 @@ plugins {
 }
 
 // The Android adapter for :review: Play In-App Review plus Compose effects. A module of its own, like sunset-compose
-// next to sunset, so :review keeps no runtime dependencies and apps without Play Services can use the rules alone.
+// next to sunset, so :review keeps only the Core contract and apps without Play Services can use the rules alone.
 // commonMain holds the pure launch order (request, then markPrompted, then launch) and the settle loop, so they
 // run on the JVM too (the jvm artifact carries only those); androidMain holds Play and the composables.
 // The Compose compiler runs only for Android: the jvm target has no Compose runtime.

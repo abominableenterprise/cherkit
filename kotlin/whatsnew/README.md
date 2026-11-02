@@ -78,6 +78,40 @@ Outside Android (e.g. a consumer app's shared Kotlin code) pass any loader:
 - First launch shows nothing and marks the version seen; a downgrade shows nothing and keeps the higher last-seen.
 - Invalid notes files are skipped (pass `onSkip` to log them); a corrupt stored value counts as absent. Nothing throws.
 
+## Optional telemetry (Kotlin)
+
+`WhatsNewChecker`, `LoadedReleaseNotesSource`, `ReleaseNotesLoader.load`, `AndroidWhatsNew.checker`,
+`AndroidWhatsNew.assetsSource` and `AndroidWhatsNew.history` accept `telemetrySink: TelemetrySink? = null`.
+For example, use `AndroidWhatsNew.checker(context, telemetrySink = sink)`. Trailing loader/skip callbacks are
+preserved, and old JVM signatures and default-argument bridges remain as hidden deprecated overloads.
+
+| Domain | Code | Meaning |
+| --- | --- | --- |
+| `cherkit.whatsnew` | 1 | Notes files absent, unreadable, or loader failed |
+| `cherkit.whatsnew` | 2 | A notes file could not be decoded/validated |
+| `cherkit.whatsnew` | 3 | Locale fallback used |
+
+File errors are reported once per file per read; an empty/missing directory or a failed loader reports code 1 once,
+not once per expected release. An Android asset open failure reports only code 1, never an additional code 2.
+A loaded source's own sink takes precedence over its checker's sink, avoiding duplicate reports. Loaders are not
+cached: subsequent reads are separate operations. A custom file source that throws or has no files reports code 1;
+invalid files report code 2 even when no valid notes remain.
+
+Android reports are delivered on the main looper, including checks run by WhatsNew Compose on IO. JVM hosts
+must call the checker on the telemetry owner's thread, or supply a thread-dispatching sink. A custom source that
+overrides parsed `releaseNotes()` should also override the sink-aware `releaseNotes(telemetrySink)` to retain its
+custom loading behavior when a sink is supplied; file-based sources use the instrumented default decoder.
+
+Fallback reports code 3 at most once per `onLaunch`/`history` call when any returned release uses a locale other
+than the first preference (case, surrounding ASCII whitespace and underscore/hyphen spelling are ignored).
+Parent-language, later-preference and English fallback count; no preferences means English is the intended default.
+Notes not selected for display do not produce a launch fallback report.
+
+`cherkit.whatsnew.shown` is emitted without attributes by `markSeen()` only when notes were pending, once even if
+`markSeen()` is called repeatedly. Call it after presentation as usual; fetching notes or history alone never emits
+this breadcrumb. All errors also have no attributes: no file names, locale tags, versions, note text, URLs or exception
+messages are sent. Null sinks send nothing; sink exceptions cannot change loading or presentation behavior.
+
 ## App-side layout
 
 - **iOS (Xcode):** keep the files in `whatsnew/` at the repo root and add that folder to the app target as a folder

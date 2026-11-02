@@ -1,0 +1,37 @@
+{
+  "breadcrumb": "cherkit.review.prompted",
+  "cases": [
+    {
+      "name": "not due",
+      "due": false,
+      "enabled": true,
+      "eligible": true,
+      "prompted": false,
+      "breadcrumbs": 0
+    },
+    {
+      "name": "successful prompt then duplicate",
+      "due": true,
+      "enabled": true,
+      "eligible": true,
+      "prompted": true,
+      "breadcrumbs": 1
+    },
+    {
+      "name": "disabled",
+      "due": true,
+      "enabled": false,
+      "eligible": true,
+      "prompted": false,
+      "breadcrumbs": 0
+    },
+    {
+      "name": "ineligible",
+      "due": true,
+      "enabled": true,
+      "eligible": false,
+      "prompted": false,
+      "breadcrumbs": 0
+    }
+  ]
+}

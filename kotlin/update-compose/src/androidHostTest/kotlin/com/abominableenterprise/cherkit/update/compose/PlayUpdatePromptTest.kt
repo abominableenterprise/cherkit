@@ -84,6 +84,18 @@ class PlayUpdatePromptTest {
     }
 
     @Test
+    fun positionalManagerAndPromptCallbacksStillCompile() {
+        compose.setContent {
+            val manager: (Context) -> AppUpdateManager = { fake }
+            val update = rememberPlayUpdateState(manager)
+            val onResult: (UpdateLaunchResult) -> Unit = { results += it }
+            PlayUpdatePrompt(update, false, false, false, store, {}, {}, onResult)
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(UpdateLaunchResult.DISABLED), results)
+    }
+
+    @Test
     fun telemetrySeesAvailableAndDownloadedOnlyOncePerDownload() {
         fake.setUpdateAvailable(42)
         show(telemetrySink = sink)
@@ -112,6 +124,26 @@ class PlayUpdatePromptTest {
         }
         compose.waitForIdle()
         assertEquals(listOf("cherkit.update" to 0), errors)
+    }
+
+    @Test
+    fun playInfoFailureIsReportedOnce() {
+        fake.setInstallErrorCode(-6)
+        show(telemetrySink = sink)
+        assertEquals(listOf(UpdateLaunchResult.CHECK_FAILED), results)
+        assertEquals(listOf("cherkit.update" to 1), errors)
+        assertEquals(emptyList(), crumbs)
+    }
+
+    @Test
+    fun synchronousCompletionFailureUsesTheDocumentedFallback() {
+        val manager = object : AppUpdateManager by fake {
+            override fun completeUpdate(): com.google.android.gms.tasks.Task<Void> = error("private message")
+        }
+        val state = PlayUpdateState(manager, sink)
+        state.isDownloaded = true
+        assertFalse(state.completeUpdate())
+        assertEquals(listOf("cherkit.update" to 3), errors)
     }
 
     @Test

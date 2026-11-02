@@ -1,0 +1,18 @@
+{
+  "domain": "cherkit.whatsnew",
+  "breadcrumb": "cherkit.whatsnew.shown",
+  "fileCases": [
+    { "result": "missing", "code": 1 },
+    { "result": "throws", "code": 1 },
+    { "result": "undecodable", "code": 2 }
+  ],
+  "localeCases": [
+    { "preferred": ["de"], "fallback": false },
+    { "preferred": ["DE"], "fallback": false },
+    { "preferred": ["de-DE"], "fallback": true },
+    { "preferred": ["fr", "de"], "fallback": true },
+    { "preferred": ["fr"], "fallback": true },
+    { "preferred": [], "fallback": false }
+  ],
+  "fallbackCode": 3
+}

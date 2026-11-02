@@ -23,6 +23,22 @@ class ReviewLauncherTest {
     }
 
     @Test
+    fun originalPositionalIdleCallbackStillCompilesAndForwards() = runTest {
+        val flow = FakeReviewFlow()
+        assertEquals(ReviewLaunchResult.SKIPPED, ReviewLauncher.launch(review, flow, { false }))
+        assertTrue(flow.calls.isEmpty())
+        assertTrue(review.isDue)
+        assertEquals(ReviewLaunchResult.LAUNCHED, ReviewLauncher.launch(review, flow, { true }))
+    }
+
+    @Test
+    fun trailingIdleCallbackRemainsUnambiguous() = runTest {
+        val flow = FakeReviewFlow()
+        assertEquals(ReviewLaunchResult.SKIPPED, ReviewLauncher.launch(review, flow) { false })
+        assertTrue(flow.calls.isEmpty())
+    }
+
+    @Test
     fun aFailedRequestLeavesThePromptDue() = runTest {
         val flow = FakeReviewFlow(requestFails = true)
         assertEquals(ReviewLaunchResult.REQUEST_FAILED, ReviewLauncher.launch(review, flow))
