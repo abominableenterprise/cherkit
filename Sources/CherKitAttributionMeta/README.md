@@ -125,13 +125,18 @@ Keep that flag false; never call Meta purchase logging APIs.
    prerequisites: iOS 19.0.1 exposes no supported local AAM-disable setting, and its
    server-driven input collector is independent of the metadata flag. If suppression
    cannot be verified, remove the bundled identifiers and keep Meta OFF.
-2. Create **separate sandbox and production datasets and CAPI tokens**. Enter each dataset
-   ID and token only in the appropriate RevenueCat dashboard Meta integration settings,
-   using secure credential handling. Confirm sandbox traffic cannot reach production.
+2. Link the Meta app to a production dataset; create **separate sandbox and production
+   datasets and CAPI tokens**. Select **Conversions API** in RevenueCat's Meta integration.
+   Enter production **Dataset ID** and **Conversions API Token**, plus **Sandbox Dataset ID**
+   and **Sandbox Conversions API Token**. Generate tokens securely in Events Manager; enter
+   each dataset ID and token only in the appropriate RevenueCat dashboard Meta integration
+   settings. These are not the public SDK client token. Confirm sandbox traffic cannot
+   reach production.
    See the [RevenueCat Meta integration recipe](https://www.revenuecat.com/docs/integrations/attribution/facebook-ads-integration).
 3. Set **Trial Started → StartTrial**; **Initial Purchase → Subscribe**;
    **Trial Converted → Subscribe**. Leave **renewal forwarding OFF**. Map nonrenewing
-   purchases only if the consumer app actually sells them and that mapping is approved.
+   purchases **→ Purchase** only if the consumer app actually sells them and that mapping
+   is approved. If dashboard controls cannot enforce this selection, leave the sender OFF.
 4. Enable **send events when ATT not authorized** only after an explicit per-app review
    approving limited-data use, audience policy and disclosures. Without approval leave
    sharing OFF or use the app-owned authorized-only ATT policy; do not assume the local

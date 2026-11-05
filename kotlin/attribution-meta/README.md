@@ -96,19 +96,28 @@ activity/callback URI is required for core-only attribution. Never bundle server
 
 ## RevenueCat dashboard recipe
 
-1. Approve per-app audience, limited-data use and disclosures. Audit inherited subscriber PII/marketing
-   attributes and other senders; hashing email/phone does not make them anonymous.
-2. Link the Meta app to a production dataset; create a **separate sandbox dataset and token**.
-3. Select **Conversions API** in RevenueCat's Meta integration. Enter production **Dataset ID** and
+1. In Meta Events Manager, select the intended app/dataset. Turn **Log In-App Events
+   Automatically OFF**. Also disable **Automatically include more app event details**
+   and **Automatically send more app information**. Explicitly turn **Automatic Advanced
+   Matching OFF** and disable codeless setup too. Repeat for each environment. These are
+   prerequisites: the server-driven input collector is independent of the metadata flag.
+   If suppression cannot be verified, remove the bundled identifiers and keep Meta OFF.
+2. Approve per-app audience, limited-data use and disclosures. Audit inherited subscriber PII/marketing
+   attributes and other senders before enabling sharing; hashing email/phone does not make them anonymous.
+3. Link the Meta app to a production dataset; create **separate sandbox and production datasets and
+   CAPI tokens**. Confirm sandbox traffic cannot reach production.
+4. Select **Conversions API** in RevenueCat's Meta integration. Enter production **Dataset ID** and
    **Conversions API Token**, plus **Sandbox Dataset ID** and **Sandbox Conversions API Token**.
-   Generate tokens securely in Events Manager; these are not the public SDK client token.
-4. Forward **Trial Started → StartTrial**, **Initial Purchase + Trial Converted → Subscribe**.
+   Generate tokens securely in Events Manager; enter each dataset ID and token only in the appropriate
+   RevenueCat dashboard Meta integration settings. These are not the public SDK client token.
+5. Forward **Trial Started → StartTrial**, **Initial Purchase + Trial Converted → Subscribe**.
    **Renewals OFF**, despite the vendor's default Subscribe mapping. Non-renewing purchases → Purchase
    only if sold/approved. If dashboard controls cannot enforce this selection, leave the sender OFF.
-5. **“Send events when ATT consent is not authorized” ON only after explicit per-app privacy review**;
+6. **“Send events when ATT consent is not authorized” ON only after explicit per-app privacy review**;
    otherwise OFF/authorized-only. This controls App Store events, not Android consent. No ATT prompt
    is added. Keep Meta automatic event logging, advanced matching and codeless setup OFF everywhere.
-6. Remove all other Meta purchase senders. Test fresh physical-device sandbox purchases: `$fbAnonId`
+7. Remove all other Meta purchase senders/imports; no SDK purchase events, custom HTTP sender or
+   parallel attribution provider may duplicate RevenueCat events. Test fresh physical-device sandbox purchases: `$fbAnonId`
    before purchase where possible, expected events, no renewals/duplicates/production crossover.
    Play Store CAPI accepts `$fbAnonId` without `$gpsAdId`; broad ID collection is not required.
 
