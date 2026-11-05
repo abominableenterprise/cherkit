@@ -1,3 +1,0 @@
-package com.abominableenterprise.cherkit.attribution.revenuecat
-
-internal object RevenueCatPlaceholder
