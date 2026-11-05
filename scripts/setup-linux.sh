@@ -5,8 +5,12 @@
 # are cached, each as its own entry keyed on a SHA-256 of its recipe: the Swift toolchain
 # (version, OS, arch), the JDK + Android SDK (versions, packages, arch), Gradle's
 # dependency cache (~/.gradle/caches/modules-2) and its wrapper distributions
-# (~/.gradle/wrapper/dists). Never all of ~/.gradle: daemon logs, configuration cache and
-# transforms only bloat it. A miss, a failed restore or a restore without its marker
+# (~/.gradle/wrapper/dists). Gradle keys are deliberately coarse: modules-2 depends only on
+# the version catalog and JDK recipe, wrapper-dists only on wrapper properties (plus arch
+# and recipe revision). Extra artifacts are harmless; Gradle downloads missing ones. Release
+# bumps and new modules should not invalidate downloaded dependencies. Never all of ~/.gradle:
+# daemon logs, configuration cache and transforms only bloat it. A miss, a failed restore or
+# a restore without its marker
 # (usr/bin/swift, .complete) falls back to the upstream download (checksums and
 # signature pinned); each toolchain is saved right after its install, so a later failure
 # does not lose it. Saves never fail setup. Size limits (uncompressed; archives must stay
@@ -14,6 +18,7 @@
 # CHERKIT_TOOLCHAIN_CACHE_MAX_MB (default 5000) for the toolchains, CHERKIT_CACHE_MAX_MB
 # (default 1500) for the Gradle entries. The Gradle warm-up compile is not fatal: if it
 # fails, setup warns, skips the Gradle save (no half-filled cache) and still exits 0.
+# Restored or existing Gradle entries skip compilation; CHERKIT_GRADLE_WARMUP=1 forces it.
 set -euo pipefail
 
 SWIFT_VERSION="6.4.1"
@@ -112,10 +117,33 @@ else
   echo "all present"
 fi
 
-# --- Swift -------------------------------------------------------------------
+# Compute recipes before doing any restore, so repeat runs only need the package check.
 SWIFT_DIR="$TOOLS/swift-$SWIFT_VERSION-$SWIFT_OS-$ARCH"
-log "Swift $SWIFT_VERSION ($SWIFT_OS, $ARCH)"
 SWIFT_KEY="$(echo "cherkit-swift|$SWIFT_VERSION|$SWIFT_OS|$ARCH|$RECIPE_REVISION" | sha)"
+JA_RECIPE="cherkit-jdk-android|temurin-$JDK_VERSION|cmdline-$ANDROID_CMDLINE_TOOLS|${ANDROID_PACKAGES[*]}|$ARCH|$RECIPE_REVISION"
+JA_KEY="$(echo "$JA_RECIPE" | sha)"
+JA_DIR="$TOOLS/jdk-android-${JA_KEY:0:12}"
+GRADLE_HOME_DIR="${GRADLE_USER_HOME:-$HOME/.gradle}"
+GRADLE_NAMES=(modules-2 wrapper-dists)
+GRADLE_DIRS=("$GRADLE_HOME_DIR/caches/modules-2" "$GRADLE_HOME_DIR/wrapper/dists")
+CATALOG_HASH="$(sha <"$ROOT/gradle/libs.versions.toml")"
+WRAPPER_HASH="$(sha <"$ROOT/gradle/wrapper/gradle-wrapper.properties")"
+GRADLE_KEYS=(
+  "$(echo "cherkit-gradle-modules-2|$ARCH|$RECIPE_REVISION|$JA_RECIPE|$CATALOG_HASH" | sha)"
+  "$(echo "cherkit-gradle-wrapper-dists|$ARCH|$RECIPE_REVISION|$WRAPPER_HASH" | sha)"
+)
+# The marker also binds env.sh to these paths when CHERKIT_TOOLS / GRADLE_USER_HOME changes.
+SETUP_RECIPE="$(printf '%s\n' "$SWIFT_KEY" "$JA_KEY" "${GRADLE_KEYS[@]}" "$TOOLS" "$GRADLE_HOME_DIR" | sha)"
+if [ "${CHERKIT_GRADLE_WARMUP:-0}" != 1 ] && [ -f "$TOOLS/env.sh" ] &&
+   [ -f "$TOOLS/.setup-recipe" ] && [ "$(<"$TOOLS/.setup-recipe")" = "$SETUP_RECIPE" ] &&
+   [ -x "$SWIFT_DIR/usr/bin/swift" ] && [ -f "$JA_DIR/.complete" ] &&
+   [ -d "${GRADLE_DIRS[0]}" ] && [ -d "${GRADLE_DIRS[1]}" ]; then
+  log "already set up (in $((SECONDS - START))s)"
+  exit 0
+fi
+
+# --- Swift -------------------------------------------------------------------
+log "Swift $SWIFT_VERSION ($SWIFT_OS, $ARCH)"
 if [ -x "$SWIFT_DIR/usr/bin/swift" ]; then
   echo "already installed"
 else
@@ -150,10 +178,7 @@ else
 fi
 
 # --- JDK + Android SDK ---------------------------------------------------------
-JA_RECIPE="cherkit-jdk-android|temurin-$JDK_VERSION|cmdline-$ANDROID_CMDLINE_TOOLS|${ANDROID_PACKAGES[*]}|$ARCH|$RECIPE_REVISION"
-JA_DIR="$TOOLS/jdk-android-$(echo "$JA_RECIPE" | sha | cut -c1-12)"
 log "JDK $JDK_VERSION + Android SDK (${ANDROID_PACKAGES[*]})"
-JA_KEY="$(echo "$JA_RECIPE" | sha)"
 if [ -f "$JA_DIR/.complete" ]; then
   echo "already installed"
 else
@@ -207,20 +232,7 @@ fi
 
 # --- Gradle cache (modules-2 + wrapper dists) -------------------------------------
 log "Gradle cache"
-GRADLE_RECIPE="$(cd "$ROOT" && {
-  echo "cherkit-gradle|$ARCH|$JA_RECIPE|$RECIPE_REVISION"
-  git ls-files --cached --others --exclude-standard -- '*.gradle.kts' 'gradle/*' 'gradle.properties' \
-    | sort | xargs sha256sum
-} | sha)"
-GRADLE_HOME_DIR="${GRADLE_USER_HOME:-$HOME/.gradle}"
-# One task-cache entry per directory, each with its own key.
-GRADLE_NAMES=(modules-2 wrapper-dists)
-GRADLE_DIRS=("$GRADLE_HOME_DIR/caches/modules-2" "$GRADLE_HOME_DIR/wrapper/dists")
-GRADLE_KEYS=()
-for name in "${GRADLE_NAMES[@]}"; do
-  GRADLE_KEYS+=("$(echo "cherkit-gradle-$name|$GRADLE_RECIPE" | sha)")
-done
-TO_SAVE=() # indexes of the entries not restored
+TO_SAVE=() # indexes of the entries neither restored nor already present
 for i in "${!GRADLE_NAMES[@]}"; do
   t=$SECONDS
   if cache_restore "${GRADLE_KEYS[$i]}" "${GRADLE_DIRS[$i]}"; then
@@ -230,14 +242,18 @@ for i in "${!GRADLE_NAMES[@]}"; do
       echo "${GRADLE_NAMES[$i]}: already present"
     else
       echo "${GRADLE_NAMES[$i]}: not restored"
+      TO_SAVE+=("$i")
     fi
-    TO_SAVE+=("$i")
   fi
 done
-# Resolve every dependency and compile once, so later test runs only build our code. Not fatal: env.sh
-# and the toolchains are already in place, but a failed warm-up skips the save (no half-filled cache).
-if ! gradle_warmup "$ROOT"; then
-  TO_SAVE=()
+# Tests compile our code anyway. Warm up only to populate missing entries, or when forced.
+# Not fatal: a failed warm-up skips the save (no half-filled cache).
+if [ ${#TO_SAVE[@]} -gt 0 ] || [ "${CHERKIT_GRADLE_WARMUP:-0}" = 1 ]; then
+  if ! gradle_warmup "$ROOT"; then
+    TO_SAVE=()
+  fi
+else
+  echo "Gradle warm-up skipped: both cache entries restored or already present"
 fi
 if [ ${#TO_SAVE[@]} -gt 0 ] && has_cache; then
   # Stop the daemon so nothing writes to the caches while they are archived.
@@ -249,6 +265,7 @@ if [ ${#TO_SAVE[@]} -gt 0 ] && has_cache; then
   done
 fi
 
+printf '%s\n' "$SETUP_RECIPE" >"$TOOLS/.setup-recipe"
 log "Done in $((SECONDS - START))s"
 swift --version 2>&1 | head -1
 java -version 2>&1 | head -1

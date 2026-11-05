@@ -73,6 +73,8 @@ scripts/test.sh                 # everything that runs on Linux; run it before o
 - After a rebase that doesn't touch your module, rerun only that module (`scripts/test.sh <module>`).
 - For a one-off probe on a Mac, use `xcodebuild test -only-testing:<Target>/<Test>` (e.g. with
   `-scheme CherKit-Package -destination 'platform=iOS Simulator,name=<iPhone>'`) instead of the full script.
+- During macOS review fixes, use focused `xcodebuild test ... -only-testing:<Target>/<Class>` for touched targets
+  plus `scripts/test.sh <module>` on Linux; run full `scripts/test-mac.sh` once after the last change, before handoff.
 - Hand off right after pushing: hub-merge is on, so don't sit in pr-wait.
 - Needs macOS (not verifiable on Linux): `CherKitUI` (its sources compile to nothing on Linux), building for iOS, and
   any iOS simulator check. Linux tasks say in the PR what they could not verify.
