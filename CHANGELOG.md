@@ -4,6 +4,57 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.9.0
+
+Optional, opt-in attribution adapters: one call (`RevenueCatAttribution.start` or
+`MetaRevenueCatAttribution.start`) replaces `Purchases.configure`, rather than following it. RevenueCat owns
+Apple Search Ads (AdServices) attribution on eligible iOS devices and is the **only purchase sender to Meta**
+through its dashboard-configured Conversions API integration. Meta SDK auto-logging and advertiser-ID collection,
+and RevenueCat automatic device-identifier collection, are OFF. Restricted/switchable audiences, debug builds,
+tests and simulators get purchases only, without new attribution activation.
+
+No breaking changes. Existing modules are unchanged; apps explicitly adopt these optional products. Audience is
+an audited deployment property, not a current user role or analytics-consent switch. Existing vendor queues,
+stored identifiers and server forwarding are not erased by changing audience or stopping CherKit hooks.
+
+### Attribution RevenueCat (new, `CherKitAttributionRevenueCat`, `:attribution-revenuecat`)
+
+- added: One-call safe RevenueCat configuration preserves native builder options, purchase/restore flows,
+  identities, entitlements and purchase UI, while forcing automatic device-identifier collection OFF after
+  builder options. Remove the old configure call and broad identifier-collection glue; an already configured
+  SDK is left untouched, not made private retroactively.
+- added: Eligible adult-only release iOS deployments enable RevenueCat-owned Apple Search Ads AdServices token
+  collection. RevenueCat owns token exchange and retries; connect Apple Ads in its dashboard for campaign names
+  and revenue/LTV reporting. Android configures purchases only. Missing attribution is unknown, not proven organic.
+- added: Apple supports purchases-ios **5.x** (audited at 5.102.0). Android RevenueCat is **compileOnly** (baseline
+  9.29.1): the app supplies a compatible runtime. See the [Apple setup and capability guide](Sources/CherKitAttributionRevenueCat/README.md)
+  and [Android install/migration guide](kotlin/attribution-revenuecat/README.md).
+
+### Attribution Meta (new, `CherKitAttributionMeta`, `:attribution-meta`)
+
+- added: Optional composition of safe RevenueCat configuration with eligible Meta initialization, actual anonymous-ID
+  linking and install/activation hooks. Identity/foreground observation preserves the app's RevenueCat listener;
+  early purchases and asynchronous identity changes can remain unmatched. No purchase replay or backfill is promised.
+- added: Required app-side Boolean Info.plist / manifest privacy flags keep automatic Meta events/purchase logging,
+  advertiser-ID collection, metadata and product-improvement collection OFF. Android must also remove
+  `FacebookInitProvider` and the documented advertising/AdServices permissions. Apple uses facebook-ios-sdk **19.x**
+  (audited at 19.0.1); Android facebook-core is **compileOnly** (baseline 19.0.1), supplied by the app alongside RevenueCat.
+- added: App teams must configure both dashboards: turn Meta automatic events, extra app details, Automatic Advanced
+  Matching and codeless setup OFF; isolate production/sandbox datasets and CAPI tokens in RevenueCat's Meta integration;
+  map Trial Started → StartTrial and Initial Purchase / Trial Converted → Subscribe, with renewals OFF. Nonrenewing
+  Purchase events and sharing without ATT authorization require explicit per-app approval. Never bundle CAPI tokens
+  or add another Meta purchase sender. Follow the full [Apple plist/dashboard guide](Sources/CherKitAttributionMeta/README.md)
+  and [Android manifest/dashboard guide](kotlin/attribution-meta/README.md), including inherited-PII audits.
+- added: Meta campaign results appear in **Ads Manager**, not per customer in RevenueCat. **Android campaign revenue
+  and Google are not covered.** Unit/host tests do not establish physical-device delivery, campaign matching,
+  advertising-ID suppression, dashboard configuration, AEM eligibility or compliance. Pinned Android SDK flags do not
+  prove zero vendor advertising-ID reads; keep Meta OFF wherever required ID/matching/withdrawal suppression cannot
+  be verified. Restricted/switchable deployments stay OFF.
+- added: `MetaRevenueCatAttribution.stop()` removes CherKit observation/activation work only, not vendor queues,
+  stored identities or server conversions. If forwarding must stop, disable RevenueCat's Meta integration first,
+  then remove bundled Meta identifiers and the app route while retaining safe startup defaults. SDK upgrades require
+  re-auditing persisted settings and identity-observation assumptions; physical-device transition QA remains app-owned.
+
 ## 0.8.0
 
 Telemetry: crash reports, non-fatal errors, breadcrumbs and timings through a vendor-free facade with a Firebase

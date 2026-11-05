@@ -10,7 +10,7 @@ Add JitPack (`https://jitpack.io`) to the app's repositories, then pin the CherK
 RevenueCat explicitly:
 
 ```kotlin
-implementation("com.github.abominableenterprise.cherkit:attribution-revenuecat:<cherkit-tag>")
+implementation("com.github.abominableenterprise.cherkit:attribution-revenuecat:v0.9.0")
 implementation("com.revenuecat.purchases:purchases:9.29.1")
 ```
 
