@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Exercise setup with fake packages, toolchains and task-cache; no downloads or builds.
 set -euo pipefail
+
+if [ "$(uname -s)" != Linux ]; then
+  echo "setup-linux tests: Linux-only setup check skipped"
+  exit 0
+fi
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -51,6 +57,16 @@ run_setup() {
 count() { grep -c "$1" "$CALLS" || true; }
 keys() { grep '^restore ' "$CALLS" | tail -n 2; }
 reset_gradle() { rm -rf "$GRADLE_USER_HOME"; }
+
+# Simulate macOS and reject fixture creation: unsupported hosts must skip before setup.
+mkdir -p "$WORK/non-linux-bin"
+printf '#!/usr/bin/env bash\necho Darwin\n' >"$WORK/non-linux-bin/uname"
+printf '#!/usr/bin/env bash\necho "unexpected fixture creation" >&2\nexit 1\n' >"$WORK/non-linux-bin/mktemp"
+chmod +x "$WORK/non-linux-bin/"*
+PLATFORM_RC=0
+PATH="$WORK/non-linux-bin:$PATH" bash "$ROOT/scripts/tests/setup-linux-test.sh" >"$WORK/platform-out" 2>&1 || PLATFORM_RC=$?
+check 'non-Linux host exits successfully before fixtures' 0 "$PLATFORM_RC"
+check 'non-Linux host reports skip' 'setup-linux tests: Linux-only setup check skipped' "$(<"$WORK/platform-out")"
 
 run_setup
 BASE_KEYS="$(keys)"
