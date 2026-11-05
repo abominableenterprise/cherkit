@@ -91,7 +91,8 @@ let package = Package(
         // Test-only helper that loads the shared JSON contract in fixtures/. Not a product.
         .target(name: "CherKitTestSupport", path: "Tests/CherKitTestSupport"),
         .testTarget(name: "CherKitCoreTests", dependencies: ["CherKitCore", "CherKitTestSupport"]),
-        .testTarget(name: "CherKitAttributionRevenueCatTests", dependencies: ["CherKitAttributionRevenueCat"]),
+        .testTarget(name: "CherKitAttributionRevenueCatTests",
+                    dependencies: ["CherKitAttributionRevenueCat", "CherKitTestSupport"]),
         .testTarget(name: "CherKitAttributionMetaTests", dependencies: ["CherKitAttributionMeta"]),
         .testTarget(name: "CherKitAnalyticsTests", dependencies: ["CherKitAnalytics", "CherKitTestSupport"]),
         .testTarget(name: "CherKitTelemetryTests", dependencies: ["CherKitTelemetry", "CherKitTestSupport"]),

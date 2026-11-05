@@ -1,0 +1,434 @@
+[
+  {
+    "name": "iOS-adultOnly-debugFalse-testFalse-simFalse",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": true
+  },
+  {
+    "name": "iOS-adultOnly-debugFalse-testFalse-simTrue",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-adultOnly-debugFalse-testTrue-simFalse",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-adultOnly-debugFalse-testTrue-simTrue",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-adultOnly-debugTrue-testFalse-simFalse",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-adultOnly-debugTrue-testFalse-simTrue",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-adultOnly-debugTrue-testTrue-simFalse",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-adultOnly-debugTrue-testTrue-simTrue",
+    "platform": "iOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugFalse-testFalse-simFalse",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugFalse-testFalse-simTrue",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugFalse-testTrue-simFalse",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugFalse-testTrue-simTrue",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugTrue-testFalse-simFalse",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugTrue-testFalse-simTrue",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugTrue-testTrue-simFalse",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "iOS-restrictedOrSwitchable-debugTrue-testTrue-simTrue",
+    "platform": "iOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugFalse-testFalse-simFalse",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugFalse-testFalse-simTrue",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugFalse-testTrue-simFalse",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugFalse-testTrue-simTrue",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugTrue-testFalse-simFalse",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugTrue-testFalse-simTrue",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugTrue-testTrue-simFalse",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-adultOnly-debugTrue-testTrue-simTrue",
+    "platform": "android",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugFalse-testFalse-simFalse",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugFalse-testFalse-simTrue",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugFalse-testTrue-simFalse",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugFalse-testTrue-simTrue",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugTrue-testFalse-simFalse",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugTrue-testFalse-simTrue",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugTrue-testTrue-simFalse",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "android-restrictedOrSwitchable-debugTrue-testTrue-simTrue",
+    "platform": "android",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugFalse-testFalse-simFalse",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugFalse-testFalse-simTrue",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugFalse-testTrue-simFalse",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugFalse-testTrue-simTrue",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugTrue-testFalse-simFalse",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugTrue-testFalse-simTrue",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugTrue-testTrue-simFalse",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-adultOnly-debugTrue-testTrue-simTrue",
+    "platform": "macOS",
+    "audience": "adultOnly",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugFalse-testFalse-simFalse",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugFalse-testFalse-simTrue",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugFalse-testTrue-simFalse",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugFalse-testTrue-simTrue",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": false,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugTrue-testFalse-simFalse",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugTrue-testFalse-simTrue",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": false,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugTrue-testTrue-simFalse",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": false,
+    "enableAppleAttribution": false
+  },
+  {
+    "name": "macOS-restrictedOrSwitchable-debugTrue-testTrue-simTrue",
+    "platform": "macOS",
+    "audience": "restrictedOrSwitchable",
+    "isDebug": true,
+    "isTestHost": true,
+    "isSimulator": true,
+    "enableAppleAttribution": false
+  }
+]
