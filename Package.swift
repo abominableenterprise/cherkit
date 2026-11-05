@@ -93,7 +93,7 @@ let package = Package(
         .testTarget(name: "CherKitCoreTests", dependencies: ["CherKitCore", "CherKitTestSupport"]),
         .testTarget(name: "CherKitAttributionRevenueCatTests",
                     dependencies: ["CherKitAttributionRevenueCat", "CherKitTestSupport"]),
-        .testTarget(name: "CherKitAttributionMetaTests", dependencies: ["CherKitAttributionMeta"]),
+        .testTarget(name: "CherKitAttributionMetaTests", dependencies: ["CherKitAttributionMeta", "CherKitTestSupport"]),
         .testTarget(name: "CherKitAnalyticsTests", dependencies: ["CherKitAnalytics", "CherKitTestSupport"]),
         .testTarget(name: "CherKitTelemetryTests", dependencies: ["CherKitTelemetry", "CherKitTestSupport"]),
         .testTarget(name: "CherKitTelemetryFirebaseTests",

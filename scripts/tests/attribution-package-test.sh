@@ -21,8 +21,7 @@ for name, base in [
     assert {"byName": [base, None]} in targets[name]["dependencies"]
     assert targets[name + "Tests"]["type"] == "test"
     expected = [{"byName": [name, None]}]
-    if name == "CherKitAttributionRevenueCat":
-        expected.append({"byName": ["CherKitTestSupport", None]})
+    expected.append({"byName": ["CherKitTestSupport", None]})
     assert targets[name + "Tests"]["dependencies"] == expected
 
 vendors = ("purchases-ios", "facebook-ios-sdk")
