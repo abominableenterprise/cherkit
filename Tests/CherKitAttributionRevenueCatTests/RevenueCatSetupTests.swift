@@ -17,18 +17,18 @@ final class RevenueCatSetupTests: XCTestCase {
         }
         // No SDK startup or network: inspect the native configuration that would be passed to configure.
         let configuration = setup.configuration()
-        let fields = Dictionary(uniqueKeysWithValues: Mirror(reflecting: configuration).children.compactMap {
-            child -> (String, Any)? in child.label.map { ($0, child.value) }
-        })
+        let expected = Configuration.Builder(withAPIKey: "public-key")
+            .with(appUserID: "existing-user")
+            .with(userDefaults: defaults)
+            .with(purchasesAreCompletedBy: .myApp, storeKitVersion: .storeKit2)
+            .with(entitlementVerificationMode: .informational)
+            .with(networkTimeout: 42)
+            .with(automaticDeviceIdentifierCollectionEnabled: false)
         XCTAssertEqual(optionCalls, 1)
-        XCTAssertEqual(fields["apiKey"] as? String, "public-key")
-        XCTAssertEqual(fields["appUserID"] as? String, "existing-user")
-        XCTAssertEqual(fields["observerMode"] as? Bool, true)
-        XCTAssertTrue((fields["userDefaults"] as? UserDefaults) === defaults)
-        XCTAssertEqual(fields["networkTimeout"] as? TimeInterval, 42)
-        XCTAssertEqual(fields["automaticDeviceIdentifierCollectionEnabled"] as? Bool, false)
-        XCTAssertEqual(fields["storeKitVersion"] as? StoreKitVersion, .storeKit2)
-        XCTAssertNotNil(fields["responseVerificationMode"])
+        // RevenueCat's configuration equality includes identity, suite, completion mode,
+        // verification, timeouts, StoreKit and privacy settings; no private-field reflection.
+        XCTAssertEqual(configuration, expected.build())
+        XCTAssertNotEqual(configuration, expected.with(automaticDeviceIdentifierCollectionEnabled: true).build())
     }
 }
 #endif

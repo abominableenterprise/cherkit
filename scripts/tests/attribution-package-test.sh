@@ -20,7 +20,10 @@ for name, base in [
     assert name in products
     assert {"byName": [base, None]} in targets[name]["dependencies"]
     assert targets[name + "Tests"]["type"] == "test"
-    assert targets[name + "Tests"]["dependencies"] == [{"byName": [name, None]}]
+    expected = [{"byName": [name, None]}]
+    if name == "CherKitAttributionRevenueCat":
+        expected.append({"byName": ["CherKitTestSupport", None]})
+    assert targets[name + "Tests"]["dependencies"] == expected
 
 vendors = ("purchases-ios", "facebook-ios-sdk")
 if sys.argv[2] == "Linux":
