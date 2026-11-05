@@ -1,0 +1,44 @@
+[
+  {
+    "name": "complete-approved-config",
+    "appID": "123456789",
+    "clientToken": "public-client-token",
+    "safeStartupFlags": true,
+    "enableMetaWithEligibleEnvironment": true
+  },
+  {
+    "name": "missing-app-id",
+    "appID": "",
+    "clientToken": "public-client-token",
+    "safeStartupFlags": true,
+    "enableMetaWithEligibleEnvironment": false
+  },
+  {
+    "name": "missing-client-token",
+    "appID": "123456789",
+    "clientToken": "",
+    "safeStartupFlags": true,
+    "enableMetaWithEligibleEnvironment": false
+  },
+  {
+    "name": "whitespace-app-id",
+    "appID": "  ",
+    "clientToken": "public-client-token",
+    "safeStartupFlags": true,
+    "enableMetaWithEligibleEnvironment": false
+  },
+  {
+    "name": "whitespace-client-token",
+    "appID": "123456789",
+    "clientToken": "  ",
+    "safeStartupFlags": true,
+    "enableMetaWithEligibleEnvironment": false
+  },
+  {
+    "name": "unapproved-startup-flags",
+    "appID": "123456789",
+    "clientToken": "public-client-token",
+    "safeStartupFlags": false,
+    "enableMetaWithEligibleEnvironment": false
+  }
+]
