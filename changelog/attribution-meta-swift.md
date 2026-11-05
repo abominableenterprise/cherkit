@@ -1,0 +1,5 @@
+attribution-meta: added
+
+- Add the optional Swift `MetaRevenueCatAttribution.start(revenueCat: RevenueCatSetup, audience: Audience)` entry point: safe RevenueCat configuration, eligible iOS Meta initialization, actual anonymous-ID linking and activation. Replace, rather than follow, `Purchases.configure`; purchases remain available when attribution is ineligible.
+- Keep automatic Meta events/purchase logging, advertiser-ID collection and metadata collection OFF. A consumer app must supply the documented Boolean Info.plist flags and public Meta identifiers, review its privacy policy, and configure RevenueCat's server-side Meta integration as the only purchase sender.
+- `MetaRevenueCatAttribution.stop()` stops CherKit observation/activations only, not vendor queues, stored identities or RevenueCat server conversions. Restricted/switchable deployments stay OFF. The module README records the audited SDK versions, dashboard mappings, physical-device validation gaps and server-first rollback order.
