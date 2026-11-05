@@ -18,11 +18,31 @@ firebaseTargetDependencies += [
 ]
 #endif
 
+// Optional attribution products: apps link only the adapters they select.
+// Linux keeps the empty targets/tests, but never resolves the Apple SDK packages.
+var attributionPackages: [Package.Dependency] = []
+var revenueCatDependencies: [Target.Dependency] = ["CherKitCore"]
+var metaDependencies: [Target.Dependency] = ["CherKitAttributionRevenueCat"]
+#if !os(Linux)
+attributionPackages = [
+    .package(url: "https://github.com/RevenueCat/purchases-ios", "5.0.0"..<"6.0.0"),
+    .package(url: "https://github.com/facebook/facebook-ios-sdk", "19.0.0"..<"20.0.0"),
+]
+revenueCatDependencies += [
+    .product(name: "RevenueCat", package: "purchases-ios", condition: .when(platforms: [.iOS, .macOS])),
+]
+metaDependencies += [
+    .product(name: "FacebookCore", package: "facebook-ios-sdk", condition: .when(platforms: [.iOS])),
+]
+#endif
+
 let package = Package(
     name: "CherKit",
     platforms: [.iOS(.v16), .macOS(.v13)],
     products: [
         .library(name: "CherKitCore", targets: ["CherKitCore"]),
+        .library(name: "CherKitAttributionRevenueCat", targets: ["CherKitAttributionRevenueCat"]),
+        .library(name: "CherKitAttributionMeta", targets: ["CherKitAttributionMeta"]),
         .library(name: "CherKitAnalytics", targets: ["CherKitAnalytics"]),
         .library(name: "CherKitTelemetry", targets: ["CherKitTelemetry"]),
     ] + firebaseProducts + [
@@ -35,11 +55,13 @@ let package = Package(
         // PostHog SDK for the Analytics adapter, pinned version.
         // Linked only on Apple platforms (see CherKitAnalytics), so Linux never compiles it.
         .package(url: "https://github.com/PostHog/posthog-ios", exact: "3.71.4"),
-    ] + firebasePackages,
+    ] + firebasePackages + attributionPackages,
     targets: [
         // Logic modules: Foundation only, built and tested on Linux.
         // CherKitCore: tiny shared helpers (AppVersion) used by other modules.
         .target(name: "CherKitCore", exclude: ["README.md"]),
+        .target(name: "CherKitAttributionRevenueCat", dependencies: revenueCatDependencies),
+        .target(name: "CherKitAttributionMeta", dependencies: metaDependencies),
         // CherKitAnalytics: PostHog is linked on Apple platforms only; code using it stays in `#if canImport(PostHog)`.
         .target(
             name: "CherKitAnalytics",
@@ -69,6 +91,8 @@ let package = Package(
         // Test-only helper that loads the shared JSON contract in fixtures/. Not a product.
         .target(name: "CherKitTestSupport", path: "Tests/CherKitTestSupport"),
         .testTarget(name: "CherKitCoreTests", dependencies: ["CherKitCore", "CherKitTestSupport"]),
+        .testTarget(name: "CherKitAttributionRevenueCatTests", dependencies: ["CherKitAttributionRevenueCat"]),
+        .testTarget(name: "CherKitAttributionMetaTests", dependencies: ["CherKitAttributionMeta"]),
         .testTarget(name: "CherKitAnalyticsTests", dependencies: ["CherKitAnalytics", "CherKitTestSupport"]),
         .testTarget(name: "CherKitTelemetryTests", dependencies: ["CherKitTelemetry", "CherKitTestSupport"]),
         .testTarget(name: "CherKitTelemetryFirebaseTests",

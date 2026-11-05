@@ -37,7 +37,7 @@ swift_name() {
   for dir in $2; do
     [ -d "$dir" ] || continue
     dir="$(basename "$dir")"
-    if [ "$(echo "${dir#CherKit}" | tr '[:upper:]' '[:lower:]')" = "$1" ]; then echo "$dir"; return; fi
+    if [ "$(echo "${dir#CherKit}" | tr '[:upper:]' '[:lower:]')" = "${1//-/}" ]; then echo "$dir"; return; fi
   done
 }
 
@@ -161,7 +161,9 @@ for dir in Sources/*/; do
   has_scheme "$(basename "$dir")" || { echo "no xcodebuild scheme for $(basename "$dir") (schemes: $LISTED)" >&2; exit 1; }
 done
 if [ $# -eq 0 ]; then
-  while IFS= read -r s; do [ -n "$s" ] && SCHEMES+=("$s"); done <<<"$ALL_SCHEMES"
+  # Vendor packages can expose schemes that are not buildable (e.g. SDK UI test schemes).
+  # Build CherKit's own library schemes only; their linked dependencies build transitively.
+  for dir in Sources/*/; do SCHEMES+=("$(basename "$dir")"); done
 else
   for target in ${SWIFT_TARGETS[@]+"${SWIFT_TARGETS[@]}"}; do has_scheme "$target" && SCHEMES+=("$target"); done
   for m in "${SELECTED[@]}"; do

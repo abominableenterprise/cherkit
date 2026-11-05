@@ -111,14 +111,14 @@ running() {
   case "$(ps -o stat= -p "$1" 2>/dev/null)" in "" | Z*) echo gone ;; *) echo alive ;; esac
 }
 
-# e2e <label> <want exit> <want output pattern> <swift tests> <gradle tests> [gradle rc]
+# e2e <label> <want exit> <want output pattern> <swift tests> <gradle tests> [gradle rc] [module]
 e2e() {
   local rc=0 out
   : >"$WORK/stop.log"
   out="$(cd "$repo" && PATH="$WORK/bin:$PATH" CHERKIT_TOOLS="$WORK/tools" JAVA_HOME=/fake-jdk \
     FAKE_SWIFT_TESTS="$4" FAKE_GRADLE_TESTS="$5" FAKE_GRADLE_RC="${6:-0}" FAKE_STOP_LOG="$WORK/stop.log" \
     FAKE_DAEMON_PID="$WORK/daemon.pid" FAKE_DAEMON="$FAKE_DAEMON" CHERKIT_KOTLIN_DAEMON_MATCH="$FAKE_DAEMON" \
-    scripts/test.sh demo 2>&1)" || rc=$?
+    scripts/test.sh "${7:-demo}" 2>&1)" || rc=$?
   local pid
   pid="$(cat "$WORK/daemon.pid")"
   DAEMONS+=("$pid")
@@ -137,6 +137,11 @@ e2e "module with tests passes" 0 "All passed for: demo" 3 2
 e2e "swift filter matching nothing fails" 1 "swift test --parallel --filter CherKitDemoTests executed 0 tests" 0 2
 e2e "Gradle module with no tests fails" 1 "Gradle ran 0 tests for :demo" 3 0
 e2e "failing Gradle still stops the daemons" 1 "FAILED: gradle" 3 2 1
+
+mkdir -p "$repo/kotlin/demo-feature" "$repo/Sources/CherKitDemoFeature"
+touch "$repo/kotlin/demo-feature/build.gradle.kts"
+e2e "hyphenated module selects Swift tests" 1 \
+  "swift test --parallel --filter CherKitDemoFeatureTests executed 0 tests" 0 2 0 demo-feature
 
 echo "test-guards tests: $((N - FAILS))/$N passed"
 [ "$FAILS" -eq 0 ]

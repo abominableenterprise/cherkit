@@ -9,6 +9,8 @@ its own product, so an app imports only what it needs.
 | Module | What it does | Swift product | Kotlin module |
 | --- | --- | --- | --- |
 | [Analytics](kotlin/analytics/README.md) | Typed, opt-in PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
+| [Attribution RevenueCat](kotlin/attribution-revenuecat/README.md) | **In progress:** empty module, adapter coming | `CherKitAttributionRevenueCat` | `:attribution-revenuecat` |
+| [Attribution Meta](kotlin/attribution-meta/README.md) | **In progress:** empty optional module, adapter coming | `CherKitAttributionMeta` | `:attribution-meta` |
 | [Telemetry](kotlin/telemetry/README.md) | Privacy-filtered errors, breadcrumbs and spans; vendor-free core contract | `CherKitTelemetry` | `:telemetry` |
 | [Telemetry Firebase (Apple)](Sources/CherKitTelemetryFirebase/README.md) | Crashlytics and privacy-gated Performance spans | `CherKitTelemetryFirebase` | n/a |
 | [Telemetry Firebase](kotlin/telemetry-firebase/README.md) | Android Crashlytics and opt-in Performance backend | n/a | `:telemetry-firebase` |

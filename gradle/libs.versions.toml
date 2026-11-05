@@ -6,6 +6,9 @@ kotlinx-serialization-json = "1.9.0"
 coroutines = "1.10.2"
 posthog-android = "3.61.1"
 firebase-bom = "35.1.0"
+# Optional Android attribution SDK compile baselines; consuming apps own runtime versions.
+revenuecat-purchases = "9.29.1"
+meta-facebook-core = "19.0.1"
 android-compileSdk = "36"
 android-minSdk = "24"
 # Compose for :sunset-compose. A low, stable floor: Gradle resolves the app's newer androidx Compose (or the one
@@ -27,6 +30,9 @@ activity-compose = "1.7.0"
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 firebase-perf = { module = "com.google.firebase:firebase-perf" }
+# Compile-only attribution SDKs; not published as runtime dependencies.
+revenuecat-purchases = { module = "com.revenuecat.purchases:purchases", version.ref = "revenuecat-purchases" }
+meta-facebook-core = { module = "com.facebook.android:facebook-core", version.ref = "meta-facebook-core" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

@@ -29,11 +29,11 @@ swift_test_target() {
   local dir
   for dir in Sources/CherKitUI/*/; do
     [ -d "$dir" ] || continue
-    if [ "$(basename "$dir" | tr '[:upper:]' '[:lower:]')" = "$1" ]; then echo CherKitUITests; break; fi
+    if [ "$(basename "$dir" | tr '[:upper:]' '[:lower:]')" = "${1//-/}" ]; then echo CherKitUITests; break; fi
   done
   for dir in Sources/CherKit*/; do
     dir="$(basename "$dir")"
-    if [ "$(echo "${dir#CherKit}" | tr '[:upper:]' '[:lower:]')" = "$1" ]; then echo "${dir}Tests"; return; fi
+    if [ "$(echo "${dir#CherKit}" | tr '[:upper:]' '[:lower:]')" = "${1//-/}" ]; then echo "${dir}Tests"; return; fi
   done
 }
 
