@@ -136,6 +136,23 @@ final class MetaStartupTests: XCTestCase {
         XCTAssertTrue(active.calls.isEmpty)
     }
 
+    @MainActor func testIdentityMonitorDetectsOfflineLogoutWithoutCustomerInfo() {
+        var identity = "signed-in"
+        var refreshes = 0
+        let monitor = MetaIdentityMonitor(currentIdentity: { identity }, changed: { refreshes += 1 })
+        monitor.sample()
+        XCTAssertEqual(refreshes, 0)
+        // Logout changes the public identity even when no CustomerInfo can be fetched.
+        identity = "anonymous-after-offline-logout"
+        monitor.sample()
+        XCTAssertEqual(refreshes, 1)
+        monitor.sample()
+        XCTAssertEqual(refreshes, 1)
+        identity = "another-account"
+        monitor.sample()
+        XCTAssertEqual(refreshes, 2)
+    }
+
     @MainActor func testExistingRevenueCatIsNotRetrofitted() {
         let fake = RecordingClients()
         fake.isConfigured = true

@@ -36,7 +36,10 @@ Meta integration. Missing attribution must never block a purchase.
 
 Eligible order: safe RevenueCat configure → safe runtime Meta settings → initialize Meta
 → read the SDK's actual anonymous ID → RevenueCat `setFBAnonymousID` → Meta `activateApp`.
-Refresh the ID on eligible foregrounds and RevenueCat identity changes. Repeated startup
+Refresh the ID on eligible foregrounds and RevenueCat identity changes. One owned task
+samples the public current `appUserID` every 250 ms, including after offline logout;
+it does not depend on customer-info delivery or replace the app's delegate. This is
+best-effort, not an atomic hook before an immediate post-login purchase. Repeated startup
 must not stack observers. An already initialized vendor SDK is not made private by calling
 this adapter afterward. Do not use repeated startup to change audience policy.
 Early purchases and asynchronous identity changes can remain unmatched; no network wait,
@@ -94,6 +97,11 @@ Before initialization the adapter must also set these `Settings.shared` properti
 
 These are adapter-owned settings, not additional app glue. Keep the startup plist flags
 even though runtime settings are applied: saved defaults and early vendor startup matter.
+The adapter seeds these six false settings into the audited SDK's `UserDefaults.standard`
+store before init and applies the setters before and after init. In 19.0.1 the pre-init
+auto-log getter otherwise returns true until CoreKit installs its dependencies, and
+saved true defaults could override the plist. This store coupling must be re-audited
+on SDK upgrades.
 `isAdvertiserTrackingEnabled` is **not** an IDFA-collection switch; on supported newer iOS
 paths its setter is ignored in favor of ATT status. No ATT prompt is added. ATT and any
 consent presentation remain app-owned; denial does not authorize alternative-ID tracking.
@@ -112,7 +120,11 @@ Keep that flag false; never call Meta purchase logging APIs.
 
 1. In Meta Events Manager, select the intended app/dataset. Turn **Log In-App Events
    Automatically OFF**. Also disable **Automatically include more app event details**
-   and **Automatically send more app information**. Repeat for each environment.
+   and **Automatically send more app information**. Explicitly turn **Automatic Advanced
+   Matching OFF** and disable codeless setup too. Repeat for each environment. These are
+   prerequisites: iOS 19.0.1 exposes no supported local AAM-disable setting, and its
+   server-driven input collector is independent of the metadata flag. If suppression
+   cannot be verified, remove the bundled identifiers and keep Meta OFF.
 2. Create **separate sandbox and production datasets and CAPI tokens**. Enter each dataset
    ID and token only in the appropriate RevenueCat dashboard Meta integration settings,
    using secure credential handling. Confirm sandbox traffic cannot reach production.
@@ -144,6 +156,10 @@ campaign validation. Re-check for the consumer app's exact lockfile before relea
 In Meta 19.0.1, initialization registers persist-on-close observers, foreground processing
 checks saved events, and background processing persists events for later delivery.
 Turning off automatic events is **not** a blanket network-off or queue-purge switch.
+Automatic Advanced Matching can separately install text-input swizzles, hash matching
+input-derived values and persist them as event user data. The local flags above do not
+suppress that collector; dashboard AAM OFF must be verified before enabling this route.
+See the [AAM collector](https://github.com/facebook/facebook-ios-sdk/blob/v19.0.1/FBSDKCoreKit/FBSDKCoreKit/AppEvents/Internal/AAM/FBSDKMetadataIndexer.m).
 Metadata opt-out clears cached URLs/screen titles in the audited code, but already
 installed swizzles are permanent. Do not treat a flag change as a full privacy reset.
 RevenueCat source evidence:

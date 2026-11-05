@@ -7,6 +7,14 @@ import CherKitAttributionRevenueCat
 
 @MainActor final class LiveMetaClient: MetaClient {
     func disableAutomaticCollection() {
+        // In 19.0.1 Settings has no data store until SDK configuration, and its auto-log
+        // getter ignores the pre-init backing value. Seed the audited standard store first
+        // so saved true values cannot override the plist during SDK configuration.
+        for key in ["FacebookAutoLogAppEventsEnabled", "FacebookAdvertiserIDCollectionEnabled",
+                    "FBSDKAutoLogMetaDataEnabled", "FBSDKAutoLogProductImprovementEnabled",
+                    "FacebookCodelessDebugLogEnabled", "FacebookSKAdNetworkReportEnabled"] {
+            UserDefaults.standard.set(false, forKey: key)
+        }
         Settings.shared.isAutoLogAppEventsEnabled = false
         Settings.shared.isAdvertiserIDCollectionEnabled = false
         Settings.shared.isMetaDataCollectionEnabled = false
@@ -16,6 +24,7 @@ import CherKitAttributionRevenueCat
     }
     func initialize() {
         _ = ApplicationDelegate.shared.application(UIApplication.shared, didFinishLaunchingWithOptions: nil)
+        disableAutomaticCollection()
     }
     var anonymousID: String { AppEvents.shared.anonymousID }
     func activate() { AppEvents.shared.activateApp() }
@@ -33,10 +42,10 @@ import CherKitAttributionRevenueCat
     func setAnonymousID(_ value: String) { Purchases.shared.attribution.setFBAnonymousID(value) }
 }
 
-/// Does not replace the app's Purchases delegate. Owns exactly one foreground token and one stream task.
+/// Does not replace the app's Purchases delegate. Owns one foreground token and one identity task.
 @MainActor final class LiveMetaObservation: MetaObservation {
     private var foregroundToken: NSObjectProtocol?
-    private var customerTask: Task<Void, Never>?
+    private var identityTask: Task<Void, Never>?
 
     func start(foreground: @escaping () -> Void, identityChanged: @escaping () -> Void) {
         guard foregroundToken == nil else { return }
@@ -46,12 +55,14 @@ import CherKitAttributionRevenueCat
             // Delivery is synchronous on the main queue: assign the ID before activation.
             MainActor.assumeIsolated { foreground() }
         }
-        // Create the stream synchronously so an immediate login cannot precede subscription.
-        let stream = Purchases.shared.customerInfoStream
-        customerTask = Task { @MainActor in
-            for await _ in stream {
+        let monitor = MetaIdentityMonitor(currentIdentity: { Purchases.shared.appUserID },
+                                          changed: identityChanged)
+        identityTask = Task { @MainActor in
+            while !Task.isCancelled {
+                do { try await Task.sleep(nanoseconds: 250_000_000) }
+                catch { break }
                 guard !Task.isCancelled else { break }
-                identityChanged()
+                monitor.sample()
             }
         }
     }
@@ -59,8 +70,8 @@ import CherKitAttributionRevenueCat
     func stop() {
         if let token = foregroundToken { NotificationCenter.default.removeObserver(token) }
         foregroundToken = nil
-        customerTask?.cancel()
-        customerTask = nil
+        identityTask?.cancel()
+        identityTask = nil
     }
 }
 
