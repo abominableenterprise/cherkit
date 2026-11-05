@@ -9,8 +9,8 @@ its own product, so an app imports only what it needs.
 | Module | What it does | Swift product | Kotlin module |
 | --- | --- | --- | --- |
 | [Analytics](kotlin/analytics/README.md) | Typed, opt-in PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
-| [Attribution RevenueCat](kotlin/attribution-revenuecat/README.md) | **In progress:** empty module, adapter coming | `CherKitAttributionRevenueCat` | `:attribution-revenuecat` |
-| [Attribution Meta](kotlin/attribution-meta/README.md) | **In progress:** empty optional module, adapter coming | `CherKitAttributionMeta` | `:attribution-meta` |
+| [Attribution RevenueCat](kotlin/attribution-revenuecat/README.md) | Optional safe RevenueCat setup; Apple Search Ads attribution on eligible iOS devices, purchases-only on Android | `CherKitAttributionRevenueCat` | `:attribution-revenuecat` |
+| [Attribution Meta](kotlin/attribution-meta/README.md) | Optional Meta install/anonymous-ID bridge; RevenueCat CAPI is the only purchase sender | `CherKitAttributionMeta` | `:attribution-meta` |
 | [Telemetry](kotlin/telemetry/README.md) | Privacy-filtered errors, breadcrumbs and spans; vendor-free core contract | `CherKitTelemetry` | `:telemetry` |
 | [Telemetry Firebase (Apple)](Sources/CherKitTelemetryFirebase/README.md) | Crashlytics and privacy-gated Performance spans | `CherKitTelemetryFirebase` | n/a |
 | [Telemetry Firebase](kotlin/telemetry-firebase/README.md) | Android Crashlytics and opt-in Performance backend | n/a | `:telemetry-firebase` |
@@ -23,7 +23,7 @@ its own product, so an app imports only what it needs.
 | [Review](kotlin/review/README.md) | Store-review prompt rules: when to ask, once per version, never over a modal (iOS prompt in `CherKitUI`; Android in Review Compose) | `CherKitReview` | `:review` |
 | [CherKitUI](Sources/CherKitUI/README.md) | SwiftUI views for Sunset and WhatsNew, and the App Store review prompt | `CherKitUI` | n/a |
 
-Status: v0.8.0: Telemetry (vendor-free crash/error diagnostics, breadcrumbs and timings with optional Firebase Crashlytics + Performance backends and module TelemetrySink wiring), Analytics (PostHog), Sunset (with "update available" prompts: App Store lookup and TestFlight test builds on iOS, Play In-App Updates on Android), WhatsNew and Review logic plus SwiftUI views (including the review prompt); Android UI: Sunset Compose, WhatsNew Compose, Review Compose and Update Compose, with launch signals (`onCheckingChange`, `onLaunchCheckComplete`) to order Play's update prompt after Sunset and "What's new".
+Status: v0.9.0: Attribution (optional, opt-in RevenueCat Apple Search Ads and Meta adapters; purchases-only for restricted/switchable audiences and non-production builds), Telemetry (vendor-free crash/error diagnostics, breadcrumbs and timings with optional Firebase Crashlytics + Performance backends and module TelemetrySink wiring), Analytics (PostHog), Sunset (with "update available" prompts: App Store lookup and TestFlight test builds on iOS, Play In-App Updates on Android), WhatsNew and Review logic plus SwiftUI views (including the review prompt); Android UI: Sunset Compose, WhatsNew Compose, Review Compose and Update Compose, with launch signals (`onCheckingChange`, `onLaunchCheckComplete`) to order Play's update prompt after Sunset and "What's new".
 
 ## Install
 
@@ -32,13 +32,13 @@ Releases are git tags `vX.Y.Z`. Use the same version on both platforms.
 ### iOS / macOS (SwiftPM)
 
 Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File > Add Package Dependencies, rule
-"Up to Next Major Version" from 0.8.0), then link only the products you use:
-`CherKitAnalytics`, `CherKitTelemetry`, `CherKitTelemetryFirebase`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
+"Up to Next Major Version" from 0.9.0), then link only the products you use:
+`CherKitAttributionRevenueCat`, `CherKitAttributionMeta`, `CherKitAnalytics`, `CherKitTelemetry`, `CherKitTelemetryFirebase`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.8.0"),
+    .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.9.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -68,19 +68,29 @@ JVM variant automatically, and from a Kotlin Multiplatform module you can add th
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:analytics:v0.8.0")
-    implementation("com.github.abominableenterprise.cherkit:telemetry:v0.8.0")
-    implementation("com.github.abominableenterprise.cherkit:telemetry-firebase:v0.8.0") // Android only; app supplies Firebase
-    implementation("com.github.abominableenterprise.cherkit:sunset:v0.8.0")
-    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.8.0")   // Android only; brings sunset
-    implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.8.0")
-    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.8.0") // Android only; brings whatsnew
-    implementation("com.github.abominableenterprise.cherkit:review:v0.8.0")
-    implementation("com.github.abominableenterprise.cherkit:review-compose:v0.8.0")   // Android only; brings review
-    implementation("com.github.abominableenterprise.cherkit:update-compose:v0.8.0")   // Android only; Play In-App Updates
-    implementation("com.github.abominableenterprise.cherkit:core:v0.8.0")             // already included by sunset and whatsnew
+    implementation("com.github.abominableenterprise.cherkit:analytics:v0.9.0")
+    implementation("com.github.abominableenterprise.cherkit:attribution-revenuecat:v0.9.0") // Android only; app supplies RevenueCat
+    implementation("com.github.abominableenterprise.cherkit:attribution-meta:v0.9.0") // Android only; app supplies RevenueCat + facebook-core
+    implementation("com.github.abominableenterprise.cherkit:telemetry:v0.9.0")
+    implementation("com.github.abominableenterprise.cherkit:telemetry-firebase:v0.9.0") // Android only; app supplies Firebase
+    implementation("com.github.abominableenterprise.cherkit:sunset:v0.9.0")
+    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.9.0")   // Android only; brings sunset
+    implementation("com.github.abominableenterprise.cherkit:whatsnew:v0.9.0")
+    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.9.0") // Android only; brings whatsnew
+    implementation("com.github.abominableenterprise.cherkit:review:v0.9.0")
+    implementation("com.github.abominableenterprise.cherkit:review-compose:v0.9.0")   // Android only; brings review
+    implementation("com.github.abominableenterprise.cherkit:update-compose:v0.9.0")   // Android only; Play In-App Updates
+    implementation("com.github.abominableenterprise.cherkit:core:v0.9.0")             // already included by sunset and whatsnew
 }
 ```
+
+Attribution is optional and opt-in: replace `Purchases.configure` with one `RevenueCatAttribution.start` or
+`MetaRevenueCatAttribution.start` call, never both startup paths. Meta SDK auto-logging and advertiser-ID collection,
+and RevenueCat automatic device-identifier collection, stay OFF. Meta results belong in Ads Manager, not per customer
+in RevenueCat; Android campaign revenue and Google are not covered. Follow the
+[Apple RevenueCat](Sources/CherKitAttributionRevenueCat/README.md), [Apple Meta](Sources/CherKitAttributionMeta/README.md),
+[Android RevenueCat](kotlin/attribution-revenuecat/README.md) and [Android Meta](kotlin/attribution-meta/README.md)
+guides for required Info.plist / manifest keys, app-supplied Android vendor SDKs and RevenueCat + Meta dashboard setup.
 
 Android Firebase is compileOnly: the app supplies the BoM, SDKs and plugins; Performance is off by default.
 See [Firebase app-side setup](kotlin/telemetry-firebase/README.md). On iOS, call

@@ -11,7 +11,7 @@ Supply vendor runtimes explicitly; CherKit uses `compileOnly` dependencies. Add 
 (`https://jitpack.io`) for CherKit and pin a release:
 
 ```kotlin
-implementation("com.github.abominableenterprise.cherkit:attribution-meta:<cherkit-tag>")
+implementation("com.github.abominableenterprise.cherkit:attribution-meta:v0.9.0")
 implementation("com.revenuecat.purchases:purchases:9.29.1")
 implementation("com.facebook.android:facebook-core:19.0.1")
 ```

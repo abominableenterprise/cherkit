@@ -6,7 +6,7 @@ behavior and English text. Android only (the `jvm` artifact carries just the str
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.8.0") // brings :whatsnew
+    implementation("com.github.abominableenterprise.cherkit:whatsnew-compose:v0.9.0") // brings :whatsnew
 }
 ```
 
