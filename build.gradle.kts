@@ -1,3 +1,10 @@
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
+import com.android.build.gradle.tasks.BundleAar
+import org.gradle.process.CommandLineArgumentProvider
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+
 // Plugins are declared once here (not applied) so every kotlin/<module> uses the same versions.
 plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
@@ -9,6 +16,26 @@ plugins {
 // Shared cross-platform test contract: every module's JVM-based tests read ../fixtures through this property.
 val fixturesDir = layout.projectDirectory.dir("fixtures").asFile.absolutePath
 subprojects {
+    // Keep the build JDK (21) independent of the consumer bytecode contract (17).
+    plugins.withId("org.jetbrains.kotlin.multiplatform") {
+        extensions.configure<KotlinMultiplatformExtension> {
+            targets.withType<KotlinJvmTarget>().configureEach {
+                compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+                compilations.configureEach {
+                    compileJavaTaskProvider?.configure { options.release.set(17) }
+                }
+            }
+            targets.withType<KotlinMultiplatformAndroidLibraryTarget>().configureEach {
+                compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+            }
+        }
+    }
+    // Android javac uses the SDK bootclasspath, so use source/target instead of --release there.
+    // JVM compilations additionally use --release above to constrain Java API usage.
+    tasks.withType<JavaCompile>().configureEach {
+        sourceCompatibility = "17"
+        targetCompatibility = "17"
+    }
     tasks.withType<Test>().configureEach {
         systemProperty("cherkit.fixtures", fixturesDir)
         inputs.dir(fixturesDir).withPropertyName("cherkitFixtures").withPathSensitivity(PathSensitivity.RELATIVE)
@@ -36,6 +63,21 @@ subprojects {
     val m = name
     val v = publishVersion
     plugins.withId("maven-publish") {
+        val bytecodeScript = rootProject.layout.projectDirectory.file("scripts/check-bytecode.sh")
+        // These are the archive producers used by the Android and JVM Maven publications.
+        // A live task collection also picks up targets registered later in module build scripts.
+        val archives = objects.fileCollection().from(tasks.withType<AbstractArchiveTask>().matching {
+            (it is BundleAar && it.name == "bundleAndroidMainAar") || it.name == "jvmJar"
+        })
+        val checkBytecode = tasks.register<Exec>("checkBytecode") {
+            group = "verification"
+            description = "Verify published Android and JVM archives use Java 17 bytecode or lower"
+            inputs.file(bytecodeScript)
+            inputs.files(archives)
+            commandLine("bash", bytecodeScript.asFile.absolutePath)
+            argumentProviders.add(CommandLineArgumentProvider { archives.files.map { it.absolutePath }.sorted() })
+        }
+        tasks.matching { it.name == "check" }.configureEach { dependsOn(checkBytecode) }
         tasks.withType<GenerateModuleMetadata>().configureEach {
             val file = outputFile
             doLast {

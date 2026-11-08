@@ -51,6 +51,8 @@ targets: [
 
 ### Android / JVM (Gradle, via JitPack)
 
+Consumers need JDK 17+ (including JVM/Robolectric host tests).
+
 Add JitPack to the repositories in `settings.gradle.kts`:
 
 ```kotlin
