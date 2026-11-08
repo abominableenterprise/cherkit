@@ -72,7 +72,7 @@ for m in "${SELECTED[@]}"; do
       case " ${SWIFT_ARGS[*]} " in *" $target "*) ;; *) SWIFT_ARGS+=(--filter "$target") ;; esac
     done
   fi
-  GRADLE_TASKS+=(":$m:jvmTest" ":$m:testAndroidHostTest")
+  GRADLE_TASKS+=(":$m:jvmTest" ":$m:testAndroidHostTest" ":$m:checkBytecode")
 done
 
 # A selection of Kotlin-only modules has no Swift filter: skip Swift rather than run every Swift test.
