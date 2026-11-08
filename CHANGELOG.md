@@ -4,6 +4,21 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.9.1
+
+Patch release: all Kotlin/Android artifacts target Java 17 bytecode (class version 61). Consumers need JDK 17+
+for JVM/Robolectric tests. No API changes; Swift is unchanged, and the same `v0.9.1` tag resolves for SwiftPM.
+
+### Kotlin / Android
+
+- fixed: JDK 17 test hosts can load CherKit; 0.9.0 artifacts used Java 21 bytecode (class version 65) and failed
+  to load. See the [install guide](README.md#android--jvm-gradle-via-jitpack).
+
+### Build / Docs
+
+- changed: Linux setup reuses Gradle downloads across release/module edits, skips warm-up when both caches are
+  available, and exits quickly on configured VMs. Set `CHERKIT_GRADLE_WARMUP=1` to force compilation. Tooling only.
+
 ## 0.9.0
 
 Optional, opt-in attribution adapters: one call (`RevenueCatAttribution.start` or
