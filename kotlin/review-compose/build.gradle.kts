@@ -57,10 +57,11 @@ val checkPlayApiPublication = tasks.register("checkPlayApiPublication") {
     group = "verification"
     description = "Verify the Android POM exports Play Review at compile scope"
     dependsOn("generatePomFileForAndroidPublication")
+    val pomFile = tasks.named<GenerateMavenPom>("generatePomFileForAndroidPublication").map { it.destination }
+    inputs.file(pomFile)
     doLast {
-        val pom = tasks.named<GenerateMavenPom>("generatePomFileForAndroidPublication").get()
         val xml = javax.xml.parsers.DocumentBuilderFactory.newInstance()
-            .newDocumentBuilder().parse(pom.destination)
+            .newDocumentBuilder().parse(pomFile.get())
         val dependencies = xml.getElementsByTagName("dependency")
         val play = (0 until dependencies.length).map { dependencies.item(it) as org.w3c.dom.Element }
             .single {
