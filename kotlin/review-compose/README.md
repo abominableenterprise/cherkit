@@ -5,7 +5,7 @@ nothing itself: `ReviewCoordinator` holds the rules, this module finds a calm mo
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:review-compose:v0.9.2") // brings :review
+    implementation("com.github.abominableenterprise.cherkit:review-compose:v0.9.3") // brings :review
 }
 ```
 

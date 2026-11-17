@@ -6,7 +6,7 @@ block and the same "Not now" memory. Android only (the `jvm` artifact carries ju
 
 ```kotlin
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.9.2") // brings :sunset
+    implementation("com.github.abominableenterprise.cherkit:sunset-compose:v0.9.3") // brings :sunset
 }
 ```
 
