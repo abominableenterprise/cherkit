@@ -84,6 +84,9 @@ cp "$SCRIPTS/test.sh" "$repo/scripts/test.sh"
 cp "$SCRIPTS/lib/test-guards.sh" "$repo/scripts/lib/test-guards.sh"
 touch "$repo/kotlin/demo/build.gradle.kts"
 printf '#!/bin/sh\necho "size-check: ok"\n' >"$repo/scripts/size-check"
+# Privacy validation has its own regression suite; this fixture only exercises test orchestration.
+printf '#!/bin/sh\nexit 0\n' >"$repo/scripts/privacy-manifest-check"
+chmod +x "$repo/scripts/privacy-manifest-check"
 cat >"$WORK/bin/swift" <<'SH'
 #!/bin/sh
 echo "Build complete!"
