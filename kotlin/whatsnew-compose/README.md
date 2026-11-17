@@ -48,9 +48,19 @@ Options, all with defaults:
   taken away while suppressed (not a dismissal: nothing is marked seen) and comes back afterwards.
 - `onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)?`: called once the launch check has answered (see below).
   `null` by default.
-- `onVisibilityChange: ((Boolean) -> Unit)?`: `true` when the sheet appears, `false` when it goes away. An inline
+- `onDismiss: (() -> Unit)?`: consumption signal (checker overload), `null` by default. Called exactly once,
+  immediately after `checker.markSeen()` on user dismissal, never on suppression or leaving composition.
+- `onVisibilityChange: ((Boolean) -> Unit)?`: presentation only; `true` when the sheet appears, `false` when it goes away. An inline
   lambda is fine: a new instance on recomposition sends nothing, and the `false` goes to the callback that got the
   `true`.
+
+### Know when notes are consumed
+
+Do not clear a pending-notes gate from `onVisibilityChange(false)`: suppression or leaving composition also hides
+notes without consuming them. A hide while paused or blocked can otherwise strand that gate. The checker-based
+`WhatsNewPrompt` now accepts `onDismiss = { /* clear pending notes */ }` as the consumption signal, after `markSeen()`;
+keep `onVisibilityChange` only for presentation/interruption tracking. The old compiled signatures remain available
+as hidden binary-compatibility overloads.
 
 ### Know when the launch check is done
 
@@ -224,13 +234,13 @@ WhatsNewHistoryScreen(history, strings = strings, showTitle = true)
 
 | Swift (CherKitUI) | Kotlin (`com.abominableenterprise.cherkit.whatsnew.compose`) |
 | --- | --- |
-| `.whatsNew(checker:installedVersion:locale:strings:)` | `WhatsNewPrompt(checker, installedVersion, locales, strings, suppressed, onLaunchCheckComplete, onVisibilityChange)` |
+| `.whatsNew(checker:installedVersion:locale:strings:)` | `WhatsNewPrompt(checker, installedVersion, locales, strings, suppressed, onLaunchCheckComplete, onDismiss, onVisibilityChange)` |
 | `.whatsNew(entries:strings:onDismiss:)` | `WhatsNewPrompt(entries, onDismiss, strings, suppressed, onVisibilityChange)` |
 | `WhatsNewSheet(entries:strings:onContinue:)` | `WhatsNewSheet(entries, strings, onContinue)` |
 | `WhatsNewHistoryView(entries:strings:)` | `WhatsNewHistoryScreen(entries, modifier, strings, contentPadding, showTitle)` |
 | `WhatsNewStrings(...)` | `WhatsNewStrings(...)`: `title`, `continueButton`, `versionTitle`, `historyTitle`, `installedBadge`, `noNotes`, `emptyHistory` |
 
-`suppressed`, `onLaunchCheckComplete`, `onVisibilityChange` and `showTitle` are Android additions (iOS shows `historyTitle` as the navigation
+`suppressed`, `onLaunchCheckComplete`, `onVisibilityChange`, checker-based `onDismiss` and `showTitle` are Android additions (iOS shows `historyTitle` as the navigation
 title).
 
 Accessibility: the sheet title and each version are headings for TalkBack, each bullet is its own node (the "•" is

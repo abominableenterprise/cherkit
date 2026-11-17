@@ -1,3 +1,4 @@
+import org.gradle.api.publish.maven.tasks.GenerateMavenPom
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
@@ -35,7 +36,8 @@ kotlin {
         androidMain.dependencies {
             api(libs.compose.runtime)
             api(libs.compose.ui)
-            implementation(libs.play.review.ktx)
+            // ReviewManager is named by the public PlayReview.launch factory.
+            api(libs.play.review.ktx)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -49,3 +51,25 @@ kotlin {
         }
     }
 }
+
+// Regression for #83: consumers must be able to name ReviewManager/FakeReviewManager without another dependency.
+val checkPlayApiPublication = tasks.register("checkPlayApiPublication") {
+    group = "verification"
+    description = "Verify the Android POM exports Play Review at compile scope"
+    dependsOn("generatePomFileForAndroidPublication")
+    doLast {
+        val pom = tasks.named<GenerateMavenPom>("generatePomFileForAndroidPublication").get()
+        val xml = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder().parse(pom.destination)
+        val dependencies = xml.getElementsByTagName("dependency")
+        val play = (0 until dependencies.length).map { dependencies.item(it) as org.w3c.dom.Element }
+            .single {
+                it.getElementsByTagName("groupId").item(0).textContent == "com.google.android.play" &&
+                    it.getElementsByTagName("artifactId").item(0).textContent == "review-ktx"
+            }
+        check(play.getElementsByTagName("scope").item(0)?.textContent == "compile") {
+            "Play Review is public API and must have Maven compile scope"
+        }
+    }
+}
+tasks.matching { it.name == "check" }.configureEach { dependsOn(checkPlayApiPublication) }

@@ -48,6 +48,24 @@ public fun ReviewPromptEffect(
     telemetrySink: TelemetrySink? = null,
     onResult: (ReviewLaunchResult) -> Unit = {},
 ) {
+    ReviewPromptEffect(coordinator, { isIdle }, settleDelay, requirePlayInstall, telemetrySink, onResult)
+}
+
+/**
+ * Live idle gate: reads [isIdle] before and after Play's suspended request, without waiting for recomposition.
+ * Use a cheap, main-thread-safe read of your current model state. Compose-observable reads also restart the
+ * settle when the idle value changes; non-observable changes are checked on the next settle-loop attempt.
+ * The bound lifecycle and Activity are checked live too, so another resumed root cannot authorize this one.
+ */
+@Composable
+public fun ReviewPromptEffect(
+    coordinator: ReviewCoordinator,
+    isIdle: () -> Boolean,
+    settleDelay: Duration = ReviewSettle.DEFAULT_DELAY,
+    requirePlayInstall: Boolean = true,
+    telemetrySink: TelemetrySink? = null,
+    onResult: (ReviewLaunchResult) -> Unit = {},
+) {
     ReviewPromptEffect(coordinator, isIdle, settleDelay, onResult) { activity, idle ->
         PlayReview.launch(activity, coordinator, requirePlayInstall, idle, telemetrySink = telemetrySink)
     }
@@ -89,18 +107,37 @@ internal fun ReviewPromptEffect(
     onResult: (ReviewLaunchResult) -> Unit,
     launch: suspend (Activity, isIdle: () -> Boolean) -> ReviewLaunchResult,
 ) {
+    ReviewPromptEffect(coordinator, { isIdle }, settleDelay, onResult, launch)
+}
+
+/** Live-gate implementation, with a replaceable Play launch for host tests. */
+@Composable
+internal fun ReviewPromptEffect(
+    coordinator: ReviewCoordinator,
+    isIdle: () -> Boolean,
+    settleDelay: Duration,
+    onResult: (ReviewLaunchResult) -> Unit,
+    launch: suspend (Activity, isIdle: () -> Boolean) -> ReviewLaunchResult,
+) {
     val activity = LocalContext.current.findActivity()
-    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val resumed = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val lifecycleState by lifecycle.currentStateAsState()
+    val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    val idle = isIdle()
     val currentIdle by rememberUpdatedState(isIdle)
-    val currentResumed by rememberUpdatedState(resumed)
+    val currentActivity by rememberUpdatedState(activity)
+    val currentLifecycle by rememberUpdatedState(lifecycle)
     val currentLaunch by rememberUpdatedState(launch)
     val currentOnResult by rememberUpdatedState(onResult)
     // Keyed on `resumed`: every ON_RESUME (after an ON_PAUSE) starts a fresh settle and check.
-    LaunchedEffect(coordinator, activity, isIdle, resumed, settleDelay) {
-        if (activity == null || !isIdle || !resumed) return@LaunchedEffect
+    LaunchedEffect(coordinator, activity, lifecycle, idle, resumed, settleDelay) {
+        if (activity == null || !idle || !resumed) return@LaunchedEffect
         val result = ReviewSettle.awaitThenLaunch(coordinator, settleDelay) {
-            currentLaunch(activity) { currentIdle && currentResumed }
+            currentLaunch(activity) {
+                currentActivity === activity && currentLifecycle === lifecycle &&
+                    !activity.isFinishing && !activity.isDestroyed &&
+                    lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && currentIdle()
+            }
         }
         currentOnResult(result)
     }

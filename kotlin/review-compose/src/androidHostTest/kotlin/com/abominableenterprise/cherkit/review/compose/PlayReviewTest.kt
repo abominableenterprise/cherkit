@@ -58,6 +58,29 @@ class PlayReviewTest {
     }
 
     @Test
+    fun finishingDuringRequestSkipsBeforeMarkingPrompted() = runTest {
+        var launches = 0
+        val fake = FakeReviewManager(activity)
+        val manager = object : ReviewManager {
+            override fun requestReviewFlow(): Task<ReviewInfo> {
+                activity.finish()
+                return fake.requestReviewFlow()
+            }
+            override fun launchReviewFlow(activity: Activity, info: ReviewInfo): Task<Void> {
+                launches++
+                return Tasks.forResult(null)
+            }
+        }
+        assertEquals(
+            ReviewLaunchResult.SKIPPED,
+            PlayReview.launch(activity, review, requirePlayInstall = false, manager = { manager }),
+        )
+        assertEquals(0, launches)
+        assertTrue(review.isDue)
+        assertNull(store.load().lastPromptedVersion)
+    }
+
+    @Test
     fun originalPositionalCallbacksStillCompileAndForward() = runTest {
         var created = 0
         val manager = { created++; FakeReviewManager(activity) }

@@ -40,7 +40,9 @@ import com.abominableenterprise.cherkit.whatsnew.WhatsNewChecker
  *   later, when it shows. Use it like Sunset's `onFirstCheckComplete`, e.g. to hold back Play's update prompt until
  *   it runs (see the README). Keep the flag it sets per process too (an `object`), not in `remember` or
  *   `rememberSaveable`.
- * @param onVisibilityChange Called with `true` when the sheet appears and `false` when it goes away, e.g.
+ * @param onDismiss Consumption signal: called exactly once after `markSeen()` when the user dismisses the notes.
+ *   Suppression and leaving composition do not consume notes and never call this callback.
+ * @param onVisibilityChange Presentation only: called with `true` when the sheet appears and `false` when it goes away, e.g.
  *   `{ review.setInterruptionVisible(it, ReviewInterruption.WHATS_NEW) }`.
  */
 @Composable
@@ -51,12 +53,54 @@ public fun WhatsNewPrompt(
     strings: WhatsNewStrings = WhatsNewStrings(),
     suppressed: Boolean = false,
     onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
     onVisibilityChange: ((Boolean) -> Unit)? = null,
 ) {
     WhatsNewCheckerPrompt(
         WhatsNewLaunch.shared, checker, installedVersion, locales, strings, suppressed,
         onLaunchCheckComplete = onLaunchCheckComplete,
+        onDismiss = onDismiss,
         onVisibilityChange = onVisibilityChange,
+    )
+}
+
+/** Keeps fully positional visibility callbacks source-compatible; named/trailing calls use the API above. */
+@JvmName("WhatsNewPromptPositional")
+@Composable
+public fun WhatsNewPrompt(
+    checker: WhatsNewChecker,
+    installedVersion: String,
+    locales: List<String>,
+    strings: WhatsNewStrings,
+    suppressed: Boolean,
+    onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)?,
+    visibilityCallback: ((Boolean) -> Unit)?,
+) {
+    WhatsNewPrompt(
+        checker, installedVersion, locales, strings, suppressed,
+        onLaunchCheckComplete = onLaunchCheckComplete,
+        onDismiss = null,
+        onVisibilityChange = visibilityCallback,
+    )
+}
+
+/** The 0.9.1 signature, kept so already compiled calls (including default arguments) still link. */
+@Deprecated("Kept for binary compatibility", level = DeprecationLevel.HIDDEN)
+@Composable
+public fun WhatsNewPrompt(
+    checker: WhatsNewChecker,
+    installedVersion: String = rememberInstalledVersion(),
+    locales: List<String> = AndroidWhatsNew.preferredLocales(),
+    strings: WhatsNewStrings = WhatsNewStrings(),
+    suppressed: Boolean = false,
+    onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)? = null,
+    onVisibilityChange: ((Boolean) -> Unit)? = null,
+) {
+    WhatsNewPrompt(
+        checker, installedVersion, locales, strings, suppressed,
+        onLaunchCheckComplete = onLaunchCheckComplete,
+        onVisibilityChange = onVisibilityChange,
+        onDismiss = null,
     )
 }
 
@@ -88,6 +132,7 @@ internal fun WhatsNewCheckerPrompt(
     strings: WhatsNewStrings,
     suppressed: Boolean,
     onLaunchCheckComplete: ((hasNotes: Boolean) -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
     onVisibilityChange: ((Boolean) -> Unit)?,
 ) {
     SideEffect { launch.launched(checker, installedVersion, locales) }
@@ -97,7 +142,7 @@ internal fun WhatsNewCheckerPrompt(
         visible = entries.isNotEmpty() && !suppressed,
         strings = strings,
         onVisibilityChange = onVisibilityChange,
-        onDismiss = launch::dismissed,
+        onDismiss = { launch.dismissed(onDismiss) },
     )
     // After the sheet above, so its onVisibilityChange(true) for the same notes runs first.
     ReportWhatsNewLaunch(launch, onLaunchCheckComplete)

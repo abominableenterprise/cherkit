@@ -92,10 +92,12 @@ class ReviewPromptEffectTest {
                 ReviewPromptEffect(disabled, true, 1500.milliseconds, false, { results += it })
                 ReviewPromptEffect(disabled, onResult = { results += it })
                 ReviewPromptEffect(disabled) { results += it }
+                ReviewPromptEffect(disabled, isIdle = { true }, onResult = { results += it })
+                ReviewPromptEffect(disabled, { true }, 1500.milliseconds, false) { results += it }
             }
         }
         compose.waitForIdle()
-        assertEquals(List(3) { ReviewLaunchResult.SKIPPED }, results)
+        assertEquals(List(5) { ReviewLaunchResult.SKIPPED }, results)
     }
 
     @Test

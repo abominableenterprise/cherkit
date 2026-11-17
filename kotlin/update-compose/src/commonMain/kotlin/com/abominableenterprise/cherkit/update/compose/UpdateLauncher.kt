@@ -17,7 +17,9 @@ public object UpdateLauncher {
      * 7. `startFlexible()`: [UpdateLaunchResult.STARTED] and the session counts as prompted, else
      *    [UpdateLaunchResult.START_FAILED].
      *
-     * Never throws (except cancellation).
+     * [isAllowed] is evaluated live at step 6, after the request and store read, immediately before starting.
+     * Supply a fast, side-effect-free, non-throwing callback that reads current app state, not a captured snapshot.
+     * Never throws (except cancellation or an exception from the caller's [isAllowed] callback).
      */
     public suspend fun <T> launch(
         flow: UpdateFlow<T>,

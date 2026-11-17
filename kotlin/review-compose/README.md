@@ -24,7 +24,7 @@ val review = remember { AndroidReview.coordinator(context.applicationContext) } 
 review.isEligible = { viewModel.isReviewEligible }
 
 // On your main screens, not over a modal:
-ReviewPromptEffect(review, isIdle = !isEditing)
+ReviewPromptEffect(review, isIdle = { !viewModel.isEditing })
 
 // For each of your own dialogs, sheets and banners:
 ReviewInterruptionEffect(review, source = "paywall", visible = showPaywall)
@@ -41,6 +41,23 @@ ReviewInterruptionEffect(review, source = ReviewInterruption.WHATS_NEW, visible 
 - Finds the Activity from `LocalContext` (through `ContextWrapper`s); without one (a preview) it does nothing.
 - A disabled coordinator does nothing.
 - `onResult` gets the `ReviewLaunchResult` that ended each run (for logging).
+
+### Live idle gate: `ReviewPromptEffect(coordinator, isIdle = { ... }, ...)`
+
+Prefer the lambda overload when input can make the screen busy while Play's `requestReviewFlow()` is suspended.
+It reads your current model state both before the request and immediately before `markPrompted()`, without waiting
+for recomposition. Keep the lambda cheap and main-thread safe. Compose-observable reads restart the settle when
+idle changes; plain model changes are checked on the next settle-loop attempt (and after a pending request).
+
+The Boolean overload remains supported and delegates to the same implementation, but its idle value only updates
+on recomposition: a tap can make the screen busy and Play can finish before the next frame. A lambda over live
+state avoids that race. Other synchronous guards are `review.isEligible = { viewModel.isReviewEligible }`, or calling
+`review.setInterruptionVisible(true, "busy")` directly in the input handler and `false` when the action settles.
+Do not rely on a Compose effect alone to report a modal that opens during a pending request.
+
+Both overloads check their own bound lifecycle's **live** `RESUMED` state and Activity identity/validity after the
+request, even if a stopped window receives no further frames. A resumed root B cannot authorize a pending request
+from stopped root A; skipped attempts consume nothing and B can still prompt.
 
 ### `ReviewInterruptionEffect(coordinator, source, visible)`
 
@@ -61,15 +78,19 @@ What `ReviewPromptEffect` calls; a suspend function for apps that pick the momen
    **Play testing tracks (internal, closed and open testing) install through `com.android.vending` and pass.**
 3. `requestReviewFlow()`. If it fails (no Play Store, offline, any Play error): `REQUEST_FAILED`, and the version is
    **not** consumed, so the due prompt stays due for the next check.
-4. `markPrompted()` (it rechecks `shouldPrompt`; a modal that opened during the request gives `SKIPPED`), right
-   before `launchReviewFlow()`: `LAUNCHED`, or `LAUNCH_FAILED` if Play throws.
+4. Recheck the live `isIdle()` gate and that the bound Activity is not finishing or destroyed, then `markPrompted()`
+   (it rechecks `shouldPrompt`; a modal that opened during the request gives `SKIPPED`), right before
+   `launchReviewFlow()`: `LAUNCHED`, or `LAUNCH_FAILED` if Play throws. Direct callers should include their live
+   lifecycle `RESUMED` check in `isIdle`; the Compose effect supplies that automatically.
 
 It never throws (except cancellation). **Quota:** `launchReviewFlow` does not say whether Play showed anything. On a
 Play-installed build where Play still shows nothing because of its quota, the version counts as prompted all the same;
 the API gives no way to tell.
 
 Testing: pass `manager = { FakeReviewManager(context) }` (from Play), or implement `ReviewFlow<T>` and call
-`ReviewLauncher.launch(coordinator, flow, isIdle = isIdle)`, which is plain Kotlin.
+`ReviewLauncher.launch(coordinator, flow, isIdle = isIdle)`, which is plain Kotlin. The Android artifact exposes
+Play Review as an API dependency, so consumer app/test code can name `ReviewManager` and `FakeReviewManager`
+without declaring an extra Play dependency.
 
 ## Optional telemetry
 
@@ -120,7 +141,7 @@ SunsetPrompt(checker = checker, onPromptChange = { kind ->
 
 | Kotlin (`com.abominableenterprise.cherkit.review.compose`) | What |
 | --- | --- |
-| `ReviewPromptEffect(coordinator, isIdle, settleDelay, requirePlayInstall, telemetrySink, onResult)` | settle, check, launch Play |
+| `ReviewPromptEffect(coordinator, isIdle, settleDelay, requirePlayInstall, telemetrySink, onResult)` | settle, check, launch Play; `isIdle` is Boolean or a live `() -> Boolean` |
 | `ReviewInterruptionEffect(coordinator, source, visible)` | report a modal |
 | `PlayReview.launch(activity, coordinator, requirePlayInstall, isIdle, telemetrySink, manager)` | one launch attempt |
 | `PlayInstall.installerPackageName(context)`, `isPlayInstall(context)`, `PLAY_STORE_PACKAGE` | the installer check |

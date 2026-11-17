@@ -102,6 +102,37 @@ process-wide `object`, not `rememberSaveable` (see "Precedence with Sunset" belo
 - **`onVisibilityChange`:** `true` when Play's sheet opens, `false` when it closes (or the prompt leaves the
   composition).
 
+### Live veto before Play starts
+
+The Boolean `suppressed` overload remains supported, but its value is a composition snapshot. If a pointer-down,
+selection, modal, or Sunset callback marks the app busy while `appUpdateInfo` is suspended, Play can answer before
+another frame recomposes that Boolean. Use the public overload with required `isAllowed: () -> Boolean` for a
+synchronous final veto:
+
+```kotlin
+PlayUpdatePrompt(
+    state = update,
+    suppressed = !LaunchGate.sunsetSettled || sunsetKind != null || sunsetChecking ||
+        !LaunchGate.whatsNewSettled || whatsNewVisible,
+    isAllowed = {
+        LaunchGate.sunsetSettled && sunsetKind == null && !sunsetChecking &&
+            LaunchGate.whatsNewSettled && !whatsNewVisible && !appBusy.value
+    },
+)
+```
+
+Update `appBusy.value` synchronously in the interaction callback, before launching other work. Read the live value
+**inside** `isAllowed`; capturing `val allowed = !appBusy.value` during composition recreates the race. The callback
+must be fast, side-effect-free and non-throwing. It is combined with `!suppressed` and the resumed gate, evaluated
+at step 6 of `UpdateLauncher.launch`, after the request and declined-version check, immediately before
+`startFlexible`. A veto returns `SUPPRESSED`, does not consume the session and does not hide downloaded updates.
+Changing only its result does not trigger a new attempt: use observable `suppressed` state or the next resume to
+retry. It cannot dismiss a Play sheet that has already started.
+
+The new overload is
+`PlayUpdatePrompt(state, isAllowed, suppressed, enabled, requirePlayInstall, store, onVisibilityChange, onDownloaded, telemetrySink, onResult)`;
+only `isAllowed` is required. Existing overloads, including positional callbacks and binary bridges, are unchanged.
+
 ### Review interruptions
 
 Report the sheet to the Review coordinator ([review-compose](../review-compose/README.md)) so the store-review prompt
@@ -169,12 +200,26 @@ update behavior. Missing UI/manager prerequisites remain a quiet no-op, not a fa
 `enabled = true` on test builds. Or implement `UpdateFlow<T>` and call `UpdateLauncher.launch(flow, store, session)`,
 which is plain Kotlin.
 
+Play In-App Updates is exported as an Android `api` dependency, so consumers can name `AppUpdateManager` and
+`FakeAppUpdateManager` without adding their own Play dependency. The JVM-only artifact intentionally has no Play.
+
+Both public `PlayUpdatePrompt` overloads use process-wide `UpdateSession.shared`. Once any prompt test returns
+`STARTED`, later prompt tests in that JVM return `ALREADY_PROMPTED`; recomposing or creating another state does not
+reset it. For isolated launch-order tests, prefer `UpdateLauncher.launch(flow, store, UpdateSession())` with a fresh
+session per test (and pass `isAllowed = { ... }` for live vetoes). Do not rely on test ordering or reset production
+session state. The module's host regression holds Play's request, flips the live callback without advancing a
+frame, and expects `SUPPRESSED`, no sheet, and no consumed session.
+
+The publication regression is `./gradlew :update-compose:checkPlayApiPublication` (also part of `check`); it generates
+the Android POM and asserts that `app-update-ktx` has Maven compile scope.
+
 ## API
 
 | Kotlin (`com.abominableenterprise.cherkit.update.compose`) | What |
 | --- | --- |
 | `PlayUpdatePrompt(state, suppressed, enabled, requirePlayInstall, store, onVisibilityChange, onDownloaded, onResult)` | check and start the flexible flow |
-| `rememberPlayUpdateState(manager)`, `PlayUpdateState` (`isDownloaded`, `isVisible`, `completeUpdate()`) | state for your UI, "Restart to install" |
+| `PlayUpdatePrompt(state, isAllowed, suppressed, enabled, requirePlayInstall, store, onVisibilityChange, onDownloaded, telemetrySink, onResult)` | same flow with a final live veto; `isAllowed` is required |
+| `rememberPlayUpdateState(manager)`,  `PlayUpdateState` (`isDownloaded`, `isVisible`, `completeUpdate()`) | state for your UI, "Restart to install" |
 | `UpdateInterruption.SOURCE` | `"update"`, for `ReviewCoordinator.setInterruptionVisible` |
 | `UpdatePromptStore`, `SharedPreferencesUpdatePromptStore(prefs, key)`, `InMemoryUpdatePromptStore`, `rememberUpdatePromptStore()` | "Not now" per versionCode |
 | `AndroidUpdate.promptStore(context, name, key)`, `isEnabledByDefault(context)`, `DEFAULT_PREFERENCES_NAME` | Android wiring |
