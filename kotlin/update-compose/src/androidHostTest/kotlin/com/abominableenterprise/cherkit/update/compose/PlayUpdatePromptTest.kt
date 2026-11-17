@@ -12,6 +12,9 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
+import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.TaskCompletionSource
+import com.google.android.play.core.appupdate.AppUpdateInfo
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateOptions
 import com.google.android.play.core.install.model.AppUpdateType
@@ -93,6 +96,53 @@ class PlayUpdatePromptTest {
         }
         compose.waitForIdle()
         assertEquals(listOf(UpdateLaunchResult.DISABLED), results)
+    }
+
+    @Test
+    fun publicLiveGateVetoesAHeldRequestWithoutAnotherFrame() {
+        fake.setUpdateAvailable(42)
+        val info = fake.appUpdateInfo.result
+        val held = TaskCompletionSource<AppUpdateInfo>()
+        var requests = 0
+        var allowed = true // Deliberately not Compose state: changed synchronously by an app callback.
+        var gateReads = 0
+        val manager = object : AppUpdateManager by fake {
+            override fun getAppUpdateInfo(): Task<AppUpdateInfo> {
+                requests++
+                return held.task
+            }
+        }
+        compose.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                val update = rememberPlayUpdateState(manager = { manager })
+                PlayUpdatePrompt(
+                    state = update,
+                    isAllowed = { gateReads++; allowed },
+                    enabled = true,
+                    requirePlayInstall = false,
+                    store = store,
+                    onVisibilityChange = { visibility += it },
+                    onResult = { results += it },
+                )
+            }
+        }
+        compose.waitForIdle()
+        assertEquals(1, requests)
+        assertTrue(results.isEmpty())
+        assertEquals(0, gateReads)
+        compose.mainClock.autoAdvance = false
+        val frameTime = compose.mainClock.currentTime
+        compose.runOnIdle {
+            allowed = false
+            held.setResult(info)
+        }
+        compose.waitForIdle()
+        assertEquals(frameTime, compose.mainClock.currentTime)
+        assertEquals(listOf(UpdateLaunchResult.SUPPRESSED), results)
+        assertEquals(1, gateReads)
+        assertFalse(fake.isConfirmationDialogVisible)
+        assertFalse(UpdateSession.shared.prompted)
+        assertTrue(visibility.isEmpty())
     }
 
     @Test

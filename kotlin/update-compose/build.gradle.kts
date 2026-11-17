@@ -1,3 +1,4 @@
+import org.gradle.api.publish.maven.tasks.GenerateMavenPom
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
@@ -36,7 +37,8 @@ kotlin {
             api(libs.compose.runtime)
             api(libs.compose.ui)
             implementation(libs.androidx.activity.compose)
-            implementation(libs.play.app.update.ktx)
+            // AppUpdateManager is named by the public rememberPlayUpdateState factory.
+            api(libs.play.app.update.ktx)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -51,3 +53,27 @@ kotlin {
         }
     }
 }
+
+// Regression for #83: Maven consumers must be able to name AppUpdateManager/FakeAppUpdateManager
+// without adding a second Play dependency. Check the published scope, not just this module's test classpath.
+val checkPlayApiPublication = tasks.register("checkPlayApiPublication") {
+    group = "verification"
+    description = "Verify the Android POM exports Play In-App Updates at compile scope"
+    dependsOn("generatePomFileForAndroidPublication")
+    val pomFile = tasks.named<GenerateMavenPom>("generatePomFileForAndroidPublication").map { it.destination }
+    inputs.file(pomFile)
+    doLast {
+        val xml = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder().parse(pomFile.get())
+        val dependencies = xml.getElementsByTagName("dependency")
+        val play = (0 until dependencies.length).map { dependencies.item(it) as org.w3c.dom.Element }
+            .single {
+                it.getElementsByTagName("groupId").item(0).textContent == "com.google.android.play" &&
+                    it.getElementsByTagName("artifactId").item(0).textContent == "app-update-ktx"
+            }
+        check(play.getElementsByTagName("scope").item(0)?.textContent == "compile") {
+            "Play In-App Updates is public API and must have Maven compile scope"
+        }
+    }
+}
+tasks.matching { it.name == "check" }.configureEach { dependsOn(checkPlayApiPublication) }

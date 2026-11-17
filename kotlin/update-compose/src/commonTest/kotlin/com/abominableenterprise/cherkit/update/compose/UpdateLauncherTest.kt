@@ -57,6 +57,28 @@ class UpdateLauncherTest {
     }
 
     @Test
+    fun liveGateIsReadAfterTheStoreImmediatelyBeforeStarting() = runTest {
+        var allowed = true
+        var gateReads = 0
+        val changingStore = object : UpdatePromptStore {
+            override val declinedVersionCode: Int?
+                get() {
+                    allowed = false
+                    return null
+                }
+            override fun rememberDeclined(versionCode: Int) = Unit
+        }
+        val result = UpdateLauncher.launch(flow, changingStore, session) {
+            gateReads++
+            allowed
+        }
+        assertEquals(UpdateLaunchResult.SUPPRESSED, result)
+        assertEquals(1, gateReads)
+        assertEquals(0, flow.starts)
+        assertNull(session.promptedVersionCode)
+    }
+
+    @Test
     fun aDownloadedUpdateIsReportedEvenAfterThePrompt() = runTest {
         launch()
         flow.status = FakeUpdateFlow.downloaded(42)

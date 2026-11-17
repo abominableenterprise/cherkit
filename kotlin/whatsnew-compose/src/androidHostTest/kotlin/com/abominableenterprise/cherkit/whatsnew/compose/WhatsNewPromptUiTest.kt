@@ -33,13 +33,19 @@ class WhatsNewPromptUiTest {
     private val visibility = mutableListOf<Boolean>()
     private var suppressed by mutableStateOf(false)
     private var composed by mutableStateOf(true)
+    private var dismissals = 0
 
     private fun showChecker() {
         compose.setContent {
             if (composed) {
-                WhatsNewCheckerPrompt(launch, test.checker, "1.1.0", listOf("en-US"), strings, suppressed) {
-                    visibility += it
-                }
+                WhatsNewCheckerPrompt(
+                    launch, test.checker, "1.1.0", listOf("en-US"), strings, suppressed,
+                    onDismiss = {
+                        assertEquals("1.1.0", test.lastSeen, "markSeen must precede the consumption callback")
+                        dismissals++
+                    },
+                    onVisibilityChange = { visibility += it },
+                )
             }
         }
         compose.waitForIdle()
@@ -54,7 +60,7 @@ class WhatsNewPromptUiTest {
     }
 
     @Test
-    fun continueMarksSeenOnlyOnDismissal() {
+    fun continueCallsOnDismissAfterMarkSeenExactlyOnce() {
         showChecker()
         assertSheetShown()
         assertEquals("1.0.0", test.lastSeen, "shown is not seen: only the dismissal marks it")
@@ -65,6 +71,11 @@ class WhatsNewPromptUiTest {
         compose.onNodeWithText(strings.title).assertDoesNotExist()
         assertEquals("1.1.0", test.lastSeen)
         assertEquals(listOf(true, false), visibility)
+        assertEquals(1, dismissals)
+        launch.dismissed { dismissals++ }
+        composed = false
+        compose.waitForIdle()
+        assertEquals(1, dismissals, "duplicate dismissal and disposal must not consume again")
     }
 
     @Test
@@ -94,7 +105,7 @@ class WhatsNewPromptUiTest {
     }
 
     @Test
-    fun suppressingAShownSheetIsNotADismissal() {
+    fun suppressingAShownSheetDoesNotCallOnDismiss() {
         showChecker()
         suppressed = true
         compose.waitForIdle()
@@ -106,10 +117,11 @@ class WhatsNewPromptUiTest {
         compose.waitForIdle()
         assertSheetShown()
         assertEquals(listOf(true, false, true), visibility)
+        assertEquals(0, dismissals)
     }
 
     @Test
-    fun onLaunchRunsOnceAcrossRecompositionAndKeepsUnseenNotes() {
+    fun leavingCompositionDoesNotCallOnDismissAndKeepsUnseenNotes() {
         showChecker()
         composed = false
         compose.waitForIdle()
@@ -119,6 +131,7 @@ class WhatsNewPromptUiTest {
         compose.waitForIdle()
         assertEquals(1, test.launches)
         assertSheetShown()
+        assertEquals(0, dismissals)
     }
 
     @Test

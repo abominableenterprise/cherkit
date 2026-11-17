@@ -18,7 +18,8 @@ public object PlayReview {
      *    [ReviewLaunchResult.NOT_PLAY_INSTALL] without consuming anything, because Play would show nothing there.
      *    Play testing tracks (internal, closed, open) install through `com.android.vending` and pass.
      * 3. `requestReviewFlow()`. If it fails, [ReviewLaunchResult.REQUEST_FAILED] and the prompt stays due.
-     * 4. `markPrompted()`, right before `launchReviewFlow()` ([ReviewLaunchResult.LAUNCHED]).
+     * 4. Recheck [isIdle] and that [activity] is not finishing or destroyed, then `markPrompted()`, right before
+     *    `launchReviewFlow()` ([ReviewLaunchResult.LAUNCHED]).
      *
      * Play gives no signal about whether it showed anything: on a Play-installed build where Play still shows nothing
      * (its quota), the version counts as prompted all the same. Never throws (except cancellation): a Play error
@@ -36,7 +37,8 @@ public object PlayReview {
         telemetrySink: TelemetrySink? = null,
         manager: () -> ReviewManager = { ReviewManagerFactory.create(activity) },
     ): ReviewLaunchResult {
-        if (!coordinator.shouldPrompt(isIdle())) return ReviewLaunchResult.SKIPPED
+        val canLaunch = { !activity.isFinishing && !activity.isDestroyed && isIdle() }
+        if (!coordinator.shouldPrompt(canLaunch())) return ReviewLaunchResult.SKIPPED
         if (requirePlayInstall && !PlayInstall.isPlayInstall(activity)) return ReviewLaunchResult.NOT_PLAY_INSTALL
         val flow = try {
             PlayReviewFlow(activity, manager())
@@ -47,7 +49,7 @@ public object PlayReview {
             return ReviewLaunchResult.REQUEST_FAILED
         }
         // The launcher owns request/launch reporting; this layer reports only manager creation failure.
-        return ReviewLauncher.launch(coordinator, flow, telemetrySink, isIdle)
+        return ReviewLauncher.launch(coordinator, flow, telemetrySink, canLaunch)
     }
 
     /** Keeps positional callbacks source-compatible; named and trailing callbacks use the sink-aware API. */

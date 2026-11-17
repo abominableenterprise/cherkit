@@ -89,6 +89,34 @@ public fun PlayUpdatePrompt(
     )
 }
 
+/**
+ * [PlayUpdatePrompt] with a synchronous, live veto immediately before Play's sheet starts.
+ *
+ * [isAllowed] is read after the suspended Play request, in addition to [suppressed] and the resumed gate.
+ * Read current app state inside it; do not capture a Boolean calculated during composition. It must be fast,
+ * side-effect-free and non-throwing. Changing only the callback's result does not schedule another attempt;
+ * resume or change [suppressed] to retry. Download notifications are not vetoed.
+ */
+@Composable
+public fun PlayUpdatePrompt(
+    state: PlayUpdateState = rememberPlayUpdateState(),
+    isAllowed: () -> Boolean,
+    suppressed: Boolean = false,
+    enabled: Boolean = AndroidUpdate.isEnabledByDefault(LocalContext.current),
+    requirePlayInstall: Boolean = true,
+    store: UpdatePromptStore = rememberUpdatePromptStore(),
+    onVisibilityChange: (Boolean) -> Unit = {},
+    onDownloaded: () -> Unit = {},
+    telemetrySink: TelemetrySink? = null,
+    onResult: (UpdateLaunchResult) -> Unit = {},
+) {
+    val isPlayInstall: (Context) -> Boolean = if (requirePlayInstall) PlayInstall::isPlayInstall else { _ -> true }
+    PlayUpdatePrompt(
+        state, suppressed, enabled, store, onVisibilityChange, onDownloaded, onResult,
+        UpdateSession.shared, isPlayInstall, telemetrySink ?: state.telemetrySink, isAllowed,
+    )
+}
+
 @Deprecated("Use the overload with telemetrySink", level = DeprecationLevel.HIDDEN)
 @Composable
 public fun PlayUpdatePrompt(
@@ -134,10 +162,12 @@ internal fun PlayUpdatePrompt(
     session: UpdateSession,
     isPlayInstall: (Context) -> Boolean,
     telemetrySink: TelemetrySink? = state.telemetrySink,
+    isAllowed: () -> Boolean = { true },
 ) {
     val context = LocalContext.current
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val resumed = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    val currentIsAllowed by rememberUpdatedState(isAllowed)
     val currentSuppressed by rememberUpdatedState(suppressed)
     val currentResumed by rememberUpdatedState(resumed)
     val currentStore by rememberUpdatedState(store)
@@ -183,7 +213,7 @@ internal fun PlayUpdatePrompt(
             !isPlayInstall(context) -> UpdateLaunchResult.NOT_PLAY_INSTALL
             manager == null || sheet == null -> UpdateLaunchResult.CHECK_FAILED
             else -> UpdateLauncher.launch(PlayUpdateFlow(manager, sheet), currentStore, session, currentSink) {
-                !currentSuppressed && currentResumed
+                !currentSuppressed && currentResumed && currentIsAllowed()
             }
         }
         when (result) {

@@ -67,10 +67,11 @@ internal class WhatsNewLaunch(
     }
 
     /** The user dismissed the sheet: hide it and mark the notes seen, once. */
-    fun dismissed() {
+    fun dismissed(onDismiss: (() -> Unit)? = null) {
         if (entries.isEmpty()) return
         entries = emptyList()
         checker?.markSeen()
+        onDismiss?.invoke()
     }
 
     companion object {
