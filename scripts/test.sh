@@ -49,6 +49,8 @@ command -v swift >/dev/null || { echo "swift not found: run scripts/setup-linux.
 [ -n "${JAVA_HOME:-}" ] || command -v java >/dev/null || { echo "java not found: run scripts/setup-linux.sh" >&2; exit 1; }
 
 START=$SECONDS
+echo "==> privacy-manifest-check"
+scripts/privacy-manifest-check
 echo "==> size-check"
 if git rev-parse --verify -q origin/main >/dev/null; then
   scripts/size-check --check-baseline-against origin/main
