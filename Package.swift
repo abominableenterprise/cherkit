@@ -61,7 +61,8 @@ let package = Package(
         // CherKitCore: tiny shared helpers (AppVersion) used by other modules.
         .target(name: "CherKitCore", exclude: ["README.md"]),
         .target(name: "CherKitAttributionRevenueCat", dependencies: revenueCatDependencies),
-        .target(name: "CherKitAttributionMeta", dependencies: metaDependencies),
+        .target(name: "CherKitAttributionMeta", dependencies: metaDependencies,
+                resources: [.copy("PrivacyInfo.xcprivacy")]),
         // CherKitAnalytics: PostHog is linked on Apple platforms only; code using it stays in `#if canImport(PostHog)`.
         .target(
             name: "CherKitAnalytics",
@@ -78,15 +79,19 @@ let package = Package(
             dependencies: firebaseTargetDependencies,
             exclude: ["README.md"]
         ),
-        .target(name: "CherKitSunset", dependencies: ["CherKitCore"], exclude: ["README.md"]),
-        .target(name: "CherKitWhatsNew", dependencies: ["CherKitCore"], exclude: ["README.md"]),
+        .target(name: "CherKitSunset", dependencies: ["CherKitCore"], exclude: ["README.md"],
+                resources: [.copy("PrivacyInfo.xcprivacy")]),
+        .target(name: "CherKitWhatsNew", dependencies: ["CherKitCore"], exclude: ["README.md"],
+                resources: [.copy("PrivacyInfo.xcprivacy")]),
         // CherKitReview: store-review prompt rules only; the StoreKit/SwiftUI adapter lives in CherKitUI.
-        .target(name: "CherKitReview", dependencies: ["CherKitCore"], exclude: ["README.md"]),
+        .target(name: "CherKitReview", dependencies: ["CherKitCore"], exclude: ["README.md"],
+                resources: [.copy("PrivacyInfo.xcprivacy")]),
         // SwiftUI views. Sources are wrapped in `#if canImport(SwiftUI)` so Linux builds stay green.
         .target(
             name: "CherKitUI",
             dependencies: ["CherKitSunset", "CherKitWhatsNew", "CherKitReview"],
-            exclude: ["README.md"]
+            exclude: ["README.md"],
+            resources: [.copy("PrivacyInfo.xcprivacy")]
         ),
         // Test-only helper that loads the shared JSON contract in fixtures/. Not a product.
         .target(name: "CherKitTestSupport", path: "Tests/CherKitTestSupport"),

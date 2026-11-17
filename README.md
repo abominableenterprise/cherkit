@@ -36,6 +36,9 @@ Add the package `https://github.com/abominableenterprise/cherkit` (Xcode: File >
 `CherKitAttributionRevenueCat`, `CherKitAttributionMeta`, `CherKitAnalytics`, `CherKitTelemetry`, `CherKitTelemetryFirebase`, `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` (SwiftUI views for Sunset and WhatsNew, and the review prompt) and
 `CherKitCore` (pulled in by Sunset and WhatsNew).
 
+Each target that uses `UserDefaults` ships its own Apple privacy manifest, including standard and App Group
+storage reasons; consuming apps no longer need to declare CherKit's `UserDefaults` use themselves.
+
 ```swift
 dependencies: [
     .package(url: "https://github.com/abominableenterprise/cherkit", from: "0.9.2"),

@@ -110,6 +110,8 @@ echo "Xcode: $(xcodebuild -version | tr '\n' ' ')($(xcode-select -p 2>/dev/null 
 echo "macOS: $(sw_vers -productVersion) ($(uname -m))"
 echo "Modules: ${SELECTED[*]}"
 
+run privacy-manifest-check "scripts/privacy-manifest-check" scripts/privacy-manifest-check
+
 # 1. Size check, as in scripts/test.sh.
 if git rev-parse --verify -q origin/main >/dev/null; then
   run size-check "scripts/size-check" scripts/size-check --check-baseline-against origin/main
@@ -201,7 +203,7 @@ else
   for target in ${TEST_TARGETS[@]+"${TEST_TARGETS[@]}"}; do ONLY+=("-only-testing:$target"); done
   run ios-test "xcodebuild test -scheme CherKit-Package (iOS Simulator)" \
     xcodebuild -scheme CherKit-Package -destination "$DESTINATION" -derivedDataPath "$DERIVED" \
-    test ${ONLY[@]+"${ONLY[@]}"}
+    test -collect-test-diagnostics never ${ONLY[@]+"${ONLY[@]}"}
   # Its tail holds the test summary: print it on success too (run already did on failure).
   [ "$LAST_RC" -ne 0 ] || log_excerpt "$LOGS/ios-test.log" 60
   require_tests "$(tests_run_count "$LOGS/ios-test.log")" "xcodebuild test (iOS Simulator)"

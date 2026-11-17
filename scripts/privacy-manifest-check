@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""Require a copied privacy manifest for every Sources target using UserDefaults."""
+import json
+from pathlib import Path
+import plistlib
+import subprocess
+import sys
+
+root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
+package = json.loads(subprocess.check_output(["swift", "package", "dump-package"], cwd=root))
+targets = {target["name"]: target for target in package["targets"]}
+errors = []
+for directory in sorted((root / "Sources").iterdir()):
+    if not directory.is_dir():
+        continue
+    if not any("UserDefaults" in source.read_text() for source in directory.rglob("*.swift")):
+        continue
+    manifest = directory / "PrivacyInfo.xcprivacy"
+    resources = targets.get(directory.name, {}).get("resources", [])
+    if not any(resource.get("path") == manifest.name and "copy" in resource.get("rule", {})
+               for resource in resources):
+        errors.append(f"{directory.name}: declare .copy(\"{manifest.name}\") as a target resource")
+    try:
+        with manifest.open("rb") as stream:
+            privacy = plistlib.load(stream)
+        defaults = [entry for entry in privacy.get("NSPrivacyAccessedAPITypes", [])
+                    if entry.get("NSPrivacyAccessedAPIType") == "NSPrivacyAccessedAPICategoryUserDefaults"]
+        if not any({"CA92.1", "1C8F.1"} <= set(entry.get("NSPrivacyAccessedAPITypeReasons", []))
+                   for entry in defaults):
+            errors.append(f"{directory.name}: declare UserDefaults reasons CA92.1 and 1C8F.1")
+        if (privacy.get("NSPrivacyTracking") is not False
+                or privacy.get("NSPrivacyTrackingDomains") != []
+                or privacy.get("NSPrivacyCollectedDataTypes") != []):
+            errors.append(f"{directory.name}: expected no tracking, tracking domains or collected data")
+    except (OSError, plistlib.InvalidFileException, ValueError) as error:
+        errors.append(f"{directory.name}: cannot read privacy manifest: {error}")
+if errors:
+    sys.exit("\n".join(errors))
+print("Privacy manifest check passed")
