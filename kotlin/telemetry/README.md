@@ -58,7 +58,7 @@ span.end(status: .ok)
 
 ## Kotlin usage
 
-Depend on `:telemetry` (published as `com.github.abominableenterprise.cherkit:telemetry:v0.9.2`).
+Depend on `:telemetry` (published as `com.github.abominableenterprise.cherkit:telemetry:v0.9.3`).
 Use one instance on the main thread; the Kotlin facade is not thread-safe, matching the Swift main-actor contract.
 
 ```kotlin

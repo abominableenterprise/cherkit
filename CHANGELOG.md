@@ -4,6 +4,20 @@ Developer-facing notes on CherKit for the apps that use it. Versions follow semv
 (SwiftPM resolves the tag, JitPack publishes the Kotlin modules with the tag as the version). Between releases,
 changes collect as fragments in [changelog/](changelog/README.md).
 
+## 0.9.3
+
+Patch release: Swift packages now ship Apple privacy manifests, so apps no longer need to declare CherKit's
+UserDefaults use themselves. No API changes. Kotlin is unchanged; the same `v0.9.3` tag also publishes Kotlin
+modules via JitPack.
+
+### Swift
+
+- fixed: Bundle `PrivacyInfo.xcprivacy` with `CherKitSunset`, `CherKitWhatsNew`, `CherKitReview`, `CherKitUI` and
+  `CherKitAttributionMeta`, declaring UserDefaults access for standard and App Group storage (approved reasons
+  `CA92.1` and `1C8F.1`). Consuming apps no longer need to declare CherKit's UserDefaults use themselves.
+- changed: Add a [privacy manifest guard](scripts/privacy-manifest-check) to validate the bundled manifests
+  and their SwiftPM resource declarations.
+
 ## 0.9.2
 
 Patch release: source-compatible Android Compose fixes (additive overloads only). Swift is unchanged;

@@ -1,8 +1,8 @@
 # CherKit Telemetry Firebase (Android)
 
 Implements the [Telemetry core](../telemetry/README.md) with Crashlytics non-fatals, crash collection,
-breadcrumbs, custom keys and opt-in Performance traces. Available in v0.9.2 as
-`com.github.abominableenterprise.cherkit:telemetry-firebase:v0.9.2`.
+breadcrumbs, custom keys and opt-in Performance traces. Available in v0.9.3 as
+`com.github.abominableenterprise.cherkit:telemetry-firebase:v0.9.3`.
 
 ## App-side Firebase setup
 
@@ -29,7 +29,7 @@ plugins {
 }
 
 dependencies {
-    implementation("com.github.abominableenterprise.cherkit:telemetry-firebase:v0.9.2")
+    implementation("com.github.abominableenterprise.cherkit:telemetry-firebase:v0.9.3")
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-crashlytics")
     implementation("com.google.firebase:firebase-perf")
