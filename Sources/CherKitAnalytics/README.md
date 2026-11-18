@@ -2,7 +2,8 @@
 
 The typed, privacy-first analytics facade. Privacy rules, gate and lifecycle are shared with Kotlin and described in
 [kotlin/analytics/README.md](../../kotlin/analytics/README.md); the behavior is specified in
-[fixtures/analytics](../../fixtures/analytics).
+[fixtures/analytics](../../fixtures/analytics). The library starts with `consentGranted = false`; the app sets it
+from its anonymous usage sharing setting.
 
 ```swift
 import CherKitAnalytics
@@ -23,9 +24,10 @@ let isReleaseBuild = true
     buildEnabled: isReleaseBuild && !AnalyticsTestHost.isRunningTests
 )
 
-analytics.consentGranted = settings.analyticsOptIn    // default false: opt-in
-analytics.sessionActive = session.isSignedInAdult     // never true on a kid's device
-analytics.track(.appOpened)                           // returns whether it was sent
+// The app defaults this setting to on. Users can turn it off in Settings; a saved off choice always wins.
+analytics.consentGranted = settings.shareAnonymousUsage
+analytics.sessionActive = session.isSignedInAdult  // never true on a kid's device
+analytics.track(.appOpened)                       // returns whether it was sent
 ```
 
 `Analytics` is `@MainActor`: its state and every backend call stay on the main thread without locks, which suits
@@ -49,7 +51,7 @@ let isDebug = false
     buildEnabled: !isDebug && !AnalyticsTestHost.isRunningTests
 )
 
-analytics.consentGranted = settings.analyticsOptIn
+analytics.consentGranted = settings.shareAnonymousUsage
 analytics.sessionActive = session.isSignedInAdult
 ```
 
