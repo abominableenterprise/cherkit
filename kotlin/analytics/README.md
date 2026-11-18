@@ -11,7 +11,9 @@ sits behind `AnalyticsBackend` (on Android: `PostHogAnalyticsBackend`). Swift: `
   attached to an event.
 - **Allowlisted names only.** Events are an app-owned type. A name must match `^[a-z][a-z0-9_]{0,63}$` (ASCII);
   anything else is dropped. Check your whole allowlist in a test with `AnalyticsEventName.isValid`.
-- **Opt-in.** `consentGranted` starts `false`; nothing is sent or started until the app sets it from the user's choice.
+- **App-controlled consent.** In the library, `consentGranted` starts `false`; the backend doesn't start or send
+  anything until the app sets it to `true`. Set it from the app's anonymous usage sharing setting. Default that
+  setting to on and let users turn it off in Settings. A saved off choice always wins.
 - **Off in debug, tests and emulators.** The app passes `buildEnabled = false` there (`AnalyticsTestHost` helps).
 - **Off on kids' devices.** `sessionActive` is set only for a session allowed to be measured, e.g. a signed-in adult.
   Apps never set it on a child or kid device.
@@ -37,9 +39,10 @@ val analytics = Analytics<ExampleEvent>(
     buildEnabled = !BuildConfig.DEBUG && !AnalyticsTestHost.isRunningTests && !isEmulator,
 )
 
-analytics.consentGranted = settings.analyticsOptIn  // default false: opt-in
-analytics.sessionActive = session.isSignedInAdult   // never true on a kid's device
-analytics.track(ExampleEvent.APP_OPENED)            // returns whether it was sent
+// The app defaults this setting to on. Users can turn it off in Settings; a saved off choice always wins.
+analytics.consentGranted = settings.shareAnonymousUsage
+analytics.sessionActive = session.isSignedInAdult  // never true on a kid's device
+analytics.track(ExampleEvent.APP_OPENED)           // returns whether it was sent
 ```
 
 Kotlin uses `eventName` because an enum's `name` is final. `Analytics` is not thread-safe, matching the Swift
@@ -64,8 +67,9 @@ class ExampleApp : Application() {
             PostHogAnalyticsBackend(this, apiKey = BuildConfig.POSTHOG_KEY),  // host defaults to US cloud
             buildEnabled = !BuildConfig.DEBUG,
         )
-        analytics.consentGranted = settings.analyticsOptIn  // opt-in, default false
-        analytics.sessionActive = session.isSignedInAdult   // never on a kid's device
+        // Defaults to on in the app. Users can turn it off in Settings; a saved off choice always wins.
+        analytics.consentGranted = settings.shareAnonymousUsage
+        analytics.sessionActive = session.isSignedInAdult  // never on a kid's device
     }
 }
 ```

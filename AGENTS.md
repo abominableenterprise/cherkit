@@ -9,8 +9,8 @@ apps, pure Swift iOS apps and later others). It ships as a Swift Package (`Packa
 Kotlin Multiplatform modules (`kotlin/`, Android + JVM, packages `com.abominableenterprise.cherkit.*`, published through
 JitPack as `com.github.abominableenterprise.cherkit:<module>`; see the README's Install section). v1 modules:
 
-- **Analytics** (`CherKitAnalytics`, `:analytics`): thin typed facade over PostHog, fixed list of allowed events, opt-in,
-  off in debug builds.
+- **Analytics** (`CherKitAnalytics`, `:analytics`): thin typed, consent-gated facade over PostHog with a fixed event list,
+  off in debug builds. Apps default anonymous usage sharing to on, with a Settings switch to turn it off; a saved off wins.
 - **Sunset** (`CherKitSunset`, `:sunset`): version sunsetting from a hosted min-version config, soft or hard update screen.
 - **WhatsNew** (`CherKitWhatsNew`, `:whatsnew`): "What's new" notes plus the history of versions installed on the device.
 - **Review** (`CherKitReview`, `:review`): store-review prompt rules (when to ask, once per version, never over a
@@ -107,7 +107,8 @@ A release is its own small PR, then a tag:
 - The hosted config and release notes are public, read-only JSON served over HTTPS. A tampered, malformed or unreachable
   config must **fail open**: never lock users out of an app.
 - No secrets live in the library. The PostHog project key is a public client key supplied by the app.
-- No PII in analytics events. Analytics is off on kids' devices and whenever the user has not opted in.
+- No PII in analytics events. Analytics is off on kids' devices and whenever the app's anonymous usage setting is off.
+  The library's `consentGranted` starts `false` until the app sets it from that setting.
 - Main risks: locking users out (Sunset bugs), privacy leaks (Analytics) and app crashes. Ordinary input validation on
   local data is low severity.
 

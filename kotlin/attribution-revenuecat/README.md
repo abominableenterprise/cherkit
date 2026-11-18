@@ -87,7 +87,7 @@ work for restricted audiences; ordinary RevenueCat purchase processing still run
 
 This is not a blanket guarantee about an app's other SDKs, existing subscriber attributes or dashboard
 integrations. Audit those separately. Do not inherit marketing/PII forwarding accidentally. No ATT
-prompt is added and analytics opt-in is not advertising authorization.
+prompt is added and enabling anonymous usage analytics does not authorize advertising.
 
 Android has no Apple attribution route or local attribution queue to stop. An existing SDK instance
 cannot be reconfigured safely here; previously stored identifiers, pending vendor work and

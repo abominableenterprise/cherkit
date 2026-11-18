@@ -8,7 +8,7 @@ its own product, so an app imports only what it needs.
 
 | Module | What it does | Swift product | Kotlin module |
 | --- | --- | --- | --- |
-| [Analytics](kotlin/analytics/README.md) | Typed, opt-in PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
+| [Analytics](kotlin/analytics/README.md) | Typed, consent-gated PostHog facade with a fixed event list | `CherKitAnalytics` | `:analytics` |
 | [Attribution RevenueCat](kotlin/attribution-revenuecat/README.md) | Optional safe RevenueCat setup; Apple Search Ads attribution on eligible iOS devices, purchases-only on Android | `CherKitAttributionRevenueCat` | `:attribution-revenuecat` |
 | [Attribution Meta](kotlin/attribution-meta/README.md) | Optional Meta install/anonymous-ID bridge; RevenueCat CAPI is the only purchase sender | `CherKitAttributionMeta` | `:attribution-meta` |
 | [Telemetry](kotlin/telemetry/README.md) | Privacy-filtered errors, breadcrumbs and spans; vendor-free core contract | `CherKitTelemetry` | `:telemetry` |
